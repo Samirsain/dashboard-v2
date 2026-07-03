@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  // Accepts either an Email or an Employee Code (e.g. "EM01").
+  identifier: z.string().min(1, "identifier (email or employee code) is required"),
   password: z.string().min(1, "Password is required"),
 });
 

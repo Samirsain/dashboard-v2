@@ -12,6 +12,7 @@ const entity = sheetsConfig.users;
 function toUser(record: SheetRecord): User {
   return {
     id: record["Doer ID"] ?? "",
+    employeeCode: record["Employee Code"] ?? "",
     name: record["Name"] ?? "",
     mobile: record["Mobile"] ?? "",
     email: record["Email"] ?? "",
@@ -52,6 +53,18 @@ export const usersService = {
     return match ? toUserWithSecrets(match) : null;
   },
 
+  /** Login lookup: `identifier` may be either an Email or an Employee Code (e.g. "EM01"). */
+  async findByIdentifier(identifier: string): Promise<UserWithSecrets | null> {
+    const records = await googleSheetsService.findAll(entity);
+    const needle = identifier.trim().toLowerCase();
+    const match = records.find(
+      (r) =>
+        (r["Email"] ?? "").toLowerCase() === needle ||
+        (r["Employee Code"] ?? "").toLowerCase() === needle
+    );
+    return match ? toUserWithSecrets(match) : null;
+  },
+
   async create(input: {
     name: string;
     mobile: string;
@@ -60,6 +73,7 @@ export const usersService = {
     role: UserRole;
     status: UserStatus;
     password: string;
+    employeeCode?: string;
   }): Promise<User> {
     const existing = await this.findByEmail(input.email);
     if (existing) throw AppError.conflict(`A doer with email "${input.email}" already exists`);
@@ -67,6 +81,7 @@ export const usersService = {
     const passwordHash = await bcrypt.hash(input.password, 10);
     const record: SheetRecord = {
       "Doer ID": generateId("USR"),
+      "Employee Code": input.employeeCode ?? "",
       Name: input.name,
       Mobile: input.mobile,
       Email: input.email,
@@ -83,7 +98,9 @@ export const usersService = {
 
   async update(
     id: string,
-    updates: Partial<Pick<User, "name" | "mobile" | "email" | "department" | "role" | "status">>
+    updates: Partial<
+      Pick<User, "name" | "mobile" | "email" | "department" | "role" | "status" | "employeeCode">
+    >
   ): Promise<User> {
     const patch: Partial<SheetRecord> = {};
     if (updates.name !== undefined) patch["Name"] = updates.name;
@@ -92,6 +109,7 @@ export const usersService = {
     if (updates.department !== undefined) patch["Department"] = updates.department;
     if (updates.role !== undefined) patch["Role"] = updates.role;
     if (updates.status !== undefined) patch["Status"] = updates.status;
+    if (updates.employeeCode !== undefined) patch["Employee Code"] = updates.employeeCode;
 
     const saved = await googleSheetsService.updateById(entity, id, patch);
     return toUser(saved);

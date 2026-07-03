@@ -6,8 +6,8 @@ import type { LoginInput, RegisterInput } from "../validation/auth.schema";
 
 export const authController = {
   login: asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body as LoginInput;
-    const result = await authService.login(email, password);
+    const { identifier, password } = req.body as LoginInput;
+    const result = await authService.login(identifier, password);
     ok(res, result);
   }),
 

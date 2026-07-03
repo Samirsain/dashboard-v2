@@ -49,6 +49,7 @@ export const sheetsConfig = {
     "Doer ID",
     [
       "Doer ID",
+      "Employee Code",
       "Name",
       "Mobile",
       "Email",

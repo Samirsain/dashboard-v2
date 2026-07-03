@@ -4,6 +4,8 @@ export type UserStatus = "Active" | "Inactive";
 /** A row from DOERLIST — the master employee table. `id` is the Doer ID. */
 export interface User {
   id: string;
+  /** Login username, e.g. "EM01" — independent of Doer ID and safe to share/type. */
+  employeeCode: string;
   name: string;
   mobile: string;
   email: string;

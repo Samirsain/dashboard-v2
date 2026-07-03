@@ -73,7 +73,7 @@ All routes are under `/api` and (aside from `/auth/login`, `/auth/register`,
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| POST | `/api/auth/login` | |
+| POST | `/api/auth/login` | `{ identifier, password }` — identifier is either an Email or an Employee Code (e.g. `"EM01"`) |
 | POST | `/api/auth/register` | |
 | GET | `/api/auth/me` | |
 | GET/POST | `/api/users` | POST requires Admin/Manager. Reads/writes DOERLIST |

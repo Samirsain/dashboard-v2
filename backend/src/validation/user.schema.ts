@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const createUserSchema = z.object({
   name: z.string().min(1),
+  employeeCode: z.string().min(1).optional(),
   mobile: z.string().min(1),
   email: z.string().email(),
   department: z.string().min(1),
@@ -12,6 +13,7 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
+  employeeCode: z.string().min(1).optional(),
   mobile: z.string().min(1).optional(),
   email: z.string().email().optional(),
   department: z.string().min(1).optional(),

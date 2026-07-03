@@ -5,16 +5,16 @@ import { usersService } from "./users.service";
 import type { JwtClaims, User, UserRole } from "../types";
 
 export const authService = {
-  async login(email: string, password: string): Promise<{ token: string; user: User }> {
-    const user = await usersService.findByEmail(email);
-    if (!user) throw AppError.unauthorized("Invalid email or password");
+  async login(identifier: string, password: string): Promise<{ token: string; user: User }> {
+    const user = await usersService.findByIdentifier(identifier);
+    if (!user) throw AppError.unauthorized("Invalid credentials");
 
     if (user.status !== "Active") {
       throw AppError.forbidden("This account is inactive");
     }
 
     const isValid = await usersService.verifyPassword(user, password);
-    if (!isValid) throw AppError.unauthorized("Invalid email or password");
+    if (!isValid) throw AppError.unauthorized("Invalid credentials");
 
     const { passwordHash: _passwordHash, ...publicUser } = user;
     const token = signToken({ sub: user.id, email: user.email, role: user.role });
