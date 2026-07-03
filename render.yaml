@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: dashboard-v2-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: SCHEDULER_ENABLED
+        value: "true"
+      - key: SCHEDULER_DAILY_CRON
+        value: "1 0 * * *"
+      - key: SCHEDULER_TIMEZONE
+        value: Asia/Kolkata
+      - key: LOG_LEVEL
+        value: info
+      # --- Secrets: set these in the Render dashboard, not in this file ---
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: GOOGLE_SPREADSHEET_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
