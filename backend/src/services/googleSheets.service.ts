@@ -85,10 +85,20 @@ class GoogleSheetsService {
       }
 
       const authClient = await auth.getClient();
+      // Log which credential source was used — never the credentials themselves.
+      const source = env.google.serviceAccountJson
+        ? "GOOGLE_SERVICE_ACCOUNT_JSON"
+        : env.google.serviceAccountEmail
+          ? "GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_PRIVATE_KEY"
+          : "GOOGLE_SERVICE_ACCOUNT_PATH";
+      logger.info({ source }, "Google Sheets client authenticated");
       return google.sheets({ version: "v4", auth: authClient as never });
     } catch (error) {
       this.authClientPromise = null;
-      logger.error({ err: error }, "Failed to initialize Google Sheets client");
+      // Log only the error's message/name — never dump the raw error object,
+      // which for auth failures can echo back parts of the credentials.
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ errorMessage: message }, "Failed to initialize Google Sheets client");
       if (error instanceof AppError) throw error;
       throw new AppError(
         "Failed to authenticate with Google Sheets. Check your service account credentials.",
@@ -98,97 +108,156 @@ class GoogleSheetsService {
     }
   }
 
+  /**
+   * Runs a raw Google API call and translates failures into AppErrors with
+   * actionable messages (permission/sharing issues, missing spreadsheet,
+   * rate limits, ...) instead of letting a raw googleapis/Gaxios error
+   * reach the client. AppErrors thrown deliberately elsewhere (e.g.
+   * notFound) pass through untouched.
+   */
+  private async withErrorHandling<T>(operation: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+
+      const gaxiosError = error as {
+        code?: number | string;
+        response?: { status?: number; data?: { error?: { message?: string } } };
+        message?: string;
+      };
+      const status =
+        gaxiosError.response?.status ??
+        (typeof gaxiosError.code === "number" ? gaxiosError.code : undefined);
+      const apiMessage =
+        gaxiosError.response?.data?.error?.message ?? gaxiosError.message ?? "Unknown error";
+
+      logger.error({ operation, status, apiMessage }, "Google Sheets API call failed");
+
+      if (status === 403) {
+        throw new AppError(
+          "Google Sheets denied access. Share the spreadsheet with the service account's " +
+            "client_email as Editor, and confirm the Sheets API is enabled.",
+          502,
+          "SHEETS_PERMISSION_DENIED"
+        );
+      }
+      if (status === 404) {
+        throw new AppError(
+          "Spreadsheet not found. Check GOOGLE_SPREADSHEET_ID in your .env file.",
+          502,
+          "SHEETS_SPREADSHEET_NOT_FOUND"
+        );
+      }
+      if (status === 429) {
+        throw new AppError(
+          "Google Sheets API rate limit exceeded. Please try again shortly.",
+          429,
+          "SHEETS_RATE_LIMITED"
+        );
+      }
+      throw new AppError(`Google Sheets API error during ${operation}: ${apiMessage}`, 502, "SHEETS_API_ERROR");
+    }
+  }
+
   private assertSpreadsheetId(entity: SheetEntityConfig): string {
     if (!entity.spreadsheetId) {
       throw AppError.serviceUnavailable(
         `No spreadsheet ID configured for sheet "${entity.sheetName}". ` +
-          "Set GOOGLE_SHEETS_SPREADSHEET_ID (or the sheet-specific override) in your .env file."
+          "Set GOOGLE_SPREADSHEET_ID (or the sheet-specific override) in your .env file."
       );
     }
     return entity.spreadsheetId;
   }
 
-  /** Resolves and caches the numeric tab ID for a sheet, creating the tab if it doesn't exist. */
+  /**
+   * Resolves and caches the numeric tab ID for a sheet. If the tab doesn't
+   * exist yet, creates it and writes the expected header row — this is the
+   * "create sheets/headers automatically if missing" behavior.
+   */
   private async getTabId(entity: SheetEntityConfig): Promise<number> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
     const cacheKey = `${spreadsheetId}::${entity.sheetName}`;
     const cached = this.tabIdCache.get(cacheKey);
     if (cached !== undefined) return cached;
 
-    const client = await this.getClient();
-    const meta = await client.spreadsheets.get({ spreadsheetId });
-    const sheet = meta.data.sheets?.find(
-      (s) => s.properties?.title === entity.sheetName
-    );
+    return this.withErrorHandling(`getTabId(${entity.sheetName})`, async () => {
+      const client = await this.getClient();
+      const meta = await client.spreadsheets.get({ spreadsheetId });
+      const sheet = meta.data.sheets?.find((s) => s.properties?.title === entity.sheetName);
 
-    if (sheet?.properties?.sheetId !== undefined && sheet.properties.sheetId !== null) {
-      this.tabIdCache.set(cacheKey, sheet.properties.sheetId);
-      return sheet.properties.sheetId;
-    }
+      if (sheet?.properties?.sheetId !== undefined && sheet.properties.sheetId !== null) {
+        this.tabIdCache.set(cacheKey, sheet.properties.sheetId);
+        return sheet.properties.sheetId;
+      }
 
-    // Tab doesn't exist yet — create it with the expected header row.
-    const addResponse = await client.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title: entity.sheetName } } }],
-      },
+      logger.info({ sheetName: entity.sheetName }, "Tab not found — creating it with headers");
+
+      // Tab doesn't exist yet — create it with the expected header row.
+      const addResponse = await client.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title: entity.sheetName } } }],
+        },
+      });
+      const newTabId = addResponse.data.replies?.[0]?.addSheet?.properties?.sheetId ?? undefined;
+
+      if (newTabId === undefined) {
+        throw new AppError(
+          `Failed to create missing tab "${entity.sheetName}" in spreadsheet.`,
+          502,
+          "SHEETS_TAB_CREATE_FAILED"
+        );
+      }
+
+      await client.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${entity.sheetName}'!A1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [entity.expectedHeaders] },
+      });
+
+      this.tabIdCache.set(cacheKey, newTabId);
+      return newTabId;
     });
-    const newTabId =
-      addResponse.data.replies?.[0]?.addSheet?.properties?.sheetId ?? undefined;
-
-    if (newTabId === undefined) {
-      throw new AppError(
-        `Failed to create missing tab "${entity.sheetName}" in spreadsheet.`,
-        502,
-        "SHEETS_TAB_CREATE_FAILED"
-      );
-    }
-
-    await client.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${entity.sheetName}'!A1`,
-      valueInputOption: "RAW",
-      requestBody: { values: [entity.expectedHeaders] },
-    });
-
-    this.tabIdCache.set(cacheKey, newTabId);
-    return newTabId;
   }
 
   /** Reads the full tab and parses it into header-keyed records, tagged with sheet row numbers. */
   async readAll(entity: SheetEntityConfig): Promise<ReadResult> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
-    const client = await this.getClient();
 
     // Ensures the tab (and its header row) exists before reading.
     await this.getTabId(entity);
 
-    const response = await client.spreadsheets.values.get({
-      spreadsheetId,
-      range: `'${entity.sheetName}'!A1:ZZ`,
-    });
-
-    const values = response.data.values ?? [];
-    if (values.length === 0) {
-      return { headers: entity.expectedHeaders, rows: [] };
-    }
-
-    const headers = (values[0] ?? []).map((h) => String(h).trim());
-    const rows: ReadResult["rows"] = [];
-
-    for (let i = 1; i < values.length; i++) {
-      const rawRow = values[i] ?? [];
-      if (rawRow.every((cell) => cell === undefined || cell === "")) continue;
-
-      const data: SheetRecord = {};
-      headers.forEach((header, colIndex) => {
-        data[header] = String(rawRow[colIndex] ?? "");
+    return this.withErrorHandling(`readAll(${entity.sheetName})`, async () => {
+      const client = await this.getClient();
+      const response = await client.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${entity.sheetName}'!A1:ZZ`,
       });
 
-      rows.push({ row: i + 1, data });
-    }
+      const values = response.data.values ?? [];
+      if (values.length === 0) {
+        return { headers: entity.expectedHeaders, rows: [] };
+      }
 
-    return { headers, rows };
+      const headers = (values[0] ?? []).map((h) => String(h).trim());
+      const rows: ReadResult["rows"] = [];
+
+      for (let i = 1; i < values.length; i++) {
+        const rawRow = values[i] ?? [];
+        if (rawRow.every((cell) => cell === undefined || cell === "")) continue;
+
+        const data: SheetRecord = {};
+        headers.forEach((header, colIndex) => {
+          data[header] = String(rawRow[colIndex] ?? "");
+        });
+
+        rows.push({ row: i + 1, data });
+      }
+
+      return { headers, rows };
+    });
   }
 
   async findAll(entity: SheetEntityConfig): Promise<SheetRecord[]> {
@@ -204,25 +273,26 @@ class GoogleSheetsService {
 
   async append(entity: SheetEntityConfig, record: SheetRecord): Promise<SheetRecord> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
-    const client = await this.getClient();
     const { headers } = await this.readAll(entity);
-
     const orderedHeaders = headers.length > 0 ? headers : entity.expectedHeaders;
     const rowValues = orderedHeaders.map((header) => record[header] ?? "");
 
-    await client.spreadsheets.values.append({
-      spreadsheetId,
-      range: `'${entity.sheetName}'!A1`,
-      valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: { values: [rowValues] },
-    });
+    return this.withErrorHandling(`append(${entity.sheetName})`, async () => {
+      const client = await this.getClient();
+      await client.spreadsheets.values.append({
+        spreadsheetId,
+        range: `'${entity.sheetName}'!A1`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: [rowValues] },
+      });
 
-    const result: SheetRecord = {};
-    orderedHeaders.forEach((header, i) => {
-      result[header] = rowValues[i] ?? "";
+      const result: SheetRecord = {};
+      orderedHeaders.forEach((header, i) => {
+        result[header] = rowValues[i] ?? "";
+      });
+      return result;
     });
-    return result;
   }
 
   async updateById(
@@ -231,7 +301,6 @@ class GoogleSheetsService {
     updates: Partial<SheetRecord>
   ): Promise<SheetRecord> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
-    const client = await this.getClient();
     const { headers, rows } = await this.readAll(entity);
 
     const match = rows.find((r) => r.data[entity.idColumn] === id);
@@ -247,19 +316,21 @@ class GoogleSheetsService {
     }
     const rowValues = headers.map((header) => merged[header] ?? "");
 
-    await client.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${entity.sheetName}'!A${match.row}:${columnLetter(headers.length)}${match.row}`,
-      valueInputOption: "RAW",
-      requestBody: { values: [rowValues] },
-    });
+    return this.withErrorHandling(`updateById(${entity.sheetName})`, async () => {
+      const client = await this.getClient();
+      await client.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${entity.sheetName}'!A${match.row}:${columnLetter(headers.length)}${match.row}`,
+        valueInputOption: "RAW",
+        requestBody: { values: [rowValues] },
+      });
 
-    return merged;
+      return merged;
+    });
   }
 
   async deleteById(entity: SheetEntityConfig, id: string): Promise<void> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
-    const client = await this.getClient();
     const { rows } = await this.readAll(entity);
 
     const match = rows.find((r) => r.data[entity.idColumn] === id);
@@ -271,23 +342,58 @@ class GoogleSheetsService {
 
     const tabId = await this.getTabId(entity);
 
-    await client.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId: tabId,
-                dimension: "ROWS",
-                startIndex: match.row - 1,
-                endIndex: match.row,
+    await this.withErrorHandling(`deleteById(${entity.sheetName})`, async () => {
+      const client = await this.getClient();
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId: tabId,
+                  dimension: "ROWS",
+                  startIndex: match.row - 1,
+                  endIndex: match.row,
+                },
               },
             },
-          },
-        ],
-      },
+          ],
+        },
+      });
     });
+  }
+
+  // ---- Spec-named aliases -------------------------------------------------
+  // The four CRUD verbs above (findAll/readAll, append, updateById,
+  // deleteById) are the names used throughout this codebase. These aliases
+  // exist so the service also satisfies the connect()/readSheet()/
+  // appendRow()/updateRow()/deleteRow() surface some integrations expect —
+  // they're thin wrappers, not separate implementations.
+
+  /** Establishes (and warms) the Google Sheets client. Throws if credentials are missing/invalid. */
+  async connect(): Promise<void> {
+    await this.getClient();
+  }
+
+  async readSheet(entity: SheetEntityConfig): Promise<ReadResult> {
+    return this.readAll(entity);
+  }
+
+  async appendRow(entity: SheetEntityConfig, record: SheetRecord): Promise<SheetRecord> {
+    return this.append(entity, record);
+  }
+
+  async updateRow(
+    entity: SheetEntityConfig,
+    id: string,
+    updates: Partial<SheetRecord>
+  ): Promise<SheetRecord> {
+    return this.updateById(entity, id, updates);
+  }
+
+  async deleteRow(entity: SheetEntityConfig, id: string): Promise<void> {
+    return this.deleteById(entity, id);
   }
 }
 

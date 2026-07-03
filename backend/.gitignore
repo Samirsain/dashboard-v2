@@ -2,3 +2,8 @@ node_modules/
 dist/
 .env
 *.log
+
+# Never commit real Google service account keys.
+credentials/
+*.json.key
+service-account*.json

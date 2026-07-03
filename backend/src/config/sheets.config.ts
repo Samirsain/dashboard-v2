@@ -21,7 +21,12 @@ export interface SheetEntityConfig {
   expectedHeaders: string[];
 }
 
-const defaultSpreadsheetId = optionalEnv("GOOGLE_SHEETS_SPREADSHEET_ID", "");
+// GOOGLE_SPREADSHEET_ID is the primary name; GOOGLE_SHEETS_SPREADSHEET_ID is
+// accepted as a fallback for backward compatibility.
+const defaultSpreadsheetId = optionalEnv(
+  "GOOGLE_SPREADSHEET_ID",
+  optionalEnv("GOOGLE_SHEETS_SPREADSHEET_ID", "")
+);
 
 function entity(
   key: string,
@@ -107,7 +112,7 @@ export const sheetsConfig = {
       "Status",
       "CreatedAt",
     ],
-    "ChecklistTemplates"
+    "CHECKLIST"
   ),
   checklistInstances: entity(
     "CHECKLIST_INSTANCES",
@@ -122,13 +127,13 @@ export const sheetsConfig = {
       "CompletedBy",
       "CompletedAt",
     ],
-    "ChecklistInstances"
+    "CHECKLIST_INSTANCES"
   ),
   activityLogs: entity(
     "ACTIVITY_LOGS",
     "Log ID",
     ["Log ID", "User", "Action", "Task", "Date", "Time", "Details"],
-    "ActivityLogs"
+    "ACTIVITY_LOGS"
   ),
 };
 

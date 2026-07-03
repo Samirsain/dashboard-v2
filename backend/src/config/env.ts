@@ -26,7 +26,11 @@ export const env = {
     serviceAccountEmail: requiredAtRuntime("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
     privateKey: requiredAtRuntime("GOOGLE_PRIVATE_KEY")?.replace(/\\n/g, "\n"),
     // Alternative: path to a service account key file on disk.
-    applicationCredentialsPath: requiredAtRuntime("GOOGLE_APPLICATION_CREDENTIALS"),
+    // GOOGLE_SERVICE_ACCOUNT_PATH is the primary name; GOOGLE_APPLICATION_CREDENTIALS
+    // (the standard Google Cloud SDK env var) is accepted as a fallback.
+    applicationCredentialsPath:
+      requiredAtRuntime("GOOGLE_SERVICE_ACCOUNT_PATH") ??
+      requiredAtRuntime("GOOGLE_APPLICATION_CREDENTIALS"),
   },
 
   scheduler: {
