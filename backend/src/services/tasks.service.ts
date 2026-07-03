@@ -1,10 +1,12 @@
 import { sheetsConfig } from "../config/sheets.config";
 import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
 import { activityService } from "./activity.service";
-import { generateId } from "../utils/id";
+import { revisionsService } from "./revisions.service";
+import { usersService } from "./users.service";
+import { generateUuid } from "../utils/id";
 import { isBeforeToday, isToday, isWithinNextDays, todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
-import type { Task, TaskPriority, TaskStatus } from "../types";
+import type { DoerSummary, Task, TaskPriority, TaskStatus, TaskWithDoer, User } from "../types";
 
 const entity = sheetsConfig.tasks;
 
@@ -13,7 +15,7 @@ function toTask(record: SheetRecord): Task {
     id: record["Task ID"] ?? "",
     title: record["Title"] ?? "",
     description: record["Description"] ?? "",
-    assignedTo: record["Assigned To"] ?? "",
+    assignedDoerId: record["Assigned Doer ID"] ?? "",
     priority: (record["Priority"] as TaskPriority) || "Normal",
     dueDate: record["Due Date"] ?? "",
     status: (record["Status"] as TaskStatus) || "Pending",
@@ -26,9 +28,31 @@ function toTask(record: SheetRecord): Task {
   };
 }
 
+function toDoerSummary(user: User): DoerSummary {
+  return {
+    id: user.id,
+    name: user.name,
+    mobile: user.mobile,
+    email: user.email,
+    department: user.department,
+    role: user.role,
+  };
+}
+
+async function assertDoerExists(doerId: string): Promise<void> {
+  const exists = await usersService.exists(doerId);
+  if (!exists) {
+    throw AppError.badRequest(
+      `Assigned Doer ID "${doerId}" does not exist in DOERLIST`,
+      "INVALID_DOER_ID"
+    );
+  }
+}
+
 export const tasksService = {
-  async list(filters?: {
-    assignedTo?: string;
+  /** Plain TASKLIST rows, no DOERLIST join — used internally for filtering/aggregation. */
+  async listRaw(filters?: {
+    assignedDoerId?: string;
     status?: TaskStatus;
     priority?: TaskPriority;
     department?: string;
@@ -36,7 +60,8 @@ export const tasksService = {
     const records = await googleSheetsService.findAll(entity);
     let tasks = records.map(toTask);
 
-    if (filters?.assignedTo) tasks = tasks.filter((t) => t.assignedTo === filters.assignedTo);
+    if (filters?.assignedDoerId)
+      tasks = tasks.filter((t) => t.assignedDoerId === filters.assignedDoerId);
     if (filters?.status) tasks = tasks.filter((t) => t.status === filters.status);
     if (filters?.priority) tasks = tasks.filter((t) => t.priority === filters.priority);
     if (filters?.department) tasks = tasks.filter((t) => t.department === filters.department);
@@ -44,27 +69,53 @@ export const tasksService = {
     return tasks;
   },
 
-  async getById(id: string): Promise<Task> {
+  /** TASKLIST joined with DOERLIST — what the public task-listing endpoints return. */
+  async list(filters?: {
+    assignedDoerId?: string;
+    status?: TaskStatus;
+    priority?: TaskPriority;
+    department?: string;
+  }): Promise<TaskWithDoer[]> {
+    const [tasks, doers] = await Promise.all([this.listRaw(filters), usersService.list()]);
+    const doerMap = new Map(doers.map((d) => [d.id, d]));
+
+    return tasks.map((task) => ({
+      ...task,
+      doer: doerMap.has(task.assignedDoerId) ? toDoerSummary(doerMap.get(task.assignedDoerId)!) : null,
+    }));
+  },
+
+  async getById(id: string): Promise<TaskWithDoer> {
     const record = await googleSheetsService.findById(entity, id);
     if (!record) throw AppError.notFound(`Task "${id}" not found`);
-    return toTask(record);
+    const task = toTask(record);
+
+    let doer: DoerSummary | null = null;
+    if (task.assignedDoerId) {
+      const user = await usersService.getById(task.assignedDoerId).catch(() => null);
+      doer = user ? toDoerSummary(user) : null;
+    }
+
+    return { ...task, doer };
   },
 
   async create(input: {
     title: string;
     description: string;
-    assignedTo: string;
+    assignedDoerId: string;
     priority: TaskPriority;
     dueDate: string;
     department: string;
     createdBy: string;
   }): Promise<Task> {
+    await assertDoerExists(input.assignedDoerId);
+
     const now = new Date().toISOString();
     const record: SheetRecord = {
-      "Task ID": generateId("TASK"),
+      "Task ID": generateUuid(),
       Title: input.title,
       Description: input.description,
-      "Assigned To": input.assignedTo,
+      "Assigned Doer ID": input.assignedDoerId,
       Priority: input.priority,
       "Due Date": input.dueDate,
       Status: "Pending",
@@ -92,14 +143,21 @@ export const tasksService = {
   async update(
     id: string,
     updates: Partial<
-      Pick<Task, "title" | "description" | "assignedTo" | "priority" | "dueDate" | "status" | "department">
+      Pick<
+        Task,
+        "title" | "description" | "assignedDoerId" | "priority" | "dueDate" | "status" | "department"
+      >
     >,
     actorUserId: string
   ): Promise<Task> {
+    if (updates.assignedDoerId !== undefined) {
+      await assertDoerExists(updates.assignedDoerId);
+    }
+
     const patch: Partial<SheetRecord> = { UpdatedAt: new Date().toISOString() };
     if (updates.title !== undefined) patch["Title"] = updates.title;
     if (updates.description !== undefined) patch["Description"] = updates.description;
-    if (updates.assignedTo !== undefined) patch["Assigned To"] = updates.assignedTo;
+    if (updates.assignedDoerId !== undefined) patch["Assigned Doer ID"] = updates.assignedDoerId;
     if (updates.priority !== undefined) patch["Priority"] = updates.priority;
     if (updates.dueDate !== undefined) patch["Due Date"] = updates.dueDate;
     if (updates.status !== undefined) patch["Status"] = updates.status;
@@ -131,9 +189,10 @@ export const tasksService = {
 
   /**
    * Revision workflow: a due date can't be met, so the doer requests a new
-   * date with a reason. We keep the old date in the activity log, bump the
-   * due date + revision count, and stamp "Revision Date" with today so the
-   * dashboard's "Revision Today" card can find it.
+   * date with a reason. The full old→new record is appended to the
+   * Revisions sheet (never overwritten), and the task's own "Revision
+   * Date"/"Revision Count" are bumped so dashboard filtering stays O(1)
+   * without needing to scan history.
    */
   async revise(
     id: string,
@@ -152,43 +211,52 @@ export const tasksService = {
     });
     const task = toTask(saved);
 
-    await activityService.log({
-      user: actorUserId,
-      action: "Revised",
-      task: task.title,
-      details: {
+    await Promise.all([
+      revisionsService.record({
         taskId: task.id,
         oldDueDate,
         newDueDate: input.newDueDate,
         reason: input.reason,
         comment: input.comment,
-      },
-    });
+        revisedBy: actorUserId,
+      }),
+      activityService.log({
+        user: actorUserId,
+        action: "Revised",
+        task: task.title,
+        details: { taskId: task.id, oldDueDate, newDueDate: input.newDueDate, reason: input.reason },
+      }),
+    ]);
 
     return task;
   },
 
+  async getRevisionHistory(id: string) {
+    await this.getById(id); // 404s if the task doesn't exist
+    return revisionsService.listByTaskId(id);
+  },
+
   async getOverdue(today = todayIso()): Promise<Task[]> {
-    const all = await this.list();
+    const all = await this.listRaw();
     return all.filter(
       (t) => isBeforeToday(t.dueDate, today) && t.status !== "Completed" && t.status !== "Cancelled"
     );
   },
 
   async getDueToday(today = todayIso()): Promise<Task[]> {
-    const all = await this.list();
+    const all = await this.listRaw();
     return all.filter((t) => isToday(t.dueDate, today) && t.status !== "Cancelled");
   },
 
   async getUpcoming(days = 3, today = todayIso()): Promise<Task[]> {
-    const all = await this.list();
+    const all = await this.listRaw();
     return all.filter(
       (t) => isWithinNextDays(t.dueDate, days, today) && t.status !== "Cancelled"
     );
   },
 
   async getRevisedToday(today = todayIso()): Promise<Task[]> {
-    const all = await this.list();
+    const all = await this.listRaw();
     return all.filter((t) => t.revisionDate === today);
   },
 };

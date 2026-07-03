@@ -23,6 +23,7 @@ export const authService = {
 
   async register(input: {
     name: string;
+    mobile: string;
     email: string;
     password: string;
     department: string;

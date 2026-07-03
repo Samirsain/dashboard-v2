@@ -9,3 +9,8 @@ export function generateId(prefix: string): string {
   const segment = uuidv4().split("-")[0]?.toUpperCase() ?? uuidv4().toUpperCase();
   return `${prefix}-${segment}`;
 }
+
+/** Full RFC 4122 v4 UUID — used for Task IDs, which must be UUIDs (not row-derived or sequential). */
+export function generateUuid(): string {
+  return uuidv4();
+}

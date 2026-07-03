@@ -4,6 +4,15 @@ Express + TypeScript API that uses a Google Spreadsheet as its database.
 No mock/local storage — every read and write goes through the Google
 Sheets API via `src/services/googleSheets.service.ts`.
 
+**Schema**: `DOERLIST` is the master employee table (`Doer ID` is the
+primary key). `TASKLIST` is the master task table, related to DOERLIST via
+`TASKLIST."Assigned Doer ID" = DOERLIST."Doer ID"` — relations are always
+by Doer ID, never by name. Task-fetching endpoints join the two and return
+the doer's name/mobile/email/department/role alongside each task. Every
+revision is preserved as its own row in a separate `Revisions` sheet
+(never overwritten), while the task's own `Revision Date`/`Revision Count`
+track just the latest state for fast dashboard filtering.
+
 ## Setup
 
 ```bash
@@ -26,9 +35,9 @@ responds to `/api/health`, but any endpoint that touches a sheet returns
 3. Set `GOOGLE_SHEETS_SPREADSHEET_ID` to your spreadsheet ID.
 4. (Optional) Override individual tab names via `SHEET_<ENTITY>_NAME` if
    they differ from the defaults in `src/config/sheets.config.ts`
-   (`Users`, `Tasks`, `ChecklistTemplates`, `ChecklistInstances`,
-   `ActivityLogs`). Missing tabs are auto-created with the expected header
-   row on first use.
+   (`DOERLIST`, `TASKLIST`, `Revisions`, `ChecklistTemplates`,
+   `ChecklistInstances`, `ActivityLogs`). Missing tabs are auto-created
+   with the expected header row on first use.
 
 No code changes are needed for any of the above — everything is read from
 `.env` through `src/config/`.
@@ -67,19 +76,20 @@ All routes are under `/api` and (aside from `/auth/login`, `/auth/register`,
 | POST | `/api/auth/login` | |
 | POST | `/api/auth/register` | |
 | GET | `/api/auth/me` | |
-| GET/POST | `/api/users` | POST requires Admin/Manager |
-| GET/PATCH/DELETE | `/api/users/:id` | |
-| GET/POST | `/api/tasks` | filters: `assignedTo`, `status`, `priority`, `department` |
-| GET/PATCH/DELETE | `/api/tasks/:id` | |
-| POST | `/api/tasks/:id/revision` | `{ newDueDate, reason, comment }` |
+| GET/POST | `/api/users` | POST requires Admin/Manager. Reads/writes DOERLIST |
+| GET/PATCH/DELETE | `/api/users/:id` | `:id` is a Doer ID |
+| GET/POST | `/api/tasks` | filters: `assignedDoerId`, `status`, `priority`, `department`. List/get responses are TASKLIST rows joined with DOERLIST (`doer: { name, mobile, email, department, role }`) |
+| GET/PATCH/DELETE | `/api/tasks/:id` | create/update reject an `assignedDoerId` that doesn't exist in DOERLIST (`400 INVALID_DOER_ID`) |
+| POST | `/api/tasks/:id/revision` | `{ newDueDate, reason, comment }` — appends to revision history and bumps the task's Revision Date/Count |
+| GET | `/api/tasks/:id/revisions` | full revision history for a task, oldest first |
 | GET/POST | `/api/checklist/templates` | |
 | GET/PATCH/DELETE | `/api/checklist/templates/:id` | |
-| GET | `/api/checklist/instances` | filters: `date`, `status`, `assignedTo` |
+| GET | `/api/checklist/instances` | filters: `date`, `status`, `assignedDoerId` |
 | GET | `/api/checklist/today` | |
 | POST | `/api/checklist/instances/:id/complete` | |
 | POST | `/api/checklist/generate` | manually re-run today's generation |
-| GET | `/api/dashboard` | full dashboard payload |
-| GET | `/api/dashboard/summary` | KPI cards only |
+| GET | `/api/dashboard` | full payload: summary + user-wise/department-wise breakdowns + section lists |
+| GET | `/api/dashboard/summary` | Pending, Completed, Overdue, Today's Tasks, Today's Revisions, Urgent, Critical, Checklist Today, Upcoming |
 | GET | `/api/activity` / `/api/activity/today` | |
 
 ## IDs, not row numbers

@@ -24,7 +24,7 @@ function toTemplate(record: SheetRecord): ChecklistTemplate {
     description: record["Description"] ?? "",
     frequency: (record["Frequency"] as ChecklistFrequency) || "Daily",
     frequencyValue: record["FrequencyValue"] ?? "",
-    assignedTo: record["AssignedTo"] ?? "",
+    assignedDoerId: record["Assigned Doer ID"] ?? "",
     department: record["Department"] ?? "",
     priority: (record["Priority"] as TaskPriority) || "Normal",
     status: (record["Status"] as ChecklistTemplateStatus) || "Active",
@@ -38,7 +38,7 @@ function toInstance(record: SheetRecord): ChecklistInstance {
     templateId: record["Template ID"] ?? "",
     taskName: record["Task Name"] ?? "",
     date: record["Date"] ?? "",
-    assignedTo: record["AssignedTo"] ?? "",
+    assignedDoerId: record["Assigned Doer ID"] ?? "",
     status: (record["Status"] as ChecklistInstanceStatus) || "Pending",
     completedBy: record["CompletedBy"] ?? "",
     completedAt: record["CompletedAt"] ?? "",
@@ -64,7 +64,7 @@ export const checklistService = {
     description: string;
     frequency: ChecklistFrequency;
     frequencyValue: string;
-    assignedTo: string;
+    assignedDoerId: string;
     department: string;
     priority: TaskPriority;
     status: ChecklistTemplateStatus;
@@ -75,7 +75,7 @@ export const checklistService = {
       Description: input.description,
       Frequency: input.frequency,
       FrequencyValue: input.frequencyValue,
-      AssignedTo: input.assignedTo,
+      "Assigned Doer ID": input.assignedDoerId,
       Department: input.department,
       Priority: input.priority,
       Status: input.status,
@@ -94,7 +94,7 @@ export const checklistService = {
         | "description"
         | "frequency"
         | "frequencyValue"
-        | "assignedTo"
+        | "assignedDoerId"
         | "department"
         | "priority"
         | "status"
@@ -106,7 +106,7 @@ export const checklistService = {
     if (updates.description !== undefined) patch["Description"] = updates.description;
     if (updates.frequency !== undefined) patch["Frequency"] = updates.frequency;
     if (updates.frequencyValue !== undefined) patch["FrequencyValue"] = updates.frequencyValue;
-    if (updates.assignedTo !== undefined) patch["AssignedTo"] = updates.assignedTo;
+    if (updates.assignedDoerId !== undefined) patch["Assigned Doer ID"] = updates.assignedDoerId;
     if (updates.department !== undefined) patch["Department"] = updates.department;
     if (updates.priority !== undefined) patch["Priority"] = updates.priority;
     if (updates.status !== undefined) patch["Status"] = updates.status;
@@ -124,14 +124,14 @@ export const checklistService = {
   async listInstances(filters?: {
     date?: string;
     status?: ChecklistInstanceStatus;
-    assignedTo?: string;
+    assignedDoerId?: string;
   }): Promise<ChecklistInstance[]> {
     const records = await googleSheetsService.findAll(instancesEntity);
     let instances = records.map(toInstance);
 
     if (filters?.date) instances = instances.filter((i) => i.date === filters.date);
     if (filters?.status) instances = instances.filter((i) => i.status === filters.status);
-    if (filters?.assignedTo) instances = instances.filter((i) => i.assignedTo === filters.assignedTo);
+    if (filters?.assignedDoerId) instances = instances.filter((i) => i.assignedDoerId === filters.assignedDoerId);
 
     return instances;
   },
@@ -184,7 +184,7 @@ export const checklistService = {
         "Template ID": template.id,
         "Task Name": template.taskName,
         Date: dateIso,
-        AssignedTo: template.assignedTo,
+        "Assigned Doer ID": template.assignedDoerId,
         Status: "Pending",
         CompletedBy: "",
         CompletedAt: "",

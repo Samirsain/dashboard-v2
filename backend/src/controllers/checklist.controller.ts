@@ -32,13 +32,13 @@ export const checklistController = {
   }),
 
   listInstances: asyncHandler(async (req: Request, res: Response) => {
-    const { date, status, assignedTo } = req.query as Record<string, string | undefined>;
+    const { date, status, assignedDoerId } = req.query as Record<string, string | undefined>;
     ok(
       res,
       await checklistService.listInstances({
         date,
         status: status as never,
-        assignedTo,
+        assignedDoerId,
       })
     );
   }),

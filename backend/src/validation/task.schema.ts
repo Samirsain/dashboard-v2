@@ -7,7 +7,7 @@ const isoDate = z
 export const createTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(""),
-  assignedTo: z.string().min(1, "assignedTo (user ID) is required"),
+  assignedDoerId: z.string().min(1, "assignedDoerId (DOERLIST Doer ID) is required"),
   priority: z.enum(["Low", "Normal", "Urgent", "Critical"]),
   dueDate: isoDate,
   department: z.string().default(""),
@@ -16,7 +16,7 @@ export const createTaskSchema = z.object({
 export const updateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  assignedTo: z.string().min(1).optional(),
+  assignedDoerId: z.string().min(1).optional(),
   priority: z.enum(["Low", "Normal", "Urgent", "Critical"]).optional(),
   dueDate: isoDate.optional(),
   status: z.enum(["Pending", "In Progress", "Completed", "Cancelled"]).optional(),
@@ -30,7 +30,7 @@ export const revisionSchema = z.object({
 });
 
 export const taskFilterQuerySchema = z.object({
-  assignedTo: z.string().optional(),
+  assignedDoerId: z.string().optional(),
   status: z.enum(["Pending", "In Progress", "Completed", "Cancelled"]).optional(),
   priority: z.enum(["Low", "Normal", "Urgent", "Critical"]).optional(),
   department: z.string().optional(),

@@ -38,12 +38,24 @@ function entity(
 }
 
 export const sheetsConfig = {
+  /** DOERLIST — master employee table. Doer ID is the only valid key for relations. */
   users: entity(
     "USERS",
-    "ID",
-    ["ID", "Name", "Email", "Department", "Role", "Status", "PasswordHash", "CreatedAt"],
-    "Users"
+    "Doer ID",
+    [
+      "Doer ID",
+      "Name",
+      "Mobile",
+      "Email",
+      "Department",
+      "Role",
+      "Status",
+      "PasswordHash",
+      "CreatedAt",
+    ],
+    "DOERLIST"
   ),
+  /** TASKLIST — master task table. Assigned Doer ID references DOERLIST."Doer ID". */
   tasks: entity(
     "TASKS",
     "Task ID",
@@ -51,7 +63,7 @@ export const sheetsConfig = {
       "Task ID",
       "Title",
       "Description",
-      "Assigned To",
+      "Assigned Doer ID",
       "Priority",
       "Due Date",
       "Status",
@@ -62,7 +74,23 @@ export const sheetsConfig = {
       "CreatedAt",
       "UpdatedAt",
     ],
-    "Tasks"
+    "TASKLIST"
+  ),
+  /** Full revision history — one row per revision, never overwritten. */
+  revisions: entity(
+    "REVISIONS",
+    "Revision ID",
+    [
+      "Revision ID",
+      "Task ID",
+      "Old Due Date",
+      "New Due Date",
+      "Reason",
+      "Comment",
+      "Revised By",
+      "Revised At",
+    ],
+    "Revisions"
   ),
   checklistTemplates: entity(
     "CHECKLIST_TEMPLATES",
@@ -73,7 +101,7 @@ export const sheetsConfig = {
       "Description",
       "Frequency",
       "FrequencyValue",
-      "AssignedTo",
+      "Assigned Doer ID",
       "Department",
       "Priority",
       "Status",
@@ -89,7 +117,7 @@ export const sheetsConfig = {
       "Template ID",
       "Task Name",
       "Date",
-      "AssignedTo",
+      "Assigned Doer ID",
       "Status",
       "CompletedBy",
       "CompletedAt",

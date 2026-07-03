@@ -6,12 +6,14 @@ import { todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
 import type { User, UserRole, UserStatus, UserWithSecrets } from "../types";
 
+/** DOERLIST — master employee table. `id` here is the Doer ID (idColumn). */
 const entity = sheetsConfig.users;
 
 function toUser(record: SheetRecord): User {
   return {
-    id: record["ID"] ?? "",
+    id: record["Doer ID"] ?? "",
     name: record["Name"] ?? "",
+    mobile: record["Mobile"] ?? "",
     email: record["Email"] ?? "",
     department: record["Department"] ?? "",
     role: (record["Role"] as UserRole) || "Doer",
@@ -32,8 +34,14 @@ export const usersService = {
 
   async getById(id: string): Promise<User> {
     const record = await googleSheetsService.findById(entity, id);
-    if (!record) throw AppError.notFound(`User "${id}" not found`);
+    if (!record) throw AppError.notFound(`Doer "${id}" not found in DOERLIST`);
     return toUser(record);
+  },
+
+  /** True if `id` exists in DOERLIST — used to validate Assigned Doer ID on tasks. */
+  async exists(id: string): Promise<boolean> {
+    const record = await googleSheetsService.findById(entity, id);
+    return record !== null;
   },
 
   async findByEmail(email: string): Promise<UserWithSecrets | null> {
@@ -46,6 +54,7 @@ export const usersService = {
 
   async create(input: {
     name: string;
+    mobile: string;
     email: string;
     department: string;
     role: UserRole;
@@ -53,12 +62,13 @@ export const usersService = {
     password: string;
   }): Promise<User> {
     const existing = await this.findByEmail(input.email);
-    if (existing) throw AppError.conflict(`A user with email "${input.email}" already exists`);
+    if (existing) throw AppError.conflict(`A doer with email "${input.email}" already exists`);
 
     const passwordHash = await bcrypt.hash(input.password, 10);
     const record: SheetRecord = {
-      ID: generateId("USR"),
+      "Doer ID": generateId("USR"),
       Name: input.name,
+      Mobile: input.mobile,
       Email: input.email,
       Department: input.department,
       Role: input.role,
@@ -73,10 +83,11 @@ export const usersService = {
 
   async update(
     id: string,
-    updates: Partial<Pick<User, "name" | "email" | "department" | "role" | "status">>
+    updates: Partial<Pick<User, "name" | "mobile" | "email" | "department" | "role" | "status">>
   ): Promise<User> {
     const patch: Partial<SheetRecord> = {};
     if (updates.name !== undefined) patch["Name"] = updates.name;
+    if (updates.mobile !== undefined) patch["Mobile"] = updates.mobile;
     if (updates.email !== undefined) patch["Email"] = updates.email;
     if (updates.department !== undefined) patch["Department"] = updates.department;
     if (updates.role !== undefined) patch["Role"] = updates.role;

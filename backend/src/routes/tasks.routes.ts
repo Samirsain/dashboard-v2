@@ -28,5 +28,10 @@ router.post(
   validate({ params: idParamSchema, body: revisionSchema }),
   tasksController.revise
 );
+router.get(
+  "/:id/revisions",
+  validate({ params: idParamSchema }),
+  tasksController.revisionHistory
+);
 
 export default router;

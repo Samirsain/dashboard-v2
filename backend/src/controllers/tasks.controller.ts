@@ -38,4 +38,9 @@ export const tasksController = {
     const task = await tasksService.revise(req.params.id as string, input, req.user!.sub);
     ok(res, task);
   }),
+
+  revisionHistory: asyncHandler(async (req: Request, res: Response) => {
+    const history = await tasksService.getRevisionHistory(req.params.id as string);
+    ok(res, history);
+  }),
 };

@@ -1,9 +1,11 @@
 export type UserRole = "Admin" | "Manager" | "Doer";
 export type UserStatus = "Active" | "Inactive";
 
+/** A row from DOERLIST — the master employee table. `id` is the Doer ID. */
 export interface User {
   id: string;
   name: string;
+  mobile: string;
   email: string;
   department: string;
   role: UserRole;
@@ -15,24 +17,45 @@ export interface UserWithSecrets extends User {
   passwordHash: string;
 }
 
+/** The subset of Doer fields safe to embed on a joined task. */
+export type DoerSummary = Pick<User, "id" | "name" | "mobile" | "email" | "department" | "role">;
+
 export type TaskPriority = "Low" | "Normal" | "Urgent" | "Critical";
 
 export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
 
+/** A row from TASKLIST. `assignedDoerId` must reference DOERLIST."Doer ID" — never a name. */
 export interface Task {
   id: string;
   title: string;
   description: string;
-  assignedTo: string;
+  assignedDoerId: string;
   priority: TaskPriority;
   dueDate: string; // ISO date (YYYY-MM-DD)
   status: TaskStatus;
-  revisionDate: string; // last revised-to date, ISO date or ""
+  revisionDate: string; // date of the most recent revision, ISO date or ""
   revisionCount: number;
   department: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Task joined with its DOERLIST row — what task-fetching endpoints return. */
+export interface TaskWithDoer extends Task {
+  doer: DoerSummary | null;
+}
+
+/** One immutable row of a task's revision history — rows are appended, never overwritten. */
+export interface Revision {
+  id: string;
+  taskId: string;
+  oldDueDate: string;
+  newDueDate: string;
+  reason: string;
+  comment: string;
+  revisedBy: string;
+  revisedAt: string;
 }
 
 export type ChecklistFrequency =
@@ -59,7 +82,7 @@ export interface ChecklistTemplate {
    *    e.g. HalfYearly -> "01-01,07-01", Yearly -> "04-01"
    */
   frequencyValue: string;
-  assignedTo: string;
+  assignedDoerId: string;
   department: string;
   priority: TaskPriority;
   status: ChecklistTemplateStatus;
@@ -73,7 +96,7 @@ export interface ChecklistInstance {
   templateId: string;
   taskName: string;
   date: string; // ISO date this occurrence is due
-  assignedTo: string;
+  assignedDoerId: string;
   status: ChecklistInstanceStatus;
   completedBy: string;
   completedAt: string;
@@ -97,12 +120,30 @@ export interface JwtClaims {
 
 export interface DashboardSummary {
   totalTasks: number;
-  completed: number;
   pending: number;
-  urgent: number;
+  completed: number;
   overdue: number;
-  revisionToday: number;
+  todaysTasks: number;
+  todaysRevisions: number;
+  urgent: number;
+  critical: number;
   checklistToday: number;
-  todaysDue: number;
   upcoming: number;
+}
+
+export interface UserWiseTaskStat {
+  doerId: string;
+  doerName: string;
+  total: number;
+  pending: number;
+  completed: number;
+  overdue: number;
+}
+
+export interface DepartmentWiseTaskStat {
+  department: string;
+  total: number;
+  pending: number;
+  completed: number;
+  overdue: number;
 }

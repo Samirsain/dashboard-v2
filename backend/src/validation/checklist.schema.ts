@@ -6,7 +6,7 @@ export const createChecklistTemplateSchema = z
     description: z.string().default(""),
     frequency: z.enum(["Daily", "Weekly", "Monthly", "Quarterly", "HalfYearly", "Yearly"]),
     frequencyValue: z.string().default(""),
-    assignedTo: z.string().min(1, "assignedTo (user ID) is required"),
+    assignedDoerId: z.string().min(1, "assignedDoerId (DOERLIST Doer ID) is required"),
     department: z.string().default(""),
     priority: z.enum(["Low", "Normal", "Urgent", "Critical"]).default("Normal"),
     status: z.enum(["Active", "Inactive"]).default("Active"),
@@ -46,7 +46,7 @@ export const updateChecklistTemplateSchema = z.object({
     .enum(["Daily", "Weekly", "Monthly", "Quarterly", "HalfYearly", "Yearly"])
     .optional(),
   frequencyValue: z.string().optional(),
-  assignedTo: z.string().min(1).optional(),
+  assignedDoerId: z.string().min(1).optional(),
   department: z.string().optional(),
   priority: z.enum(["Low", "Normal", "Urgent", "Critical"]).optional(),
   status: z.enum(["Active", "Inactive"]).optional(),
