@@ -1,0 +1,80 @@
+import Link from "next/link";
+
+type NavKey = "dashboard" | "checklist" | "task-list" | "workflow";
+
+const NAV_ITEMS: { key: NavKey; href: string; icon: string; label: string }[] = [
+  { key: "dashboard", href: "/", icon: "dashboard", label: "Dashboard" },
+  { key: "checklist", href: "/checklist", icon: "checklist", label: "Checklist" },
+  { key: "task-list", href: "/task-list", icon: "assignment", label: "Task List" },
+  { key: "workflow", href: "/workflow", icon: "account_tree", label: "Workflow" },
+];
+
+export default function SideNav({ active }: { active: NavKey }) {
+  return (
+    <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
+      {/* Brand Area */}
+      <div className="p-6 border-b-2 border-on-surface">
+        <h1 className="font-headline-md text-headline-md font-bold uppercase tracking-tighter text-on-surface">
+          ThirtyMilestones
+        </h1>
+        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
+          Enterprise RE MIS
+        </p>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex-1 py-4 flex flex-col gap-1">
+        {NAV_ITEMS.map((item) => {
+          const isActive = item.key === active;
+          return (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={
+                isActive
+                  ? "bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 flex items-center gap-3"
+                  : "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
+              }
+            >
+              <span className="material-symbols-outlined" data-icon={item.icon}>
+                {item.icon}
+              </span>
+              <span className="font-headline-md text-headline-md text-base">
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* CTA */}
+      <div className="px-4 py-6 border-t-2 border-on-surface">
+        <button className="w-full bg-[#000000] text-on-primary font-label-sm text-label-sm py-3 px-4 swiss-border hover:bg-primary-container transition-colors uppercase">
+          Create New Asset
+        </button>
+      </div>
+
+      {/* Footer Tabs */}
+      <div className="border-t-2 border-on-surface py-2">
+        <a
+          className="text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors"
+          href="#"
+        >
+          <span className="material-symbols-outlined" data-icon="settings">
+            settings
+          </span>
+          <span className="font-label-sm text-label-sm">Settings</span>
+        </a>
+        <a
+          className="text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors"
+          href="#"
+        >
+          <span className="material-symbols-outlined" data-icon="help">
+            help
+          </span>
+          <span className="font-label-sm text-label-sm">Support</span>
+        </a>
+      </div>
+    </nav>
+  );
+}
