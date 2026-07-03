@@ -1,20 +1,64 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
+import AuthGuard from "@/components/AuthGuard";
+import { api, ApiError } from "@/lib/api";
+import type { Doer, FullDashboard, UserWiseTaskStat } from "@/lib/types";
 
-const metrics = [
-  { label: "Overall Score", value: "72%", color: "text-primary-container" },
-  { label: "Tasks Done", value: "15", color: "text-on-surface" },
-  { label: "Late Items", value: "4", color: "text-on-surface", icon: "schedule" },
-];
+function score(stat: UserWiseTaskStat): number {
+  if (stat.total === 0) return 0;
+  return Math.round((stat.completed / stat.total) * 100);
+}
 
-const leaderboard = [
-  { rank: "01", name: "Samir", dept: "Engineering", score: "100%", top: true },
-  { rank: "02", name: "Priya", dept: "Design", score: "63%" },
-  { rank: "03", name: "Shikha", dept: "Operations", score: "50%" },
-  { rank: "04", name: "Deepak", dept: "Sales", score: "22%", muted: true },
-];
+function PerformanceInner() {
+  const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
+  const [doers, setDoers] = useState<Doer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default function PerformancePage() {
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [dash, doerData] = await Promise.all([
+          api.get<FullDashboard>("/dashboard"),
+          api.get<Doer[]>("/users"),
+        ]);
+        setDashboard(dash);
+        setDoers(doerData);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to load performance data.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const departmentByDoerId = new Map(doers.map((d) => [d.id, d.department || "-"]));
+  const leaderboard = [...(dashboard?.breakdowns.userWiseTasks ?? [])].sort(
+    (a, b) => score(b) - score(a)
+  );
+  const summary = dashboard?.summary;
+  const overallPct =
+    summary && summary.totalTasks > 0
+      ? Math.round((summary.completed / summary.totalTasks) * 100)
+      : 0;
+
+  const metrics = [
+    { label: "Overall Score", value: `${overallPct}%`, color: "text-primary-container" },
+    { label: "Tasks Done", value: String(summary?.completed ?? 0), color: "text-on-surface" },
+    {
+      label: "Late Items",
+      value: String(summary?.overdue ?? 0),
+      color: "text-on-surface",
+      icon: "schedule",
+    },
+  ];
+
   return (
     <>
       <MobileHeader />
@@ -36,11 +80,14 @@ export default function PerformancePage() {
             <span className="px-3 py-1 bg-primary-container text-on-primary font-label-sm text-label-sm uppercase">
               Status: Active
             </span>
-            <span className="px-3 py-1 bg-[#000000] text-on-primary font-label-sm text-label-sm uppercase">
-              Q3 Cycle
-            </span>
           </div>
         </header>
+
+        {error && (
+          <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+            {error}
+          </p>
+        )}
 
         {/* Key Metrics Bento Grid */}
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-gutter">
@@ -65,7 +112,7 @@ export default function PerformancePage() {
             </div>
           ))}
 
-          {/* Red Flags */}
+          {/* Red Flags = critical-priority tasks */}
           <div className="bg-surface-container-lowest swiss-border flex flex-col justify-between p-6 h-40 relative overflow-hidden group hover:bg-[#F5F5F5] transition-colors cursor-pointer">
             <div className="font-label-sm text-label-sm text-error uppercase flex items-center gap-2">
               Red Flags
@@ -74,7 +121,7 @@ export default function PerformancePage() {
               </span>
             </div>
             <div className="font-headline-xl text-headline-xl text-error data-mono tracking-tighter relative z-10">
-              2
+              {summary?.critical ?? 0}
             </div>
             <div
               className="absolute inset-0 opacity-10 pointer-events-none"
@@ -92,9 +139,6 @@ export default function PerformancePage() {
             <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
               Contributor Leaderboard
             </h3>
-            <button className="font-label-sm text-label-sm border-2 border-[#000000] px-3 py-1 hover:bg-[#000000] hover:text-white transition-colors uppercase">
-              Export CSV
-            </button>
           </div>
 
           <div className="w-full overflow-x-auto bg-surface-container-lowest swiss-border">
@@ -116,69 +160,75 @@ export default function PerformancePage() {
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
-                {leaderboard.map((row) => (
-                  <tr
-                    key={row.rank}
-                    className="swiss-divider last:border-b-0 hover:bg-[#F5F5F5] transition-colors group"
-                  >
-                    <td
-                      className={`py-4 px-4 font-headline-md text-headline-md data-mono ${
-                        row.top ? "font-black" : "font-bold text-on-surface-variant"
-                      } ${row.muted ? "opacity-50" : ""}`}
-                    >
-                      {row.rank}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-10 h-10 flex items-center justify-center font-headline-md text-headline-md uppercase ${
-                            row.top
-                              ? "bg-[#000000] text-white"
-                              : row.muted
-                              ? "border-2 border-[#000000] text-on-surface bg-surface-container-lowest"
-                              : "bg-surface-variant text-on-surface"
-                          }`}
-                        >
-                          {row.name.charAt(0)}
-                        </div>
-                        <div
-                          className={`font-headline-md text-headline-md text-base ${
-                            row.muted ? "opacity-70" : ""
-                          }`}
-                        >
-                          {row.name}
-                        </div>
-                      </div>
-                    </td>
-                    <td
-                      className={`py-4 px-4 hidden md:table-cell font-label-sm text-label-sm text-on-surface-variant ${
-                        row.muted ? "opacity-70" : ""
-                      }`}
-                    >
-                      {row.dept}
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      {row.top ? (
-                        <span className="font-headline-md text-headline-md font-bold data-mono bg-primary-container text-on-primary px-2 py-1">
-                          {row.score}
-                        </span>
-                      ) : (
-                        <span
-                          className={`font-headline-md text-headline-md font-bold data-mono ${
-                            row.muted ? "text-error" : ""
-                          }`}
-                        >
-                          {row.score}
-                        </span>
-                      )}
+                {!loading && leaderboard.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      No task data yet.
                     </td>
                   </tr>
-                ))}
+                )}
+                {leaderboard.map((row, i) => {
+                  const rank = String(i + 1).padStart(2, "0");
+                  const top = i === 0;
+                  const s = score(row);
+                  return (
+                    <tr
+                      key={row.doerId}
+                      className="swiss-divider last:border-b-0 hover:bg-[#F5F5F5] transition-colors group"
+                    >
+                      <td
+                        className={`py-4 px-4 font-headline-md text-headline-md data-mono ${
+                          top ? "font-black" : "font-bold text-on-surface-variant"
+                        }`}
+                      >
+                        {rank}
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-10 h-10 flex items-center justify-center font-headline-md text-headline-md uppercase ${
+                              top
+                                ? "bg-[#000000] text-white"
+                                : "bg-surface-variant text-on-surface"
+                            }`}
+                          >
+                            {row.doerName.charAt(0)}
+                          </div>
+                          <div className="font-headline-md text-headline-md text-base">
+                            {row.doerName}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 hidden md:table-cell font-label-sm text-label-sm text-on-surface-variant">
+                        {departmentByDoerId.get(row.doerId) ?? "-"}
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        {top ? (
+                          <span className="font-headline-md text-headline-md font-bold data-mono bg-primary-container text-on-primary px-2 py-1">
+                            {s}%
+                          </span>
+                        ) : (
+                          <span className="font-headline-md text-headline-md font-bold data-mono">
+                            {s}%
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </section>
       </main>
     </>
+  );
+}
+
+export default function PerformancePage() {
+  return (
+    <AuthGuard>
+      <PerformanceInner />
+    </AuthGuard>
   );
 }

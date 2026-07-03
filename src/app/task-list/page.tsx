@@ -1,43 +1,26 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import InitialsAvatar from "@/components/InitialsAvatar";
+import AuthGuard from "@/components/AuthGuard";
+import CreateTaskModal from "@/components/CreateTaskModal";
+import { api, ApiError } from "@/lib/api";
+import type { Doer, Task, TaskPriority, TaskStatus } from "@/lib/types";
 
-const rows = [
-  {
-    id: "qh9a8lx",
-    desc: "Finalize structural integrity report for Block C",
-    doer: "J. Doe",
-    priority: "High",
-    status: "Pending",
-  },
-  {
-    id: "sf6jdgz",
-    desc: "Audit Q3 expenditure vs allocated budget",
-    doer: "A. Smith",
-    priority: "Med",
-    status: "Completed",
-  },
-  {
-    id: "klxubuh",
-    desc: "Review vendor contracts for 2024 compliance",
-    doer: "L. Chen",
-    priority: "High",
-    status: "Pending",
-  },
-  {
-    id: "v9c9e3c",
-    desc: "Deploy security patch v4.2 across mainframes",
-    doer: "M. Torres",
-    priority: "Low",
-    status: "Completed",
-  },
-];
-
-function PriorityBadge({ priority }: { priority: string }) {
-  if (priority === "High") {
+function PriorityBadge({ priority }: { priority: TaskPriority }) {
+  if (priority === "Urgent" || priority === "Critical") {
+    return (
+      <span className="inline-block bg-error text-on-error font-label-sm text-label-sm uppercase px-2 py-0.5">
+        {priority}
+      </span>
+    );
+  }
+  if (priority === "Normal") {
     return (
       <span className="inline-block bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase px-2 py-0.5">
-        High
+        Normal
       </span>
     );
   }
@@ -48,7 +31,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ status }: { status: TaskStatus }) {
   if (status === "Completed") {
     return (
       <span className="inline-block border-2 border-on-surface bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase px-3 py-1">
@@ -56,14 +39,57 @@ function StatusPill({ status }: { status: string }) {
       </span>
     );
   }
+  if (status === "Cancelled") {
+    return (
+      <span className="inline-block border-2 border-error text-error font-label-sm text-label-sm uppercase px-3 py-1">
+        Cancelled
+      </span>
+    );
+  }
   return (
     <span className="inline-block border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase px-3 py-1">
-      Pending
+      {status}
     </span>
   );
 }
 
-export default function TaskListPage() {
+function TaskListInner() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [doers, setDoers] = useState<Doer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+
+  async function loadData() {
+    setLoading(true);
+    setError(null);
+    try {
+      const [taskData, doerData] = await Promise.all([
+        api.get<Task[]>("/tasks"),
+        api.get<Doer[]>("/users"),
+      ]);
+      setTasks(taskData);
+      setDoers(doerData);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load tasks.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // Deferred so the initial fetch's setState calls don't happen
+    // synchronously within the effect body.
+    queueMicrotask(() => {
+      loadData();
+    });
+  }, []);
+
+  const filtered = tasks.filter((t) =>
+    `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <>
       <MobileHeader />
@@ -78,6 +104,8 @@ export default function TaskListPage() {
                 search
               </span>
               <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="bg-transparent border-none focus:ring-0 p-0 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant w-48"
                 placeholder="QUERY DATABASE"
                 type="text"
@@ -85,41 +113,12 @@ export default function TaskListPage() {
             </div>
           </div>
 
-          <nav className="hidden lg:flex items-center gap-stack-lg">
-            <a
-              className="text-on-surface-variant font-headline-md text-headline-md hover:text-primary underline decoration-2 transition-all"
-              href="#"
-            >
-              Portfolio
-            </a>
-            <a
-              className="text-on-surface-variant font-headline-md text-headline-md hover:text-primary underline decoration-2 transition-all"
-              href="#"
-            >
-              Analytics
-            </a>
-            <a
-              className="text-on-surface-variant font-headline-md text-headline-md hover:text-primary underline decoration-2 transition-all"
-              href="#"
-            >
-              Reports
-            </a>
-          </nav>
-
           <div className="flex items-center gap-stack-md">
             <div className="font-data-mono text-data-mono text-on-surface px-3 py-1 border-2 border-on-surface uppercase">
-              2026-07-03
+              {new Date().toISOString().split("T")[0]}
             </div>
             <div className="font-label-sm text-label-sm text-primary hidden md:block">
               Operational Status: Active
-            </div>
-            <div className="flex items-center gap-2 border-l-2 border-on-surface pl-stack-md ml-base">
-              <button className="text-on-surface hover:bg-surface-container p-1 transition-colors">
-                <span className="material-symbols-outlined">notifications</span>
-              </button>
-              <button className="text-on-surface hover:bg-surface-container p-1 transition-colors">
-                <span className="material-symbols-outlined">account_circle</span>
-              </button>
             </div>
           </div>
         </header>
@@ -132,24 +131,35 @@ export default function TaskListPage() {
                 Active Task Directory
               </h2>
               <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
-                18 entries &bull; System Live
+                {tasks.length} entries &bull; System Live
               </p>
             </div>
             <div className="flex gap-stack-sm">
-              <button className="px-4 py-2 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors">
-                Export CSV
+              <button
+                onClick={loadData}
+                className="px-4 py-2 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+              >
+                Refresh
               </button>
-              <button className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors">
-                Filter View
+              <button
+                onClick={() => setShowCreate(true)}
+                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+              >
+                + Create Task
               </button>
             </div>
           </div>
+
+          {error && (
+            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+              {error}
+            </p>
+          )}
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                 <tr>
-                  <th className="py-3 px-4 w-32 border-r border-surface-variant">ID</th>
                   <th className="py-3 px-4 border-r border-surface-variant">
                     Task Description
                   </th>
@@ -157,39 +167,56 @@ export default function TaskListPage() {
                   <th className="py-3 px-4 w-32 border-r border-surface-variant text-center">
                     Priority
                   </th>
+                  <th className="py-3 px-4 w-32 border-r border-surface-variant text-center">
+                    Due Date
+                  </th>
                   <th className="py-3 px-4 w-40 text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
-                {rows.map((row, i) => (
+                {loading && (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      Loading...
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      No tasks found.
+                    </td>
+                  </tr>
+                )}
+                {filtered.map((task, i) => (
                   <tr
-                    key={row.id}
+                    key={task.id}
                     className={`hover:bg-surface-container-low transition-colors group ${
-                      i !== rows.length - 1 ? "border-b border-surface-variant" : ""
+                      i !== filtered.length - 1 ? "border-b border-surface-variant" : ""
                     }`}
                   >
-                    <td className="py-3 px-4 font-data-mono text-data-mono border-r border-surface-variant">
-                      {row.id}
-                    </td>
                     <td className="py-3 px-4 border-r border-surface-variant group-hover:underline cursor-pointer">
-                      {row.desc}
+                      {task.title}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant">
                       <div className="flex items-center gap-2">
                         <InitialsAvatar
-                          name={row.doer}
+                          name={task.doer?.name ?? "?"}
                           className="w-6 h-6 border border-on-surface"
                         />
                         <span className="font-label-sm text-label-sm uppercase truncate">
-                          {row.doer}
+                          {task.doer?.name ?? "Unassigned"}
                         </span>
                       </div>
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <PriorityBadge priority={row.priority} />
+                      <PriorityBadge priority={task.priority} />
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
+                      {task.dueDate}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <StatusPill status={row.status} />
+                      <StatusPill status={task.status} />
                     </td>
                   </tr>
                 ))}
@@ -198,6 +225,26 @@ export default function TaskListPage() {
           </div>
         </main>
       </div>
+
+      {showCreate && (
+        <CreateTaskModal
+          doers={doers}
+          onClose={() => setShowCreate(false)}
+          onCreated={(task) => {
+            const doer = doers.find((d) => d.id === task.assignedDoerId) ?? null;
+            setTasks((prev) => [{ ...task, doer }, ...prev]);
+            setShowCreate(false);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+export default function TaskListPage() {
+  return (
+    <AuthGuard>
+      <TaskListInner />
+    </AuthGuard>
   );
 }

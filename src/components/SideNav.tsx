@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 
 type NavKey = "dashboard" | "checklist" | "task-list" | "workflow";
 
@@ -10,6 +13,8 @@ const NAV_ITEMS: { key: NavKey; href: string; icon: string; label: string }[] = 
 ];
 
 export default function SideNav({ active }: { active: NavKey }) {
+  const { user, logout } = useAuth();
+
   return (
     <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
       {/* Brand Area */}
@@ -47,12 +52,25 @@ export default function SideNav({ active }: { active: NavKey }) {
         })}
       </div>
 
-      {/* CTA */}
-      <div className="px-4 py-6 border-t-2 border-on-surface">
-        <button className="w-full bg-[#000000] text-on-primary font-label-sm text-label-sm py-3 px-4 swiss-border hover:bg-primary-container transition-colors uppercase">
-          Create New Asset
-        </button>
-      </div>
+      {/* Signed-in user + logout */}
+      {user && (
+        <div className="px-4 py-3 border-t-2 border-on-surface flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-label-sm text-label-sm uppercase text-on-surface truncate">
+              {user.name}
+            </p>
+            <p className="font-data-mono text-data-mono text-on-surface-variant text-[11px]">
+              {user.employeeCode || user.role}
+            </p>
+          </div>
+          <button
+            onClick={logout}
+            className="font-label-sm text-label-sm uppercase border-2 border-on-surface px-2 py-1 hover:bg-on-surface hover:text-on-primary transition-colors shrink-0"
+          >
+            Logout
+          </button>
+        </div>
+      )}
 
       {/* Footer Tabs */}
       <div className="border-t-2 border-on-surface py-2">

@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { authService } from "../services/auth.service";
+import { usersService } from "../services/users.service";
 import type { LoginInput, RegisterInput } from "../validation/auth.schema";
 
 export const authController = {
@@ -18,6 +19,7 @@ export const authController = {
   }),
 
   me: asyncHandler(async (req: Request, res: Response) => {
-    ok(res, req.user);
+    const user = await usersService.getById(req.user!.sub);
+    ok(res, user);
   }),
 };

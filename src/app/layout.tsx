@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
+import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 const geist = Geist({
@@ -33,7 +34,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased selection:bg-primary-container selection:text-on-primary">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
