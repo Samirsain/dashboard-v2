@@ -114,13 +114,39 @@ class GoogleSheetsService {
    * rate limits, ...) instead of letting a raw googleapis/Gaxios error
    * reach the client. AppErrors thrown deliberately elsewhere (e.g.
    * notFound) pass through untouched.
+   *
+   * Transient network failures — "Premature close", socket hang up,
+   * ECONNRESET, timeouts, etc. — are common when talking to Google's OAuth
+   * token endpoint from container platforms (IPv6/keepalive quirks), so
+   * those are retried a few times with exponential backoff before being
+   * surfaced as an error.
    */
   private async withErrorHandling<T>(operation: string, fn: () => Promise<T>): Promise<T> {
-    try {
-      return await fn();
-    } catch (error) {
-      if (error instanceof AppError) throw error;
+    const maxAttempts = 4;
+    let lastError: unknown;
 
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (error instanceof AppError) throw error;
+        lastError = error;
+
+        if (isTransientNetworkError(error) && attempt < maxAttempts) {
+          const backoffMs = 300 * 2 ** (attempt - 1); // 300, 600, 1200 ms
+          logger.warn(
+            { operation, attempt, backoffMs },
+            "Transient Google API network error — retrying"
+          );
+          await sleep(backoffMs);
+          continue;
+        }
+        break;
+      }
+    }
+
+    {
+      const error = lastError;
       const gaxiosError = error as {
         code?: number | string;
         response?: { status?: number; data?: { error?: { message?: string } } };
@@ -395,6 +421,41 @@ class GoogleSheetsService {
   async deleteRow(entity: SheetEntityConfig, id: string): Promise<void> {
     return this.deleteById(entity, id);
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * True for connection-level failures that are worth retrying — dropped
+ * sockets, DNS hiccups, and timeouts when reaching Google's servers.
+ * These carry no HTTP status because the response never completed.
+ */
+function isTransientNetworkError(error: unknown): boolean {
+  const err = error as { code?: string | number; message?: string; cause?: { code?: string } };
+  const code = String(err.code ?? err.cause?.code ?? "");
+  const message = (err.message ?? "").toLowerCase();
+
+  const transientCodes = [
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ECONNREFUSED",
+    "EAI_AGAIN",
+    "EPIPE",
+    "UND_ERR_SOCKET",
+    "UND_ERR_CONNECT_TIMEOUT",
+  ];
+  if (transientCodes.includes(code)) return true;
+
+  return (
+    message.includes("premature close") ||
+    message.includes("socket hang up") ||
+    message.includes("network socket disconnected") ||
+    message.includes("econnreset") ||
+    message.includes("etimedout") ||
+    message.includes("terminated")
+  );
 }
 
 /** Converts a 1-indexed column number to its A1 letter (1 -> A, 27 -> AA). */
