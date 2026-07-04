@@ -40,6 +40,24 @@ class GoogleSheetsService {
   private authClientPromise: Promise<sheets_v4.Sheets> | null = null;
   private tabIdCache = new Map<string, number>();
 
+  /**
+   * Short-lived read cache, keyed per sheet. A dashboard request fans out
+   * into many reads of the same sheets; without this every one costs a
+   * Google API call (quota: ~60 reads/min/user) and a network round trip.
+   * Entries expire after a few seconds and are invalidated immediately on
+   * any write to that sheet, so data is never stale after a change.
+   */
+  private readCache = new Map<string, { at: number; result: ReadResult }>();
+  private readonly cacheTtlMs = Number(process.env.SHEETS_CACHE_TTL_MS ?? "15000");
+
+  private cacheKey(entity: SheetEntityConfig): string {
+    return `${entity.spreadsheetId}::${entity.sheetName}`;
+  }
+
+  private invalidateCache(entity: SheetEntityConfig): void {
+    this.readCache.delete(this.cacheKey(entity));
+  }
+
   private async getClient(): Promise<sheets_v4.Sheets> {
     if (this.sheetsClient) return this.sheetsClient;
 
@@ -248,9 +266,23 @@ class GoogleSheetsService {
     });
   }
 
-  /** Reads the full tab and parses it into header-keyed records, tagged with sheet row numbers. */
-  async readAll(entity: SheetEntityConfig): Promise<ReadResult> {
+  /**
+   * Reads the full tab and parses it into header-keyed records, tagged with
+   * sheet row numbers. Write paths pass `skipCache` so row numbers are always
+   * resolved from a fresh read immediately before mutating.
+   */
+  async readAll(
+    entity: SheetEntityConfig,
+    options: { skipCache?: boolean } = {}
+  ): Promise<ReadResult> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
+
+    if (!options.skipCache) {
+      const cached = this.readCache.get(this.cacheKey(entity));
+      if (cached && Date.now() - cached.at < this.cacheTtlMs) {
+        return cached.result;
+      }
+    }
 
     // Ensures the tab (and its header row) exists before reading.
     await this.getTabId(entity);
@@ -282,7 +314,9 @@ class GoogleSheetsService {
         rows.push({ row: i + 1, data });
       }
 
-      return { headers, rows };
+      const result = { headers, rows };
+      this.readCache.set(this.cacheKey(entity), { at: Date.now(), result });
+      return result;
     });
   }
 
@@ -313,6 +347,8 @@ class GoogleSheetsService {
         requestBody: { values: [rowValues] },
       });
 
+      this.invalidateCache(entity);
+
       const result: SheetRecord = {};
       orderedHeaders.forEach((header, i) => {
         result[header] = rowValues[i] ?? "";
@@ -327,7 +363,8 @@ class GoogleSheetsService {
     updates: Partial<SheetRecord>
   ): Promise<SheetRecord> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
-    const { headers, rows } = await this.readAll(entity);
+    // Fresh read so the row number is current at write time, never stale from cache.
+    const { headers, rows } = await this.readAll(entity, { skipCache: true });
 
     const match = rows.find((r) => r.data[entity.idColumn] === id);
     if (!match) {
@@ -351,13 +388,15 @@ class GoogleSheetsService {
         requestBody: { values: [rowValues] },
       });
 
+      this.invalidateCache(entity);
       return merged;
     });
   }
 
   async deleteById(entity: SheetEntityConfig, id: string): Promise<void> {
     const spreadsheetId = this.assertSpreadsheetId(entity);
-    const { rows } = await this.readAll(entity);
+    // Fresh read so the row number is current at delete time, never stale from cache.
+    const { rows } = await this.readAll(entity, { skipCache: true });
 
     const match = rows.find((r) => r.data[entity.idColumn] === id);
     if (!match) {
@@ -387,6 +426,7 @@ class GoogleSheetsService {
           ],
         },
       });
+      this.invalidateCache(entity);
     });
   }
 

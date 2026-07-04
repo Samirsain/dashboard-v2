@@ -1,6 +1,7 @@
 import { sheetsConfig } from "../config/sheets.config";
 import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
 import { generateId } from "../utils/id";
+import { formatTimestamp } from "../utils/date";
 import type { Revision } from "../types";
 
 const entity = sheetsConfig.revisions;
@@ -41,7 +42,7 @@ export const revisionsService = {
       Reason: input.reason,
       Comment: input.comment,
       "Revised By": input.revisedBy,
-      "Revised At": new Date().toISOString(),
+      "Revised At": formatTimestamp(),
     };
     const saved = await googleSheetsService.append(entity, record);
     return toRevision(saved);

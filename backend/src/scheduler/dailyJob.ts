@@ -87,7 +87,7 @@ export async function runDailyJob(): Promise<void> {
           user: "system",
           action: "Flagged overdue",
           task: task.title,
-          details: { taskId: task.id, dueDate: task.dueDate },
+          detail: `Due date was ${task.dueDate}`,
         })
       )
     );

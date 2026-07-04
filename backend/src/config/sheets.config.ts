@@ -70,6 +70,7 @@ export const sheetsConfig = {
       "Title",
       "Description",
       "Assigned Doer ID",
+      "Doer Name",
       "Priority",
       "Due Date",
       "Status",

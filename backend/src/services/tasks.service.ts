@@ -4,7 +4,7 @@ import { activityService } from "./activity.service";
 import { revisionsService } from "./revisions.service";
 import { usersService } from "./users.service";
 import { generateUuid } from "../utils/id";
-import { isBeforeToday, isToday, isWithinNextDays, todayIso } from "../utils/date";
+import { formatTimestamp, isBeforeToday, isToday, isWithinNextDays, todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
 import type { DoerSummary, Task, TaskPriority, TaskStatus, TaskWithDoer, User } from "../types";
 
@@ -41,14 +41,16 @@ function toDoerSummary(user: User): DoerSummary {
   };
 }
 
-async function assertDoerExists(doerId: string): Promise<void> {
-  const exists = await usersService.exists(doerId);
-  if (!exists) {
+/** Fetches a doer, rejecting with a 400 INVALID_DOER_ID (not 404) if absent. */
+async function requireDoer(doerId: string): Promise<User> {
+  const user = await usersService.getById(doerId).catch(() => null);
+  if (!user) {
     throw AppError.badRequest(
       `Assigned Doer ID "${doerId}" does not exist in DOERLIST`,
       "INVALID_DOER_ID"
     );
   }
+  return user;
 }
 
 export const tasksService = {
@@ -112,14 +114,15 @@ export const tasksService = {
     repeatType?: string;
     repeatValue?: string;
   }): Promise<Task> {
-    await assertDoerExists(input.assignedDoerId);
+    const doer = await requireDoer(input.assignedDoerId);
 
-    const now = new Date().toISOString();
+    const now = formatTimestamp();
     const record: SheetRecord = {
       "Task ID": generateUuid(),
       Title: input.title,
       Description: input.description,
       "Assigned Doer ID": input.assignedDoerId,
+      "Doer Name": doer.name,
       Priority: input.priority,
       "Due Date": input.dueDate,
       Status: "Pending",
@@ -140,7 +143,7 @@ export const tasksService = {
       user: input.createdBy,
       action: "Created",
       task: task.title,
-      details: { taskId: task.id },
+      detail: `Assigned to ${doer.name}, due ${input.dueDate}`,
     });
 
     return task;
@@ -156,14 +159,14 @@ export const tasksService = {
     >,
     actorUserId: string
   ): Promise<Task> {
+    const patch: Partial<SheetRecord> = { UpdatedAt: formatTimestamp() };
     if (updates.assignedDoerId !== undefined) {
-      await assertDoerExists(updates.assignedDoerId);
+      const doer = await requireDoer(updates.assignedDoerId);
+      patch["Assigned Doer ID"] = updates.assignedDoerId;
+      patch["Doer Name"] = doer.name; // keep the readable column in sync
     }
-
-    const patch: Partial<SheetRecord> = { UpdatedAt: new Date().toISOString() };
     if (updates.title !== undefined) patch["Title"] = updates.title;
     if (updates.description !== undefined) patch["Description"] = updates.description;
-    if (updates.assignedDoerId !== undefined) patch["Assigned Doer ID"] = updates.assignedDoerId;
     if (updates.priority !== undefined) patch["Priority"] = updates.priority;
     if (updates.dueDate !== undefined) patch["Due Date"] = updates.dueDate;
     if (updates.status !== undefined) patch["Status"] = updates.status;
@@ -176,9 +179,9 @@ export const tasksService = {
 
     await activityService.log({
       user: actorUserId,
-      action: updates.status ? `Status changed to ${updates.status}` : "Updated",
+      action: updates.status ? `Marked ${updates.status}` : "Updated",
       task: task.title,
-      details: { taskId: task.id, updates },
+      detail: updates.status ? `Status set to ${updates.status}` : "Task details updated",
     });
 
     return task;
@@ -191,7 +194,7 @@ export const tasksService = {
       user: actorUserId,
       action: "Deleted",
       task: task.title,
-      details: { taskId: id },
+      detail: "Task removed",
     });
   },
 
@@ -215,7 +218,7 @@ export const tasksService = {
       "Due Date": input.newDueDate,
       "Revision Date": today,
       "Revision Count": String(existing.revisionCount + 1),
-      UpdatedAt: new Date().toISOString(),
+      UpdatedAt: formatTimestamp(),
     });
     const task = toTask(saved);
 
@@ -232,7 +235,7 @@ export const tasksService = {
         user: actorUserId,
         action: "Revised",
         task: task.title,
-        details: { taskId: task.id, oldDueDate, newDueDate: input.newDueDate, reason: input.reason },
+        detail: `Due date ${oldDueDate} → ${input.newDueDate} (${input.reason})`,
       }),
     ]);
 

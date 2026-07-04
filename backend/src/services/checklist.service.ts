@@ -2,7 +2,7 @@ import { sheetsConfig } from "../config/sheets.config";
 import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
 import { activityService } from "./activity.service";
 import { generateId } from "../utils/id";
-import { shouldGenerateForFrequency, todayIso } from "../utils/date";
+import { formatTimestamp, shouldGenerateForFrequency, todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
 import { logger } from "../utils/logger";
 import type {
@@ -157,7 +157,7 @@ export const checklistService = {
       user: completedBy,
       action: "Completed checklist item",
       task: instance.taskName,
-      details: { instanceId: instance.id, templateId: instance.templateId },
+      detail: `Checklist item completed`,
     });
 
     return instance;

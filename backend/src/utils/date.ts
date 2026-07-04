@@ -26,6 +26,40 @@ export function todayIso(date: Date = new Date()): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/**
+ * Human-friendly timestamp for sheet cells: "YYYY-MM-DD HH:mm" in the
+ * configured timezone. Starts with the plain date so existing
+ * value.slice(0, 10) date comparisons keep working.
+ */
+export function formatTimestamp(
+  date: Date = new Date(),
+  timeZone = env.scheduler.timezone
+): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const lookup = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${lookup("year")}-${lookup("month")}-${lookup("day")} ${lookup("hour")}:${lookup("minute")}`;
+}
+
+/** Time of day as HH:mm:ss in the configured timezone (for activity logs). */
+export function formatTime(date: Date = new Date(), timeZone = env.scheduler.timezone): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 export function isValidIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
 }
