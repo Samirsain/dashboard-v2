@@ -69,8 +69,13 @@ export function shouldGenerateForFrequency(
   frequencyValue: string,
   date: Date = new Date()
 ): boolean {
-  const { day, month, weekday } = getDateParts(date);
-  const mmdd = `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const { year, day, month, weekday } = getDateParts(date);
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  // An anchor day beyond the current month's length (e.g. 31 in April,
+  // 29-31 in February) fires on the month's last day instead of never.
+  const dayMatches = (anchorDay: number) =>
+    anchorDay === day || (anchorDay > lastDayOfMonth && day === lastDayOfMonth);
 
   switch (frequency) {
     case "Daily":
@@ -78,14 +83,17 @@ export function shouldGenerateForFrequency(
     case "Weekly":
       return weekday.toLowerCase() === frequencyValue.trim().toLowerCase();
     case "Monthly":
-      return Number(frequencyValue) === day;
+      return dayMatches(Number(frequencyValue));
     case "Quarterly":
     case "HalfYearly":
     case "Yearly":
       return frequencyValue
         .split(",")
         .map((anchor) => anchor.trim())
-        .includes(mmdd);
+        .some((anchor) => {
+          const [anchorMonth, anchorDay] = anchor.split("-").map(Number);
+          return anchorMonth === month && dayMatches(anchorDay ?? 0);
+        });
     default:
       return false;
   }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { checklistController } from "../controllers/checklist.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/role.middleware";
 import { idParamSchema } from "../validation/user.schema";
 import {
   createChecklistTemplateSchema,
@@ -20,13 +21,16 @@ router.post(
   validate({ body: createChecklistTemplateSchema }),
   checklistController.createTemplate
 );
+// Any doer may create templates; changing or deleting them stays restricted.
 router.patch(
   "/templates/:id",
+  requireRole("Admin", "Manager"),
   validate({ params: idParamSchema, body: updateChecklistTemplateSchema }),
   checklistController.updateTemplate
 );
 router.delete(
   "/templates/:id",
+  requireRole("Admin", "Manager"),
   validate({ params: idParamSchema }),
   checklistController.removeTemplate
 );

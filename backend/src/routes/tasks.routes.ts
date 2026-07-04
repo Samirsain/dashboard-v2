@@ -2,6 +2,7 @@ import { Router } from "express";
 import { tasksController } from "../controllers/tasks.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/role.middleware";
 import { idParamSchema } from "../validation/user.schema";
 import {
   createTaskSchema,
@@ -16,7 +17,14 @@ router.use(requireAuth);
 
 router.get("/", validate({ query: taskFilterQuerySchema }), tasksController.list);
 router.get("/:id", validate({ params: idParamSchema }), tasksController.getById);
-router.post("/", validate({ body: createTaskSchema }), tasksController.create);
+// Creating tasks is restricted to PC/Admin (and Manager); marking done,
+// updating status, and revising stay open to every logged-in doer.
+router.post(
+  "/",
+  requireRole("Admin", "Manager", "PC"),
+  validate({ body: createTaskSchema }),
+  tasksController.create
+);
 router.patch(
   "/:id",
   validate({ params: idParamSchema, body: updateTaskSchema }),

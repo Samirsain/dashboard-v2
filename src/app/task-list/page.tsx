@@ -8,6 +8,7 @@ import AuthGuard from "@/components/AuthGuard";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import type { Doer, Task, TaskPriority, TaskStatus } from "@/lib/types";
 
 function PriorityBadge({ priority }: { priority: TaskPriority }) {
@@ -62,6 +63,9 @@ function TaskListInner() {
   const [showCreate, setShowCreate] = useState(false);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
+  const { user } = useAuth();
+  const canCreateTasks =
+    user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
 
   async function loadData() {
     setLoading(true);
@@ -154,12 +158,14 @@ function TaskListInner() {
               >
                 Refresh
               </button>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
-              >
-                + Create Task
-              </button>
+              {canCreateTasks && (
+                <button
+                  onClick={() => setShowCreate(true)}
+                  className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                >
+                  + Create Task
+                </button>
+              )}
             </div>
           </div>
 
