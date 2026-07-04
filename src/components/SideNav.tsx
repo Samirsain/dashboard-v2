@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 
-type NavKey = "dashboard" | "checklist" | "task-list" | "workflow";
+type NavKey = "dashboard" | "checklist" | "task-list" | "workflow" | "team-performance";
 
-const NAV_ITEMS: { key: NavKey; href: string; icon: string; label: string }[] = [
+const NAV_ITEMS: { key: NavKey; href: string; icon: string; label: string; adminOnly?: boolean }[] = [
   { key: "dashboard", href: "/", icon: "dashboard", label: "Dashboard" },
   { key: "checklist", href: "/checklist", icon: "checklist", label: "Checklist" },
   { key: "task-list", href: "/task-list", icon: "assignment", label: "Task List" },
   { key: "workflow", href: "/workflow", icon: "account_tree", label: "Workflow" },
+  { key: "team-performance", href: "/team-performance", icon: "insights", label: "Team Performance", adminOnly: true },
 ];
 
 export default function SideNav({ active }: { active: NavKey }) {
@@ -30,6 +31,11 @@ export default function SideNav({ active }: { active: NavKey }) {
       {/* Navigation Tabs */}
       <div className="flex-1 py-4 flex flex-col gap-1">
         {NAV_ITEMS.map((item) => {
+          // Hide admin-only items if user is not Admin
+          if (item.adminOnly && user?.role !== "Admin") {
+            return null;
+          }
+          
           const isActive = item.key === active;
           return (
             <Link

@@ -137,6 +137,11 @@ export const checklistService = {
   },
 
   async listToday(today = todayIso()): Promise<ChecklistInstance[]> {
+    try {
+      await this.generateInstancesForDate();
+    } catch (err) {
+      logger.error({ err }, "Auto-generation of checklist instances in listToday failed");
+    }
     return this.listInstances({ date: today });
   },
 

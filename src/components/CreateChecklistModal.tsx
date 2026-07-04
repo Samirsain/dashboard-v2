@@ -30,37 +30,50 @@ export default function CreateChecklistModal({
 
     if (frequency === "Daily") {
       finalFreqValue = "1";
-    } else {
+    } else if (frequency === "Weekly") {
+      if (!calendarDate) {
+        setError("Please select a day of the week.");
+        setSubmitting(false);
+        return;
+      }
+      finalFreqValue = calendarDate;
+    } else if (frequency === "Monthly (By Date)") {
       if (!calendarDate) {
         setError("Please select a date from the calendar.");
         setSubmitting(false);
         return;
       }
-      
-      const dateObj = new Date(calendarDate);
       const parts = calendarDate.split("-");
-      const ddStr = parts[2];
-      const mm = parseInt(parts[1], 10);
-      const dd = parseInt(ddStr, 10);
-
-      if (frequency === "Weekly") {
-        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        finalFreqValue = days[dateObj.getUTCDay()]; // e.g. "Monday"
-      } else if (frequency === "Monthly") {
-        finalFreqValue = dd.toString(); // e.g. "15"
-      } else {
-        // Quarterly, HalfYearly, Yearly
-        const dates = [];
-        let interval = 12; // Yearly
-        if (frequency === "Quarterly") interval = 3;
-        if (frequency === "HalfYearly") interval = 6;
-        
-        for (let i = 0; i < 12 / interval; i++) {
-          const currentMm = ((mm - 1 + i * interval) % 12) + 1;
-          dates.push(`${currentMm.toString().padStart(2, '0')}-${ddStr}`);
-        }
-        finalFreqValue = dates.join(",");
+      const dayNum = parseInt(parts[2], 10);
+      finalFreqValue = String(dayNum);
+    } else if (frequency === "Monthly (By Day)") {
+      if (!calendarDate) {
+        setError("Please select the occurrence and day.");
+        setSubmitting(false);
+        return;
       }
+      finalFreqValue = calendarDate;
+    } else {
+      if (!calendarDate) {
+        setError("Please select a starting date.");
+        setSubmitting(false);
+        return;
+      }
+      
+      const parts = calendarDate.split("-");
+      const mm = parseInt(parts[1], 10);
+      const ddStr = parts[2];
+
+      const dates = [];
+      let interval = 12; // Yearly
+      if (frequency === "Quarterly") interval = 3;
+      if (frequency === "HalfYearly") interval = 6;
+      
+      for (let i = 0; i < 12 / interval; i++) {
+        const currentMm = ((mm - 1 + i * interval) % 12) + 1;
+        dates.push(`${currentMm.toString().padStart(2, '0')}-${ddStr}`);
+      }
+      finalFreqValue = dates.join(",");
     }
 
     try {
@@ -148,7 +161,8 @@ export default function CreateChecklistModal({
               >
                 <option value="Daily">Daily</option>
                 <option value="Weekly">Weekly</option>
-                <option value="Monthly">Monthly</option>
+                <option value="Monthly (By Date)">Monthly (By Date)</option>
+                <option value="Monthly (By Day)">Monthly (By Day)</option>
                 <option value="Quarterly">Quarterly</option>
                 <option value="HalfYearly">Half Yearly</option>
                 <option value="Yearly">Yearly</option>
@@ -156,11 +170,94 @@ export default function CreateChecklistModal({
             </div>
           </div>
 
-          {/* Unified Date Picker for all frequencies except Daily */}
-          {frequency !== "Daily" && (
+          {frequency === "Weekly" && (
             <div>
               <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                Pick a Date from Calendar
+                Select Day
+              </label>
+              <select
+                required
+                value={calendarDate}
+                onChange={(e) => setCalendarDate(e.target.value)}
+                className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+              >
+                <option value="" disabled>Select a day</option>
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+                <option value="Saturday">Saturday</option>
+                <option value="Sunday">Sunday</option>
+              </select>
+            </div>
+          )}
+
+          {frequency === "Monthly (By Date)" && (
+            <div>
+              <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                Select Date
+              </label>
+              <input
+                required
+                type="date"
+                value={calendarDate}
+                onChange={(e) => setCalendarDate(e.target.value)}
+                className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+              />
+              <p className="text-xs text-on-surface-variant mt-1 uppercase font-data-mono">
+                System will extract the day of the month from your selected date.
+              </p>
+            </div>
+          )}
+
+          {frequency === "Monthly (By Day)" && (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Occurrence
+                </label>
+                <select
+                  required
+                  value={calendarDate.split(" ")[0] || ""}
+                  onChange={(e) => setCalendarDate(`${e.target.value} ${calendarDate.split(" ")[1] || "Monday"}`)}
+                  className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+                >
+                  <option value="" disabled>Select</option>
+                  <option value="First">First</option>
+                  <option value="Second">Second</option>
+                  <option value="Third">Third</option>
+                  <option value="Fourth">Fourth</option>
+                  <option value="Last">Last</option>
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Day
+                </label>
+                <select
+                  required
+                  value={calendarDate.split(" ")[1] || ""}
+                  onChange={(e) => setCalendarDate(`${calendarDate.split(" ")[0] || "First"} ${e.target.value}`)}
+                  className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+                >
+                  <option value="" disabled>Select</option>
+                  <option value="Monday">Monday</option>
+                  <option value="Tuesday">Tuesday</option>
+                  <option value="Wednesday">Wednesday</option>
+                  <option value="Thursday">Thursday</option>
+                  <option value="Friday">Friday</option>
+                  <option value="Saturday">Saturday</option>
+                  <option value="Sunday">Sunday</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {(frequency === "Quarterly" || frequency === "HalfYearly" || frequency === "Yearly") && (
+            <div>
+              <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                Pick Starting Date from Calendar
               </label>
               <input
                 required
@@ -170,10 +267,7 @@ export default function CreateChecklistModal({
                 className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono text-on-surface focus:outline-none"
               />
               <p className="text-xs text-on-surface-variant mt-1 uppercase font-data-mono">
-                {frequency === "Weekly" && "System will automatically select this day of the week (e.g. Monday)."}
-                {frequency === "Monthly" && "System will automatically select this date of the month (e.g. 15th)."}
-                {(frequency === "Quarterly" || frequency === "HalfYearly" || frequency === "Yearly") && 
-                  `System will auto-calculate upcoming ${frequency.toLowerCase()} dates based on this starting date.`}
+                System will auto-calculate upcoming {frequency.toLowerCase()} dates based on this starting date.
               </p>
             </div>
           )}

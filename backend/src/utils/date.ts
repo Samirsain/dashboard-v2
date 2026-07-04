@@ -83,7 +83,29 @@ export function shouldGenerateForFrequency(
     case "Weekly":
       return weekday.toLowerCase() === frequencyValue.trim().toLowerCase();
     case "Monthly":
-      return dayMatches(Number(frequencyValue));
+    case "Monthly (By Date)":
+      const d = parseInt(frequencyValue, 10);
+      if (!isNaN(d)) return dayMatches(d);
+      return false;
+    case "Monthly (By Day)": {
+      if (!frequencyValue) return false;
+      const parts = frequencyValue.split(" ");
+      if (parts.length < 2) return false;
+      const [nthStr, reqWeekday] = parts;
+      if (!reqWeekday || !nthStr) return false;
+      if (reqWeekday.toLowerCase() !== weekday.toLowerCase()) return false;
+  
+      const nth = Math.ceil(day / 7);
+      const isLast = day + 7 > lastDayOfMonth;
+  
+      const nthLower = nthStr.toLowerCase();
+      if (nthLower === "first" && nth === 1) return true;
+      if (nthLower === "second" && nth === 2) return true;
+      if (nthLower === "third" && nth === 3) return true;
+      if (nthLower === "fourth" && nth === 4) return true;
+      if (nthLower === "last" && isLast) return true;
+      return false;
+    }
     case "Quarterly":
     case "HalfYearly":
     case "Yearly":
@@ -97,4 +119,55 @@ export function shouldGenerateForFrequency(
     default:
       return false;
   }
+}
+
+export function shouldGenerateRecurringTask(
+  repeatType: string,
+  repeatValue: string,
+  date: Date = new Date(),
+  timeZone = env.scheduler.timezone
+): boolean {
+  if (!repeatType || repeatType === "None") return false;
+
+  const { year, day, month, weekday } = getDateParts(date, timeZone);
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const dayMatches = (anchorDay: number) =>
+    anchorDay === day || (anchorDay > lastDayOfMonth && day === lastDayOfMonth);
+
+  if (repeatType === "Daily") {
+    return true;
+  }
+
+  if (repeatType === "Weekly") {
+    return weekday.toLowerCase() === (repeatValue || "").trim().toLowerCase();
+  }
+
+  if (repeatType === "Monthly (By Date)") {
+    const d = parseInt(repeatValue, 10);
+    if (isNaN(d)) return false;
+    return dayMatches(d);
+  }
+
+  if (repeatType === "Monthly (By Day)") {
+    if (!repeatValue) return false;
+    const parts = repeatValue.split(" ");
+    if (parts.length < 2) return false;
+    const [nthStr, reqWeekday] = parts;
+    if (!reqWeekday || !nthStr) return false;
+    if (reqWeekday.toLowerCase() !== weekday.toLowerCase()) return false;
+
+    const nth = Math.ceil(day / 7);
+    const isLast = day + 7 > lastDayOfMonth;
+
+    const nthLower = nthStr.toLowerCase();
+    if (nthLower === "first" && nth === 1) return true;
+    if (nthLower === "second" && nth === 2) return true;
+    if (nthLower === "third" && nth === 3) return true;
+    if (nthLower === "fourth" && nth === 4) return true;
+    if (nthLower === "last" && isLast) return true;
+    return false;
+  }
+
+  return false;
 }

@@ -26,6 +26,8 @@ export type TaskPriority = "Low" | "Normal" | "Urgent" | "Critical";
 
 export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
 
+export type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";
+
 /** A row from TASKLIST. `assignedDoerId` must reference DOERLIST."Doer ID" — never a name. */
 export interface Task {
   id: string;
@@ -41,6 +43,8 @@ export interface Task {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  repeatType: RepeatType;
+  repeatValue: string;
 }
 
 /** Task joined with its DOERLIST row — what task-fetching endpoints return. */
@@ -64,6 +68,8 @@ export type ChecklistFrequency =
   | "Daily"
   | "Weekly"
   | "Monthly"
+  | "Monthly (By Date)"
+  | "Monthly (By Day)"
   | "Quarterly"
   | "HalfYearly"
   | "Yearly";

@@ -2,7 +2,44 @@ import { checklistService } from "../services/checklist.service";
 import { tasksService } from "../services/tasks.service";
 import { activityService } from "../services/activity.service";
 import { hasGoogleCredentials } from "../config/env";
+import { shouldGenerateRecurringTask, todayIso } from "../utils/date";
 import { logger } from "../utils/logger";
+
+async function generateRecurringTasks(): Promise<number> {
+  const allTasks = await tasksService.listRaw();
+  const today = todayIso();
+  
+  const recurringTemplates = allTasks.filter(t => t.repeatType && t.repeatType !== "None");
+  
+  let generatedCount = 0;
+  for (const template of recurringTemplates) {
+    if (shouldGenerateRecurringTask(template.repeatType, template.repeatValue)) {
+      const alreadyExists = allTasks.some(
+        t => 
+          t.title === template.title && 
+          t.dueDate === today && 
+          t.assignedDoerId === template.assignedDoerId &&
+          t.department === template.department
+      );
+      
+      if (!alreadyExists) {
+        await tasksService.create({
+          title: template.title,
+          description: template.description,
+          assignedDoerId: template.assignedDoerId,
+          priority: template.priority,
+          dueDate: today,
+          department: template.department,
+          createdBy: template.createdBy || "system",
+          repeatType: "None", 
+          repeatValue: "",
+        });
+        generatedCount++;
+      }
+    }
+  }
+  return generatedCount;
+}
 
 /**
  * The daily automation described in the PRD:
@@ -23,6 +60,13 @@ export async function runDailyJob(): Promise<void> {
     logger.info({ count: generated.length }, "Recurring checklist instances generated");
   } catch (error) {
     logger.error({ err: error }, "Daily job: checklist generation failed");
+  }
+
+  try {
+    const generatedTasksCount = await generateRecurringTasks();
+    logger.info({ count: generatedTasksCount }, "Recurring tasks generated");
+  } catch (error) {
+    logger.error({ err: error }, "Daily job: recurring tasks generation failed");
   }
 
   try {

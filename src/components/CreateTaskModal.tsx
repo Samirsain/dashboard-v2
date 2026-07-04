@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Doer, Task, TaskPriority } from "@/lib/types";
+import type { Doer, Task, TaskPriority, RepeatType } from "@/lib/types";
 
 export default function CreateTaskModal({
   doers,
@@ -19,6 +19,8 @@ export default function CreateTaskModal({
   const [priority, setPriority] = useState<TaskPriority>("Normal");
   const [dueDate, setDueDate] = useState("");
   const [department, setDepartment] = useState("");
+  const [repeatType, setRepeatType] = useState<RepeatType>("None");
+  const [repeatValue, setRepeatValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,6 +36,8 @@ export default function CreateTaskModal({
         priority,
         dueDate,
         department,
+        repeatType,
+        repeatValue,
       });
       onCreated(task);
     } catch (err) {
@@ -141,6 +145,98 @@ export default function CreateTaskModal({
                 className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-stack-md">
+            <div>
+              <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                Repeat Type
+              </label>
+              <select
+                value={repeatType}
+                onChange={(e) => {
+                  setRepeatType(e.target.value as RepeatType);
+                  setRepeatValue("");
+                }}
+                className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+              >
+                <option value="None">None</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly (By Date)">Monthly (By Date)</option>
+                <option value="Monthly (By Day)">Monthly (By Day)</option>
+              </select>
+            </div>
+
+            {repeatType !== "None" && repeatType !== "Daily" && (
+              <div>
+                <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Repeat Value
+                </label>
+                {repeatType === "Weekly" ? (
+                  <select
+                    required
+                    value={repeatValue}
+                    onChange={(e) => setRepeatValue(e.target.value)}
+                    className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+                  >
+                    <option value="" disabled>Select day</option>
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Sunday">Sunday</option>
+                  </select>
+                ) : repeatType === "Monthly (By Date)" ? (
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    max="31"
+                    placeholder="Date (1-31)"
+                    value={repeatValue}
+                    onChange={(e) => setRepeatValue(e.target.value)}
+                    className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+                  />
+                ) : repeatType === "Monthly (By Day)" ? (
+                  <select
+                    required
+                    value={repeatValue}
+                    onChange={(e) => setRepeatValue(e.target.value)}
+                    className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+                  >
+                    <option value="" disabled>Select occurrence</option>
+                    <option value="First Monday">First Monday</option>
+                    <option value="Second Monday">Second Monday</option>
+                    <option value="Third Monday">Third Monday</option>
+                    <option value="Fourth Monday">Fourth Monday</option>
+                    <option value="Last Monday">Last Monday</option>
+                    <option value="First Tuesday">First Tuesday</option>
+                    <option value="Second Tuesday">Second Tuesday</option>
+                    <option value="Third Tuesday">Third Tuesday</option>
+                    <option value="Fourth Tuesday">Fourth Tuesday</option>
+                    <option value="Last Tuesday">Last Tuesday</option>
+                    <option value="First Wednesday">First Wednesday</option>
+                    <option value="Second Wednesday">Second Wednesday</option>
+                    <option value="Third Wednesday">Third Wednesday</option>
+                    <option value="Fourth Wednesday">Fourth Wednesday</option>
+                    <option value="Last Wednesday">Last Wednesday</option>
+                    <option value="First Thursday">First Thursday</option>
+                    <option value="Second Thursday">Second Thursday</option>
+                    <option value="Third Thursday">Third Thursday</option>
+                    <option value="Fourth Thursday">Fourth Thursday</option>
+                    <option value="Last Thursday">Last Thursday</option>
+                    <option value="First Friday">First Friday</option>
+                    <option value="Second Friday">Second Friday</option>
+                    <option value="Third Friday">Third Friday</option>
+                    <option value="Fourth Friday">Fourth Friday</option>
+                    <option value="Last Friday">Last Friday</option>
+                  </select>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {error && (

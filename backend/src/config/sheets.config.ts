@@ -79,6 +79,8 @@ export const sheetsConfig = {
       "CreatedBy",
       "CreatedAt",
       "UpdatedAt",
+      "Repeat Type",
+      "Repeat Value",
     ],
     "TASKLIST"
   ),

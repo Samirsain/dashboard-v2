@@ -11,6 +11,8 @@ export const createTaskSchema = z.object({
   priority: z.enum(["Low", "Normal", "Urgent", "Critical"]),
   dueDate: isoDate,
   department: z.string().default(""),
+  repeatType: z.enum(["None", "Daily", "Weekly", "Monthly (By Date)", "Monthly (By Day)"]).default("None"),
+  repeatValue: z.string().default(""),
 });
 
 export const updateTaskSchema = z.object({
@@ -21,6 +23,8 @@ export const updateTaskSchema = z.object({
   dueDate: isoDate.optional(),
   status: z.enum(["Pending", "In Progress", "Completed", "Cancelled"]).optional(),
   department: z.string().optional(),
+  repeatType: z.enum(["None", "Daily", "Weekly", "Monthly (By Date)", "Monthly (By Day)"]).optional(),
+  repeatValue: z.string().optional(),
 });
 
 export const revisionSchema = z.object({

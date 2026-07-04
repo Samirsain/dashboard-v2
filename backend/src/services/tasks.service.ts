@@ -25,6 +25,8 @@ function toTask(record: SheetRecord): Task {
     createdBy: record["CreatedBy"] ?? "",
     createdAt: record["CreatedAt"] ?? "",
     updatedAt: record["UpdatedAt"] ?? "",
+    repeatType: (record["Repeat Type"] as any) || "None",
+    repeatValue: record["Repeat Value"] ?? "",
   };
 }
 
@@ -107,6 +109,8 @@ export const tasksService = {
     dueDate: string;
     department: string;
     createdBy: string;
+    repeatType?: string;
+    repeatValue?: string;
   }): Promise<Task> {
     await assertDoerExists(input.assignedDoerId);
 
@@ -125,6 +129,8 @@ export const tasksService = {
       CreatedBy: input.createdBy,
       CreatedAt: now,
       UpdatedAt: now,
+      "Repeat Type": input.repeatType || "None",
+      "Repeat Value": input.repeatValue || "",
     };
 
     const saved = await googleSheetsService.append(entity, record);
@@ -145,7 +151,7 @@ export const tasksService = {
     updates: Partial<
       Pick<
         Task,
-        "title" | "description" | "assignedDoerId" | "priority" | "dueDate" | "status" | "department"
+        "title" | "description" | "assignedDoerId" | "priority" | "dueDate" | "status" | "department" | "repeatType" | "repeatValue"
       >
     >,
     actorUserId: string
@@ -162,6 +168,8 @@ export const tasksService = {
     if (updates.dueDate !== undefined) patch["Due Date"] = updates.dueDate;
     if (updates.status !== undefined) patch["Status"] = updates.status;
     if (updates.department !== undefined) patch["Department"] = updates.department;
+    if (updates.repeatType !== undefined) patch["Repeat Type"] = updates.repeatType;
+    if (updates.repeatValue !== undefined) patch["Repeat Value"] = updates.repeatValue;
 
     const saved = await googleSheetsService.updateById(entity, id, patch);
     const task = toTask(saved);

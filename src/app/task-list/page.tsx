@@ -76,7 +76,7 @@ function TaskListInner() {
         api.get<Doer[]>("/users"),
       ]);
       setTasks(taskData);
-      setDoers(doerData);
+      setDoers(doerData.filter(d => d.role === "Doer"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load tasks.");
     } finally {
@@ -189,6 +189,9 @@ function TaskListInner() {
                   <th className="py-3 px-4 w-32 border-r border-surface-variant text-center">
                     Due Date
                   </th>
+                  <th className="py-3 px-4 w-32 border-r border-surface-variant text-center">
+                    Repeat
+                  </th>
                   <th className="py-3 px-4 w-40 border-r border-surface-variant text-center">Status</th>
                   <th className="py-3 px-4 w-40 text-center">Action</th>
                 </tr>
@@ -196,14 +199,14 @@ function TaskListInner() {
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No tasks found.
                     </td>
                   </tr>
@@ -234,6 +237,15 @@ function TaskListInner() {
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                       {task.dueDate}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center">
+                      {task.repeatType && task.repeatType !== "None" ? (
+                        <span className="font-label-sm text-label-sm uppercase">
+                          {task.repeatType === "Daily" ? "Daily" : `${task.repeatType}: ${task.repeatValue}`}
+                        </span>
+                      ) : (
+                        <span className="text-on-surface-variant">-</span>
+                      )}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
                       <StatusPill status={task.status} />

@@ -15,6 +15,7 @@ export interface Doer {
 
 export type TaskPriority = "Low" | "Normal" | "Urgent" | "Critical";
 export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
+export type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";
 export type ChecklistInstanceStatus = "Pending" | "Completed";
 
 export interface ChecklistInstance {
@@ -52,6 +53,8 @@ export interface Task {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  repeatType: RepeatType;
+  repeatValue: string;
   doer: DoerSummary | null;
 }
 
