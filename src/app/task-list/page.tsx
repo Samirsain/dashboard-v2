@@ -8,7 +8,6 @@ import AuthGuard from "@/components/AuthGuard";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
 import type { Doer, Task, TaskPriority, TaskStatus } from "@/lib/types";
 
 function PriorityBadge({ priority }: { priority: TaskPriority }) {
@@ -63,7 +62,6 @@ function TaskListInner() {
   const [showCreate, setShowCreate] = useState(false);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
-  const { user } = useAuth();
 
   async function loadData() {
     setLoading(true);
@@ -192,7 +190,7 @@ function TaskListInner() {
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>

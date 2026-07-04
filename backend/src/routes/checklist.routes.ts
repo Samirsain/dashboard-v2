@@ -2,7 +2,6 @@ import { Router } from "express";
 import { checklistController } from "../controllers/checklist.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/role.middleware";
 import { idParamSchema } from "../validation/user.schema";
 import {
   createChecklistTemplateSchema,
