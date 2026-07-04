@@ -18,19 +18,16 @@ router.get("/templates", checklistController.listTemplates);
 router.get("/templates/:id", validate({ params: idParamSchema }), checklistController.getTemplate);
 router.post(
   "/templates",
-  requireRole("Admin", "Manager"),
   validate({ body: createChecklistTemplateSchema }),
   checklistController.createTemplate
 );
 router.patch(
   "/templates/:id",
-  requireRole("Admin", "Manager"),
   validate({ params: idParamSchema, body: updateChecklistTemplateSchema }),
   checklistController.updateTemplate
 );
 router.delete(
   "/templates/:id",
-  requireRole("Admin", "Manager"),
   validate({ params: idParamSchema }),
   checklistController.removeTemplate
 );
@@ -43,6 +40,6 @@ router.post(
   validate({ params: idParamSchema }),
   checklistController.completeInstance
 );
-router.post("/generate", requireRole("Admin", "Manager"), checklistController.generateToday);
+router.post("/generate", checklistController.generateToday);
 
 export default router;

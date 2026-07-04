@@ -15,6 +15,19 @@ export interface Doer {
 
 export type TaskPriority = "Low" | "Normal" | "Urgent" | "Critical";
 export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
+export type ChecklistInstanceStatus = "Pending" | "Completed";
+
+export interface ChecklistInstance {
+  id: string;
+  templateId: string;
+  taskName: string;
+  date: string;
+  assignedDoerId: string;
+  status: ChecklistInstanceStatus;
+  completedBy: string;
+  completedAt: string;
+  doer?: DoerSummary | null;
+}
 
 export interface DoerSummary {
   id: string;
