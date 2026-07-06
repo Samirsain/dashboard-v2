@@ -104,6 +104,16 @@ function DashboardInner() {
     load();
   }, []);
 
+  async function handleDeleteList(id: string) {
+    if (!confirm("Delete this list? Tasks/checklists in it will stay, just un-filed.")) return;
+    try {
+      await api.delete(`/lists/${id}`);
+      setLists((prev) => prev.filter((l) => l.id !== id));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to delete list.");
+    }
+  }
+
   const summary = dashboard?.summary;
   const overallPct =
     summary && summary.totalTasks > 0
@@ -197,6 +207,45 @@ function DashboardInner() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Lists */}
+            <div className="col-span-12 bg-surface border-2 border-on-surface p-stack-lg flex flex-col">
+              <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md flex justify-between items-end">
+                <h3 className="font-headline-md text-headline-md text-on-surface">Lists</h3>
+                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+                  {lists.length} total
+                </span>
+              </div>
+              {lists.length === 0 ? (
+                <p className="font-data-mono text-data-mono text-on-surface-variant">
+                  No lists yet. {isAdmin ? 'Use "+ Create List" above to add one.' : ""}
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {lists.map((l) => (
+                    <div
+                      key={l.id}
+                      className="border-2 border-on-surface p-stack-md flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-body-md text-body-md text-on-surface truncate">{l.name}</div>
+                        <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                          {l.type === "task" ? "Task List" : "Checklist"}
+                        </span>
+                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteList(l.id)}
+                          className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors shrink-0"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Department Performance */}
