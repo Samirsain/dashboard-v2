@@ -1,5 +1,5 @@
 import { sheetsConfig } from "../config/sheets.config";
-import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
+import { dataService, type SheetRecord } from "./data.service";
 import { usersService } from "./users.service";
 import { generateId } from "../utils/id";
 import { formatTime, todayIso } from "../utils/date";
@@ -49,12 +49,12 @@ export const activityService = {
       Time: formatTime(now),
       Details: input.detail ?? "",
     };
-    const saved = await googleSheetsService.append(entity, record);
+    const saved = await dataService.append(entity, record);
     return toActivityLog(saved);
   },
 
   async list(): Promise<ActivityLog[]> {
-    const records = await googleSheetsService.findAll(entity);
+    const records = await dataService.findAll(entity);
     return records
       .map(toActivityLog)
       .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));

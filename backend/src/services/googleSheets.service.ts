@@ -430,6 +430,37 @@ class GoogleSheetsService {
     });
   }
 
+  /**
+   * Replaces the entire contents of a tab with `records` (header row + one row
+   * per record, in the entity's header order). Used by the daily backup job to
+   * mirror the Supabase source-of-truth into Google Sheets. Any rows beyond the
+   * new data are cleared so the tab is an exact snapshot.
+   */
+  async overwriteAll(entity: SheetEntityConfig, records: SheetRecord[]): Promise<void> {
+    const spreadsheetId = this.assertSpreadsheetId(entity);
+    await this.getTabId(entity); // ensure the tab exists
+
+    const headers = entity.expectedHeaders;
+    const values = [headers, ...records.map((r) => headers.map((h) => r[h] ?? ""))];
+
+    await this.withErrorHandling(`overwriteAll(${entity.sheetName})`, async () => {
+      const client = await this.getClient();
+      // Clear the whole tab first so stale trailing rows don't survive a backup
+      // that has fewer rows than last time.
+      await client.spreadsheets.values.clear({
+        spreadsheetId,
+        range: `'${entity.sheetName}'`,
+      });
+      await client.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${entity.sheetName}'!A1`,
+        valueInputOption: "RAW",
+        requestBody: { values },
+      });
+      this.invalidateCache(entity);
+    });
+  }
+
   // ---- Spec-named aliases -------------------------------------------------
   // The four CRUD verbs above (findAll/readAll, append, updateById,
   // deleteById) are the names used throughout this codebase. These aliases

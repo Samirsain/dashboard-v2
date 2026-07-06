@@ -5,7 +5,7 @@ import tasksRoutes from "./tasks.routes";
 import checklistRoutes from "./checklist.routes";
 import dashboardRoutes from "./dashboard.routes";
 import activityRoutes from "./activity.routes";
-import { hasGoogleCredentials } from "../config/env";
+import { hasGoogleCredentials, hasSupabaseCredentials } from "../config/env";
 
 const router = Router();
 
@@ -14,7 +14,9 @@ router.get("/health", (_req, res) => {
     success: true,
     data: {
       status: "ok",
-      googleSheetsConfigured: hasGoogleCredentials(),
+      database: hasSupabaseCredentials() ? "supabase" : "unconfigured",
+      supabaseConfigured: hasSupabaseCredentials(),
+      googleSheetsBackupConfigured: hasGoogleCredentials(),
       time: new Date().toISOString(),
     },
   });

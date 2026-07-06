@@ -1,5 +1,5 @@
 import { sheetsConfig } from "../config/sheets.config";
-import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
+import { dataService, type SheetRecord } from "./data.service";
 import { generateId } from "../utils/id";
 import { formatTimestamp } from "../utils/date";
 import type { Revision } from "../types";
@@ -44,12 +44,12 @@ export const revisionsService = {
       "Revised By": input.revisedBy,
       "Revised At": formatTimestamp(),
     };
-    const saved = await googleSheetsService.append(entity, record);
+    const saved = await dataService.append(entity, record);
     return toRevision(saved);
   },
 
   async listByTaskId(taskId: string): Promise<Revision[]> {
-    const records = await googleSheetsService.findAll(entity);
+    const records = await dataService.findAll(entity);
     return records
       .map(toRevision)
       .filter((r) => r.taskId === taskId)
@@ -57,7 +57,7 @@ export const revisionsService = {
   },
 
   async listAll(): Promise<Revision[]> {
-    const records = await googleSheetsService.findAll(entity);
+    const records = await dataService.findAll(entity);
     return records.map(toRevision);
   },
 };

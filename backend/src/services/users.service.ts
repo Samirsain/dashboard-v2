@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { sheetsConfig } from "../config/sheets.config";
-import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
+import { dataService, type SheetRecord } from "./data.service";
 import { generateId } from "../utils/id";
 import { todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
@@ -29,24 +29,24 @@ function toUserWithSecrets(record: SheetRecord): UserWithSecrets {
 
 export const usersService = {
   async list(): Promise<User[]> {
-    const records = await googleSheetsService.findAll(entity);
+    const records = await dataService.findAll(entity);
     return records.map(toUser);
   },
 
   async getById(id: string): Promise<User> {
-    const record = await googleSheetsService.findById(entity, id);
+    const record = await dataService.findById(entity, id);
     if (!record) throw AppError.notFound(`Doer "${id}" not found in DOERLIST`);
     return toUser(record);
   },
 
   /** True if `id` exists in DOERLIST — used to validate Assigned Doer ID on tasks. */
   async exists(id: string): Promise<boolean> {
-    const record = await googleSheetsService.findById(entity, id);
+    const record = await dataService.findById(entity, id);
     return record !== null;
   },
 
   async findByEmail(email: string): Promise<UserWithSecrets | null> {
-    const records = await googleSheetsService.findAll(entity);
+    const records = await dataService.findAll(entity);
     const match = records.find(
       (r) => (r["Email"] ?? "").toLowerCase() === email.toLowerCase()
     );
@@ -55,7 +55,7 @@ export const usersService = {
 
   /** Login lookup: `identifier` may be either an Email or an Employee Code (e.g. "EM01"). */
   async findByIdentifier(identifier: string): Promise<UserWithSecrets | null> {
-    const records = await googleSheetsService.findAll(entity);
+    const records = await dataService.findAll(entity);
     const needle = identifier.trim().toLowerCase();
     const match = records.find(
       (r) =>
@@ -92,7 +92,7 @@ export const usersService = {
       CreatedAt: todayIso(),
     };
 
-    const saved = await googleSheetsService.append(entity, record);
+    const saved = await dataService.append(entity, record);
     return toUser(saved);
   },
 
@@ -111,12 +111,12 @@ export const usersService = {
     if (updates.status !== undefined) patch["Status"] = updates.status;
     if (updates.employeeCode !== undefined) patch["Employee Code"] = updates.employeeCode;
 
-    const saved = await googleSheetsService.updateById(entity, id, patch);
+    const saved = await dataService.updateById(entity, id, patch);
     return toUser(saved);
   },
 
   async remove(id: string): Promise<void> {
-    await googleSheetsService.deleteById(entity, id);
+    await dataService.deleteById(entity, id);
   },
 
   async verifyPassword(user: UserWithSecrets, password: string): Promise<boolean> {

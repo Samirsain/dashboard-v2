@@ -19,6 +19,17 @@ export const env = {
     expiresIn: optional("JWT_EXPIRES_IN", "8h"),
   },
 
+  supabase: {
+    // The project URL, e.g. https://xxxx.supabase.co
+    url: requiredAtRuntime("SUPABASE_URL"),
+    // The service_role (secret) key. Server-side only — bypasses RLS. Never
+    // expose to the browser. SUPABASE_SERVICE_ROLE_KEY is the primary name;
+    // SUPABASE_SECRET_KEY is accepted as a fallback (Supabase's newer key UI).
+    serviceRoleKey:
+      requiredAtRuntime("SUPABASE_SERVICE_ROLE_KEY") ??
+      requiredAtRuntime("SUPABASE_SECRET_KEY"),
+  },
+
   google: {
     // Preferred: full service account JSON as a single env var (escaped).
     serviceAccountJson: requiredAtRuntime("GOOGLE_SERVICE_ACCOUNT_JSON"),
@@ -37,11 +48,17 @@ export const env = {
     enabled: optional("SCHEDULER_ENABLED", "true") === "true",
     // Cron expression for the daily checklist/overdue job. Default: 00:01 every day.
     dailyCron: optional("SCHEDULER_DAILY_CRON", "1 0 * * *"),
+    // Supabase -> Google Sheets backup. Default: every 6 hours.
+    backupCron: optional("SCHEDULER_BACKUP_CRON", "0 */6 * * *"),
     timezone: optional("SCHEDULER_TIMEZONE", "Asia/Kolkata"),
   },
 
   logLevel: optional("LOG_LEVEL", "info"),
 };
+
+export function hasSupabaseCredentials(): boolean {
+  return Boolean(env.supabase.url && env.supabase.serviceRoleKey);
+}
 
 export function hasGoogleCredentials(): boolean {
   return Boolean(

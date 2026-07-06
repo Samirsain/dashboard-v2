@@ -1,5 +1,5 @@
 import { sheetsConfig } from "../config/sheets.config";
-import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
+import { dataService, type SheetRecord } from "./data.service";
 import { activityService } from "./activity.service";
 import { revisionsService } from "./revisions.service";
 import { usersService } from "./users.service";
@@ -61,7 +61,7 @@ export const tasksService = {
     priority?: TaskPriority;
     department?: string;
   }): Promise<Task[]> {
-    const records = await googleSheetsService.findAll(entity);
+    const records = await dataService.findAll(entity);
     let tasks = records.map(toTask);
 
     if (filters?.assignedDoerId)
@@ -90,7 +90,7 @@ export const tasksService = {
   },
 
   async getById(id: string): Promise<TaskWithDoer> {
-    const record = await googleSheetsService.findById(entity, id);
+    const record = await dataService.findById(entity, id);
     if (!record) throw AppError.notFound(`Task "${id}" not found`);
     const task = toTask(record);
 
@@ -136,7 +136,7 @@ export const tasksService = {
       "Repeat Value": input.repeatValue || "",
     };
 
-    const saved = await googleSheetsService.append(entity, record);
+    const saved = await dataService.append(entity, record);
     const task = toTask(saved);
 
     await activityService.log({
@@ -174,7 +174,7 @@ export const tasksService = {
     if (updates.repeatType !== undefined) patch["Repeat Type"] = updates.repeatType;
     if (updates.repeatValue !== undefined) patch["Repeat Value"] = updates.repeatValue;
 
-    const saved = await googleSheetsService.updateById(entity, id, patch);
+    const saved = await dataService.updateById(entity, id, patch);
     const task = toTask(saved);
 
     await activityService.log({
@@ -189,7 +189,7 @@ export const tasksService = {
 
   async remove(id: string, actorUserId: string): Promise<void> {
     const task = await this.getById(id);
-    await googleSheetsService.deleteById(entity, id);
+    await dataService.deleteById(entity, id);
     await activityService.log({
       user: actorUserId,
       action: "Deleted",
@@ -214,7 +214,7 @@ export const tasksService = {
     const oldDueDate = existing.dueDate;
     const today = todayIso();
 
-    const saved = await googleSheetsService.updateById(entity, id, {
+    const saved = await dataService.updateById(entity, id, {
       "Due Date": input.newDueDate,
       "Revision Date": today,
       "Revision Count": String(existing.revisionCount + 1),

@@ -1,5 +1,5 @@
 import { sheetsConfig } from "../config/sheets.config";
-import { googleSheetsService, type SheetRecord } from "./googleSheets.service";
+import { dataService, type SheetRecord } from "./data.service";
 import { activityService } from "./activity.service";
 import { generateId } from "../utils/id";
 import { formatTimestamp, shouldGenerateForFrequency, todayIso } from "../utils/date";
@@ -49,12 +49,12 @@ export const checklistService = {
   // ---- Templates -------------------------------------------------------
 
   async listTemplates(): Promise<ChecklistTemplate[]> {
-    const records = await googleSheetsService.findAll(templatesEntity);
+    const records = await dataService.findAll(templatesEntity);
     return records.map(toTemplate);
   },
 
   async getTemplateById(id: string): Promise<ChecklistTemplate> {
-    const record = await googleSheetsService.findById(templatesEntity, id);
+    const record = await dataService.findById(templatesEntity, id);
     if (!record) throw AppError.notFound(`Checklist template "${id}" not found`);
     return toTemplate(record);
   },
@@ -81,7 +81,7 @@ export const checklistService = {
       Status: input.status,
       CreatedAt: todayIso(),
     };
-    const saved = await googleSheetsService.append(templatesEntity, record);
+    const saved = await dataService.append(templatesEntity, record);
     return toTemplate(saved);
   },
 
@@ -111,12 +111,12 @@ export const checklistService = {
     if (updates.priority !== undefined) patch["Priority"] = updates.priority;
     if (updates.status !== undefined) patch["Status"] = updates.status;
 
-    const saved = await googleSheetsService.updateById(templatesEntity, id, patch);
+    const saved = await dataService.updateById(templatesEntity, id, patch);
     return toTemplate(saved);
   },
 
   async removeTemplate(id: string): Promise<void> {
-    await googleSheetsService.deleteById(templatesEntity, id);
+    await dataService.deleteById(templatesEntity, id);
   },
 
   // ---- Instances ---------------------------------------------------------
@@ -126,7 +126,7 @@ export const checklistService = {
     status?: ChecklistInstanceStatus;
     assignedDoerId?: string;
   }): Promise<ChecklistInstance[]> {
-    const records = await googleSheetsService.findAll(instancesEntity);
+    const records = await dataService.findAll(instancesEntity);
     let instances = records.map(toInstance);
 
     if (filters?.date) instances = instances.filter((i) => i.date === filters.date);
@@ -146,7 +146,7 @@ export const checklistService = {
   },
 
   async completeInstance(id: string, completedBy: string): Promise<ChecklistInstance> {
-    const saved = await googleSheetsService.updateById(instancesEntity, id, {
+    const saved = await dataService.updateById(instancesEntity, id, {
       Status: "Completed" as ChecklistInstanceStatus,
       CompletedBy: completedBy,
       CompletedAt: new Date().toISOString(),
@@ -195,7 +195,7 @@ export const checklistService = {
         CompletedAt: "",
       };
 
-      const saved = await googleSheetsService.append(instancesEntity, record);
+      const saved = await dataService.append(instancesEntity, record);
       created.push(toInstance(saved));
     }
 

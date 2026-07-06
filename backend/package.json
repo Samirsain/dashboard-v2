@@ -9,9 +9,12 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "migrate:supabase": "tsx scripts/migrate-sheets-to-supabase.ts",
+    "backup:once": "tsx scripts/run-backup-once.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
