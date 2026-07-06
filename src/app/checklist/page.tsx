@@ -8,7 +8,7 @@ import AuthGuard from "@/components/AuthGuard";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { Doer, ChecklistInstance } from "@/lib/types";
+import type { Doer, ChecklistInstance, List } from "@/lib/types";
 
 function ChecklistStatusPill({ status }: { status: "Pending" | "Completed" }) {
   if (status === "Completed") {
@@ -29,6 +29,7 @@ function ChecklistInner() {
   const { user } = useAuth();
   const [instances, setInstances] = useState<ChecklistInstance[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
+  const [lists, setLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -38,10 +39,12 @@ function ChecklistInner() {
     setLoading(true);
     setError(null);
     try {
-      const [checklistData, doerData] = await Promise.all([
+      const [checklistData, doerData, listData] = await Promise.all([
         api.get<ChecklistInstance[]>("/checklist/today"),
         api.get<Doer[]>("/users"),
+        api.get<List[]>("/lists?type=checklist").catch(() => [] as List[]),
       ]);
+      setLists(listData);
       
       const enrichedInstances = checklistData.map((instance) => {
         const doer = doerData.find((d) => d.id === instance.assignedDoerId);
@@ -228,6 +231,7 @@ function ChecklistInner() {
       {showCreate && (
         <CreateChecklistModal
           doers={doers}
+          lists={lists}
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false);

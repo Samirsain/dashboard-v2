@@ -2,20 +2,23 @@
 
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Doer, Task, TaskPriority, RepeatType } from "@/lib/types";
+import type { Doer, List, Task, TaskPriority, RepeatType } from "@/lib/types";
 
 export default function CreateTaskModal({
   doers,
+  lists = [],
   onClose,
   onCreated,
 }: {
   doers: Doer[];
+  lists?: List[];
   onClose: () => void;
   onCreated: (task: Task) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
+  const [listId, setListId] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("Normal");
   const [dueDate, setDueDate] = useState("");
   const [department, setDepartment] = useState("");
@@ -33,6 +36,7 @@ export default function CreateTaskModal({
         title,
         description,
         assignedDoerId,
+        listId,
         priority,
         dueDate,
         department,
@@ -145,6 +149,26 @@ export default function CreateTaskModal({
                 className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
               />
             </div>
+
+            {lists.length > 0 && (
+              <div>
+                <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  List
+                </label>
+                <select
+                  value={listId}
+                  onChange={(e) => setListId(e.target.value)}
+                  className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+                >
+                  <option value="">— No list —</option>
+                  {lists.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-stack-md">

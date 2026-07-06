@@ -20,6 +20,7 @@ const instancesEntity = sheetsConfig.checklistInstances;
 function toTemplate(record: SheetRecord): ChecklistTemplate {
   return {
     id: record["Template ID"] ?? "",
+    listId: record["List ID"] ?? "",
     taskName: record["Task Name"] ?? "",
     description: record["Description"] ?? "",
     frequency: (record["Frequency"] as ChecklistFrequency) || "Daily",
@@ -68,9 +69,11 @@ export const checklistService = {
     department: string;
     priority: TaskPriority;
     status: ChecklistTemplateStatus;
+    listId?: string;
   }): Promise<ChecklistTemplate> {
     const record: SheetRecord = {
       "Template ID": generateId("TPL"),
+      "List ID": input.listId || "",
       "Task Name": input.taskName,
       Description: input.description,
       Frequency: input.frequency,
@@ -98,10 +101,12 @@ export const checklistService = {
         | "department"
         | "priority"
         | "status"
+        | "listId"
       >
     >
   ): Promise<ChecklistTemplate> {
     const patch: Partial<SheetRecord> = {};
+    if (updates.listId !== undefined) patch["List ID"] = updates.listId;
     if (updates.taskName !== undefined) patch["Task Name"] = updates.taskName;
     if (updates.description !== undefined) patch["Description"] = updates.description;
     if (updates.frequency !== undefined) patch["Frequency"] = updates.frequency;

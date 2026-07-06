@@ -58,6 +58,19 @@ function entity(
 }
 
 export const sheetsConfig = {
+  /** Named lists (categories) an admin creates — each is a "Task List" or a "Checklist". */
+  lists: entity(
+    "LISTS",
+    "lists",
+    "List ID",
+    {
+      "List ID": "id",
+      Name: "name",
+      Type: "type",
+      CreatedAt: "created_at",
+    },
+    "LISTS"
+  ),
   /** DOERLIST — master employee table. Doer ID is the only valid key for relations. */
   users: entity(
     "USERS",
@@ -85,6 +98,7 @@ export const sheetsConfig = {
     "Task ID",
     {
       "Task ID": "id",
+      "List ID": "list_id",
       Title: "title",
       Description: "description",
       "Assigned Doer ID": "assigned_doer_id",
@@ -126,6 +140,7 @@ export const sheetsConfig = {
     "Template ID",
     {
       "Template ID": "id",
+      "List ID": "list_id",
       "Task Name": "task_name",
       Description: "description",
       Frequency: "frequency",

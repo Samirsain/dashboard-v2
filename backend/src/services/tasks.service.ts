@@ -13,6 +13,7 @@ const entity = sheetsConfig.tasks;
 function toTask(record: SheetRecord): Task {
   return {
     id: record["Task ID"] ?? "",
+    listId: record["List ID"] ?? "",
     title: record["Title"] ?? "",
     description: record["Description"] ?? "",
     assignedDoerId: record["Assigned Doer ID"] ?? "",
@@ -111,6 +112,7 @@ export const tasksService = {
     dueDate: string;
     department: string;
     createdBy: string;
+    listId?: string;
     repeatType?: string;
     repeatValue?: string;
   }): Promise<Task> {
@@ -119,6 +121,7 @@ export const tasksService = {
     const now = formatTimestamp();
     const record: SheetRecord = {
       "Task ID": generateUuid(),
+      "List ID": input.listId || "",
       Title: input.title,
       Description: input.description,
       "Assigned Doer ID": input.assignedDoerId,
@@ -154,12 +157,13 @@ export const tasksService = {
     updates: Partial<
       Pick<
         Task,
-        "title" | "description" | "assignedDoerId" | "priority" | "dueDate" | "status" | "department" | "repeatType" | "repeatValue"
+        "title" | "description" | "assignedDoerId" | "priority" | "dueDate" | "status" | "department" | "listId" | "repeatType" | "repeatValue"
       >
     >,
     actorUserId: string
   ): Promise<Task> {
     const patch: Partial<SheetRecord> = { UpdatedAt: formatTimestamp() };
+    if (updates.listId !== undefined) patch["List ID"] = updates.listId;
     if (updates.assignedDoerId !== undefined) {
       const doer = await requireDoer(updates.assignedDoerId);
       patch["Assigned Doer ID"] = updates.assignedDoerId;

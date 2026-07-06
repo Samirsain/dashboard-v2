@@ -39,8 +39,18 @@ export interface DoerSummary {
   role: UserRole;
 }
 
+export type ListType = "task" | "checklist";
+
+export interface List {
+  id: string;
+  name: string;
+  type: ListType;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
+  listId: string;
   title: string;
   description: string;
   assignedDoerId: string;

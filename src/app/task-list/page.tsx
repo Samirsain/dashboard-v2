@@ -9,7 +9,7 @@ import CreateTaskModal from "@/components/CreateTaskModal";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { Doer, Task, TaskPriority, TaskStatus } from "@/lib/types";
+import type { Doer, List, Task, TaskPriority, TaskStatus } from "@/lib/types";
 
 function PriorityBadge({ priority }: { priority: TaskPriority }) {
   if (priority === "Urgent" || priority === "Critical") {
@@ -58,6 +58,7 @@ function StatusPill({ status }: { status: TaskStatus }) {
 function TaskListInner() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
+  const [lists, setLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -71,12 +72,14 @@ function TaskListInner() {
     setLoading(true);
     setError(null);
     try {
-      const [taskData, doerData] = await Promise.all([
+      const [taskData, doerData, listData] = await Promise.all([
         api.get<Task[]>("/tasks"),
         api.get<Doer[]>("/users"),
+        api.get<List[]>("/lists?type=task").catch(() => [] as List[]),
       ]);
       setTasks(taskData);
       setDoers(doerData.filter(d => d.role === "Doer"));
+      setLists(listData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load tasks.");
     } finally {
@@ -281,6 +284,7 @@ function TaskListInner() {
       {showCreate && (
         <CreateTaskModal
           doers={doers}
+          lists={lists}
           onClose={() => setShowCreate(false)}
           onCreated={(task) => {
             const doer = doers.find((d) => d.id === task.assignedDoerId) ?? null;

@@ -31,8 +31,20 @@ export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
 export type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";
 
 /** A row from TASKLIST. `assignedDoerId` must reference DOERLIST."Doer ID" — never a name. */
+/** A named category an admin creates: either a "Task List" or a "Checklist". */
+export type ListType = "task" | "checklist";
+
+export interface List {
+  id: string;
+  name: string;
+  type: ListType;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
+  /** The Task List (list of type "task") this task is filed under, or "". */
+  listId: string;
   title: string;
   description: string;
   assignedDoerId: string;
@@ -80,6 +92,8 @@ export type ChecklistTemplateStatus = "Active" | "Inactive";
 
 export interface ChecklistTemplate {
   id: string;
+  /** The Checklist (list of type "checklist") this template is filed under, or "". */
+  listId: string;
   taskName: string;
   description: string;
   frequency: ChecklistFrequency;

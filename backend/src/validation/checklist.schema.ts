@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createChecklistTemplateSchema = z
   .object({
     taskName: z.string().min(1),
+    listId: z.string().default(""),
     description: z.string().default(""),
     frequency: z.enum([
       "Daily",
@@ -65,6 +66,7 @@ export const createChecklistTemplateSchema = z
 
 export const updateChecklistTemplateSchema = z.object({
   taskName: z.string().min(1).optional(),
+  listId: z.string().optional(),
   description: z.string().optional(),
   frequency: z
     .enum([

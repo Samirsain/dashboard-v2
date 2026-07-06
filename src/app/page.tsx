@@ -5,7 +5,46 @@ import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
-import type { DepartmentWiseTaskStat, FullDashboard, Task, TaskStatus } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
+import CreateListModal from "@/components/CreateListModal";
+import type { DepartmentWiseTaskStat, FullDashboard, List, Task, TaskStatus } from "@/lib/types";
+
+/** Builds and downloads a CSV of the given tasks (client-side, no server round-trip). */
+function exportTasksToCsv(tasks: Task[]) {
+  const headers = [
+    "Title",
+    "Assigned To",
+    "Department",
+    "Priority",
+    "Status",
+    "Due Date",
+    "Revision Count",
+    "Created At",
+  ];
+  const escape = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
+  const rows = tasks.map((t) =>
+    [
+      t.title,
+      t.doer?.name ?? t.assignedDoerId,
+      t.department,
+      t.priority,
+      t.status,
+      t.dueDate,
+      String(t.revisionCount),
+      t.createdAt,
+    ]
+      .map(escape)
+      .join(",")
+  );
+  const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tasks-report-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function StatusBadge({ status }: { status: TaskStatus }) {
   if (status === "Completed") {
@@ -28,8 +67,13 @@ function completionPct(stat: DepartmentWiseTaskStat): number {
 }
 
 function DashboardInner() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "Admin";
   const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [lists, setLists] = useState<List[]>([]);
+  const [showCreateList, setShowCreateList] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,11 +82,14 @@ function DashboardInner() {
       setLoading(true);
       setError(null);
       try {
-        const [dash, tasks] = await Promise.all([
+        const [dash, tasks, listsData] = await Promise.all([
           api.get<FullDashboard>("/dashboard"),
           api.get<Task[]>("/tasks"),
+          api.get<List[]>("/lists").catch(() => [] as List[]),
         ]);
         setDashboard(dash);
+        setLists(listsData);
+        setAllTasks(tasks);
         setRecentTasks(
           [...tasks]
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -86,7 +133,24 @@ function DashboardInner() {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setShowCreateList(true)}
+                  className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                >
+                  + Create List
+                </button>
+                <button
+                  onClick={() => exportTasksToCsv(allTasks)}
+                  disabled={allTasks.length === 0}
+                  className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors disabled:opacity-50"
+                >
+                  Export Report (CSV)
+                </button>
+              </>
+            )}
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-primary-container rounded-full" />
               <span className="font-label-sm text-label-sm uppercase text-on-surface">
@@ -227,6 +291,16 @@ function DashboardInner() {
           </div>
         </main>
       </div>
+
+      {showCreateList && (
+        <CreateListModal
+          onClose={() => setShowCreateList(false)}
+          onCreated={(list) => {
+            setLists((prev) => [...prev, list]);
+            setShowCreateList(false);
+          }}
+        />
+      )}
     </>
   );
 }

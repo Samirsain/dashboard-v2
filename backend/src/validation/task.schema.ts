@@ -6,6 +6,7 @@ const isoDate = z
 
 export const createTaskSchema = z.object({
   title: z.string().min(1),
+  listId: z.string().default(""),
   description: z.string().default(""),
   assignedDoerId: z.string().min(1, "assignedDoerId (DOERLIST Doer ID) is required"),
   priority: z.enum(["Low", "Normal", "Urgent", "Critical"]),
@@ -17,6 +18,7 @@ export const createTaskSchema = z.object({
 
 export const updateTaskSchema = z.object({
   title: z.string().min(1).optional(),
+  listId: z.string().optional(),
   description: z.string().optional(),
   assignedDoerId: z.string().min(1).optional(),
   priority: z.enum(["Low", "Normal", "Urgent", "Critical"]).optional(),
