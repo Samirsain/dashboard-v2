@@ -19,6 +19,7 @@ function toUser(record: SheetRecord): User {
     department: record["Department"] ?? "",
     role: (record["Role"] as UserRole) || "Doer",
     status: (record["Status"] as UserStatus) || "Active",
+    canViewAll: (record["Can View All"] ?? "").toLowerCase() === "true",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -88,6 +89,7 @@ export const usersService = {
       Department: input.department,
       Role: input.role,
       Status: input.status,
+      "Can View All": "false",
       PasswordHash: passwordHash,
       CreatedAt: todayIso(),
     };

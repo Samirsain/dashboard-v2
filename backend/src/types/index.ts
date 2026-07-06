@@ -12,6 +12,8 @@ export interface User {
   department: string;
   role: UserRole;
   status: UserStatus;
+  /** When true, this doer can see everyone's tasks/checklists (like an admin), without task-create rights. */
+  canViewAll: boolean;
   createdAt: string;
 }
 
@@ -124,6 +126,8 @@ export interface JwtClaims {
   sub: string; // user id
   email: string;
   role: UserRole;
+  /** Mirrors User.canViewAll so list endpoints can filter without a DB lookup. */
+  canViewAll?: boolean;
 }
 
 export interface DashboardSummary {

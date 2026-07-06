@@ -2,11 +2,17 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { tasksService } from "../services/tasks.service";
+import { canViewAllData } from "../utils/access";
 import type { CreateTaskInput, RevisionInput, TaskFilterQuery, UpdateTaskInput } from "../validation/task.schema";
 
 export const tasksController = {
   list: asyncHandler(async (req: Request, res: Response) => {
-    const filters = req.query as unknown as TaskFilterQuery;
+    const filters = { ...(req.query as unknown as TaskFilterQuery) };
+    // Normal doers only ever see their own tasks; admins/managers/PC and
+    // canViewAll doers see everything (optionally still narrowed by query).
+    if (!canViewAllData(req.user)) {
+      filters.assignedDoerId = req.user!.sub;
+    }
     const tasks = await tasksService.list(filters);
     ok(res, tasks);
   }),

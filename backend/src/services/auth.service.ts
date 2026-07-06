@@ -17,7 +17,7 @@ export const authService = {
     if (!isValid) throw AppError.unauthorized("Invalid credentials");
 
     const { passwordHash: _passwordHash, ...publicUser } = user;
-    const token = signToken({ sub: user.id, email: user.email, role: user.role });
+    const token = signToken({ sub: user.id, email: user.email, role: user.role, canViewAll: user.canViewAll });
     return { token, user: publicUser };
   },
 
@@ -33,7 +33,7 @@ export const authService = {
       ...input,
       status: "Active",
     });
-    const token = signToken({ sub: user.id, email: user.email, role: user.role });
+    const token = signToken({ sub: user.id, email: user.email, role: user.role, canViewAll: user.canViewAll });
     return { token, user };
   },
 };

@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { checklistService } from "../services/checklist.service";
+import { canViewAllData } from "../utils/access";
 import type {
   CreateChecklistTemplateInput,
   UpdateChecklistTemplateInput,
@@ -33,18 +34,24 @@ export const checklistController = {
 
   listInstances: asyncHandler(async (req: Request, res: Response) => {
     const { date, status, assignedDoerId } = req.query as Record<string, string | undefined>;
+    // Normal doers are scoped to their own checklist items; view-all users see everyone's.
+    const scopedDoerId = canViewAllData(req.user) ? assignedDoerId : req.user!.sub;
     ok(
       res,
       await checklistService.listInstances({
         date,
         status: status as never,
-        assignedDoerId,
+        assignedDoerId: scopedDoerId,
       })
     );
   }),
 
-  listToday: asyncHandler(async (_req: Request, res: Response) => {
-    ok(res, await checklistService.listToday());
+  listToday: asyncHandler(async (req: Request, res: Response) => {
+    const all = await checklistService.listToday();
+    const scoped = canViewAllData(req.user)
+      ? all
+      : all.filter((i) => i.assignedDoerId === req.user!.sub);
+    ok(res, scoped);
   }),
 
   completeInstance: asyncHandler(async (req: Request, res: Response) => {

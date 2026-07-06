@@ -72,6 +72,7 @@ export const sheetsConfig = {
       Department: "department",
       Role: "role",
       Status: "status",
+      "Can View All": "can_view_all",
       PasswordHash: "password_hash",
       CreatedAt: "created_at",
     },
