@@ -38,6 +38,8 @@ export interface List {
   id: string;
   name: string;
   type: ListType;
+  /** Doer IDs allowed to access this list (admins/PC/Manager always can). */
+  memberIds: string[];
   createdAt: string;
 }
 

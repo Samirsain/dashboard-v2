@@ -67,6 +67,7 @@ export const sheetsConfig = {
       "List ID": "id",
       Name: "name",
       Type: "type",
+      Members: "member_ids",
       CreatedAt: "created_at",
     },
     "LISTS"

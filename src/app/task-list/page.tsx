@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import InitialsAvatar from "@/components/InitialsAvatar";
@@ -95,9 +96,14 @@ function TaskListInner() {
     });
   }, []);
 
-  const filtered = tasks.filter((t) =>
-    `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const listFilter = useSearchParams().get("list") ?? "";
+  const currentList = lists.find((l) => l.id === listFilter) ?? null;
+
+  const filtered = tasks
+    .filter((t) => (listFilter ? t.listId === listFilter : true))
+    .filter((t) =>
+      `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
+    );
 
   async function handleMarkDone(id: string) {
     try {
@@ -148,10 +154,13 @@ function TaskListInner() {
           <div className="flex justify-between items-end border-b-2 border-on-surface pb-stack-md">
             <div>
               <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
-                Active Task Directory
+                {currentList ? currentList.name : "Active Task Directory"}
               </h2>
               <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
-                {tasks.length} entries &bull; System Live
+                {currentList
+                  ? `${filtered.length} in this list`
+                  : `${tasks.length} entries`}{" "}
+                &bull; System Live
               </p>
             </div>
             <div className="flex gap-stack-sm">
@@ -285,6 +294,7 @@ function TaskListInner() {
         <CreateTaskModal
           doers={doers}
           lists={lists}
+          defaultListId={listFilter}
           onClose={() => setShowCreate(false)}
           onCreated={(task) => {
             const doer = doers.find((d) => d.id === task.assignedDoerId) ?? null;
@@ -311,7 +321,9 @@ function TaskListInner() {
 export default function TaskListPage() {
   return (
     <AuthGuard>
-      <TaskListInner />
+      <Suspense fallback={null}>
+        <TaskListInner />
+      </Suspense>
     </AuthGuard>
   );
 }

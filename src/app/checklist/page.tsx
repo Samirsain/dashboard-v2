@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import InitialsAvatar from "@/components/InitialsAvatar";
@@ -8,7 +9,7 @@ import AuthGuard from "@/components/AuthGuard";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { Doer, ChecklistInstance, List } from "@/lib/types";
+import type { Doer, ChecklistInstance, ChecklistTemplate, List } from "@/lib/types";
 
 function ChecklistStatusPill({ status }: { status: "Pending" | "Completed" }) {
   if (status === "Completed") {
@@ -30,6 +31,7 @@ function ChecklistInner() {
   const [instances, setInstances] = useState<ChecklistInstance[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
   const [lists, setLists] = useState<List[]>([]);
+  const [templateListMap, setTemplateListMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -39,12 +41,16 @@ function ChecklistInner() {
     setLoading(true);
     setError(null);
     try {
-      const [checklistData, doerData, listData] = await Promise.all([
+      const [checklistData, doerData, listData, templateData] = await Promise.all([
         api.get<ChecklistInstance[]>("/checklist/today"),
         api.get<Doer[]>("/users"),
         api.get<List[]>("/lists?type=checklist").catch(() => [] as List[]),
+        api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
       ]);
       setLists(listData);
+      setTemplateListMap(
+        Object.fromEntries(templateData.map((t) => [t.id, t.listId]))
+      );
       
       const enrichedInstances = checklistData.map((instance) => {
         const doer = doerData.find((d) => d.id === instance.assignedDoerId);
@@ -83,9 +89,14 @@ function ChecklistInner() {
     }
   }
 
-  const filtered = instances.filter((t) =>
-    `${t.taskName} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const listFilter = useSearchParams().get("list") ?? "";
+  const currentList = lists.find((l) => l.id === listFilter) ?? null;
+
+  const filtered = instances
+    .filter((t) => (listFilter ? templateListMap[t.templateId] === listFilter : true))
+    .filter((t) =>
+      `${t.taskName} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
+    );
 
   return (
     <>
@@ -125,10 +136,10 @@ function ChecklistInner() {
           <div className="flex justify-between items-end border-b-2 border-on-surface pb-stack-md">
             <div>
               <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
-                Daily Checklist
+                {currentList ? currentList.name : "Daily Checklist"}
               </h2>
               <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
-                {instances.length} items &bull; System Live
+                {currentList ? `${filtered.length} in this list` : `${instances.length} items`} &bull; System Live
               </p>
             </div>
             <div className="flex gap-stack-sm">
@@ -232,6 +243,7 @@ function ChecklistInner() {
         <CreateChecklistModal
           doers={doers}
           lists={lists}
+          defaultListId={listFilter}
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false);
@@ -246,7 +258,9 @@ function ChecklistInner() {
 export default function ChecklistPage() {
   return (
     <AuthGuard>
-      <ChecklistInner />
+      <Suspense fallback={null}>
+        <ChecklistInner />
+      </Suspense>
     </AuthGuard>
   );
 }

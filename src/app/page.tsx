@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import CreateListModal from "@/components/CreateListModal";
+import ManageListAccessModal from "@/components/ManageListAccessModal";
 import type { DepartmentWiseTaskStat, FullDashboard, List, Task, TaskStatus } from "@/lib/types";
 
 /** Builds and downloads a CSV of the given tasks (client-side, no server round-trip). */
@@ -74,6 +75,7 @@ function DashboardInner() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [showCreateList, setShowCreateList] = useState(false);
+  const [manageAccessList, setManageAccessList] = useState<List | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -231,16 +233,24 @@ function DashboardInner() {
                       <div className="min-w-0">
                         <div className="font-body-md text-body-md text-on-surface truncate">{l.name}</div>
                         <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                          {l.type === "task" ? "Task List" : "Checklist"}
+                          {l.type === "task" ? "Task List" : "Checklist"} &bull; {l.memberIds.length} member{l.memberIds.length === 1 ? "" : "s"}
                         </span>
                       </div>
                       {isAdmin && (
-                        <button
-                          onClick={() => handleDeleteList(l.id)}
-                          className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors shrink-0"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            onClick={() => setManageAccessList(l)}
+                            className="border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                          >
+                            Access
+                          </button>
+                          <button
+                            onClick={() => handleDeleteList(l.id)}
+                            className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -347,6 +357,17 @@ function DashboardInner() {
           onCreated={(list) => {
             setLists((prev) => [...prev, list]);
             setShowCreateList(false);
+          }}
+        />
+      )}
+
+      {manageAccessList && (
+        <ManageListAccessModal
+          list={manageAccessList}
+          onClose={() => setManageAccessList(null)}
+          onSaved={(updated) => {
+            setLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+            setManageAccessList(null);
           }}
         />
       )}

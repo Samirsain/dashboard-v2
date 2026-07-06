@@ -18,6 +18,15 @@ export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
 export type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";
 export type ChecklistInstanceStatus = "Pending" | "Completed";
 
+export interface ChecklistTemplate {
+  id: string;
+  listId: string;
+  taskName: string;
+  assignedDoerId: string;
+  frequency: string;
+  status: string;
+}
+
 export interface ChecklistInstance {
   id: string;
   templateId: string;
@@ -45,6 +54,7 @@ export interface List {
   id: string;
   name: string;
   type: ListType;
+  memberIds: string[];
   createdAt: string;
 }
 

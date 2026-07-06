@@ -7,18 +7,20 @@ import type { Doer, List, Task, TaskPriority, RepeatType } from "@/lib/types";
 export default function CreateTaskModal({
   doers,
   lists = [],
+  defaultListId = "",
   onClose,
   onCreated,
 }: {
   doers: Doer[];
   lists?: List[];
+  defaultListId?: string;
   onClose: () => void;
   onCreated: (task: Task) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
-  const [listId, setListId] = useState("");
+  const [listId, setListId] = useState(defaultListId);
   const [priority, setPriority] = useState<TaskPriority>("Normal");
   const [dueDate, setDueDate] = useState("");
   const [department, setDepartment] = useState("");

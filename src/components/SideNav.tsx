@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api";
+import type { List } from "@/lib/types";
 
 type NavKey = "dashboard" | "checklist" | "task-list" | "workflow" | "team-performance";
 
@@ -15,6 +18,14 @@ const NAV_ITEMS: { key: NavKey; href: string; icon: string; label: string; admin
 
 export default function SideNav({ active }: { active: NavKey }) {
   const { user, logout } = useAuth();
+  const [lists, setLists] = useState<List[]>([]);
+
+  useEffect(() => {
+    api.get<List[]>("/lists").then(setLists).catch(() => setLists([]));
+  }, []);
+
+  const taskLists = lists.filter((l) => l.type === "task");
+  const checklists = lists.filter((l) => l.type === "checklist");
 
   return (
     <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
@@ -56,6 +67,49 @@ export default function SideNav({ active }: { active: NavKey }) {
             </Link>
           );
         })}
+
+        {(taskLists.length > 0 || checklists.length > 0) && (
+          <div className="mt-4 border-t-2 border-on-surface pt-3">
+            {taskLists.length > 0 && (
+              <>
+                <p className="px-4 pb-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Task Lists
+                </p>
+                {taskLists.map((l) => (
+                  <Link
+                    key={l.id}
+                    href={`/task-list?list=${l.id}`}
+                    className="text-on-surface-variant px-4 py-2 flex items-center gap-2 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
+                  >
+                    <span className="material-symbols-outlined text-base" data-icon="folder">
+                      folder
+                    </span>
+                    <span className="font-body-md text-body-md truncate">{l.name}</span>
+                  </Link>
+                ))}
+              </>
+            )}
+            {checklists.length > 0 && (
+              <>
+                <p className="px-4 pt-2 pb-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Checklists
+                </p>
+                {checklists.map((l) => (
+                  <Link
+                    key={l.id}
+                    href={`/checklist?list=${l.id}`}
+                    className="text-on-surface-variant px-4 py-2 flex items-center gap-2 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
+                  >
+                    <span className="material-symbols-outlined text-base" data-icon="folder">
+                      folder
+                    </span>
+                    <span className="font-body-md text-body-md truncate">{l.name}</span>
+                  </Link>
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Signed-in user + logout */}

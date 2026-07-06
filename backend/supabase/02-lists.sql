@@ -8,9 +8,13 @@ create table if not exists public.lists (
   id         text primary key,
   name       text,
   type       text,   -- 'task' or 'checklist'
+  member_ids text,   -- comma-separated Doer IDs who can access this list
   created_at text
 );
 alter table public.lists enable row level security;
+
+-- If the lists table already existed without member_ids, add it:
+alter table public.lists add column if not exists member_ids text default '';
 
 -- Tasks and checklist templates can be filed under a list.
 alter table public.tasks

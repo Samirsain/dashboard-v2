@@ -7,18 +7,20 @@ import type { Doer, List } from "@/lib/types";
 export default function CreateChecklistModal({
   doers,
   lists = [],
+  defaultListId = "",
   onClose,
   onCreated,
 }: {
   doers: Doer[];
   lists?: List[];
+  defaultListId?: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [taskName, setTaskName] = useState("");
   const [frequency, setFrequency] = useState("Daily");
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
-  const [listId, setListId] = useState("");
+  const [listId, setListId] = useState(defaultListId);
   const [calendarDate, setCalendarDate] = useState(""); // YYYY-MM-DD
 
   const [error, setError] = useState<string | null>(null);
