@@ -46,7 +46,7 @@ function TeamPerformanceInner() {
           api.get<Doer[]>("/users"),
         ]);
         setTasks(taskData);
-        setDoers(doerData.filter(d => d.role === "Doer"));
+        setDoers(doerData.filter(d => d.role === "Doer" || d.role === "PC"));
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to load data.");
       } finally {

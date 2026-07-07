@@ -2,24 +2,21 @@
 
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Doer, List, Task, TaskPriority } from "@/lib/types";
+import type { Doer, Task, TaskPriority } from "@/lib/types";
 
 export default function CreateTaskModal({
   doers,
-  lists = [],
   defaultListId = "",
   onClose,
   onCreated,
 }: {
   doers: Doer[];
-  lists?: List[];
   defaultListId?: string;
   onClose: () => void;
   onCreated: (task: Task) => void;
 }) {
   const [title, setTitle] = useState("");
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
-  const [listId, setListId] = useState(defaultListId);
   const [priority, setPriority] = useState<TaskPriority>("Normal");
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +30,7 @@ export default function CreateTaskModal({
       const task = await api.post<Task>("/tasks", {
         title,
         assignedDoerId,
-        listId,
+        listId: defaultListId,
         priority,
         dueDate,
       });
@@ -114,20 +111,6 @@ export default function CreateTaskModal({
               </select>
             </div>
           </div>
-
-          {lists.length > 0 && (
-            <div>
-              <label className={label}>List</label>
-              <select value={listId} onChange={(e) => setListId(e.target.value)} className={field}>
-                <option value="">— No list —</option>
-                {lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {error && (
             <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">

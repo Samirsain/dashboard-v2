@@ -15,7 +15,6 @@ export default function ReviseTaskModal({
 }) {
   const [newDueDate, setNewDueDate] = useState("");
   const [reason, setReason] = useState("");
-  const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,7 +26,6 @@ export default function ReviseTaskModal({
       await api.post(`/tasks/${task.id}/revision`, {
         newDueDate,
         reason,
-        comment,
       });
       onRevised();
     } catch (err) {
@@ -72,26 +70,12 @@ export default function ReviseTaskModal({
 
           <div>
             <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-              Reason for Revision
+              Reason for Revision (Optional)
             </label>
             <input
-              required
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="E.g., Client requested delay"
-              className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-              Additional Comments
-            </label>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={2}
-              placeholder="Optional"
               className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
             />
           </div>

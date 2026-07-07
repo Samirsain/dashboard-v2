@@ -79,7 +79,7 @@ function TaskListInner() {
         api.get<List[]>("/lists?type=task").catch(() => [] as List[]),
       ]);
       setTasks(taskData);
-      setDoers(doerData.filter(d => d.role === "Doer"));
+      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "PC"));
       setLists(listData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load tasks.");
@@ -293,7 +293,6 @@ function TaskListInner() {
       {showCreate && (
         <CreateTaskModal
           doers={doers}
-          lists={lists}
           defaultListId={listFilter}
           onClose={() => setShowCreate(false)}
           onCreated={(task) => {

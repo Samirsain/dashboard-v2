@@ -61,7 +61,7 @@ function ChecklistInner() {
       });
 
       setInstances(enrichedInstances);
-      setDoers(doerData.filter(d => d.role === "Doer"));
+      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "PC"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load checklist.");
     } finally {
@@ -242,7 +242,6 @@ function ChecklistInner() {
       {showCreate && (
         <CreateChecklistModal
           doers={doers}
-          lists={lists}
           defaultListId={listFilter}
           onClose={() => setShowCreate(false)}
           onCreated={() => {

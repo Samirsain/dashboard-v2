@@ -31,7 +31,7 @@ export const updateTaskSchema = z.object({
 
 export const revisionSchema = z.object({
   newDueDate: isoDate,
-  reason: z.string().min(1, "A reason is required"),
+  reason: z.string().default(""),
   comment: z.string().default(""),
 });
 
