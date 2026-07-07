@@ -61,6 +61,7 @@ function WorkflowInner() {
   const [statusFilter, setStatusFilter] = useState<WorkflowInstanceStatus>("Active");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedSteps, setSelectedSteps] = useState<WorkflowStepEvent[]>([]);
+  const [selectedInstance, setSelectedInstance] = useState<WorkflowInstance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
@@ -99,6 +100,7 @@ function WorkflowInner() {
         `/workflow/instances/${id}`
       );
       setSelectedSteps(detail.steps);
+      setSelectedInstance(detail.instance);
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to load workflow instance.");
     }
@@ -260,7 +262,14 @@ function WorkflowInner() {
                         selectedId === inst.id ? "bg-surface-container-lowest" : ""
                       }`}
                     >
-                      <td className="py-4 px-4 font-medium">{inst.title}</td>
+                      <td className="py-4 px-4 font-medium">
+                        {inst.title}
+                        {inst.details && (
+                          <div className="font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5 truncate max-w-xs">
+                            {inst.details}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-4 px-4 font-data-mono text-data-mono text-on-surface-variant">
                         {formatTs(inst.startedAt)}
                       </td>
@@ -277,9 +286,14 @@ function WorkflowInner() {
           {/* Selected instance detail */}
           {selectedId && (
             <div className="bg-surface border-2 border-on-surface p-stack-lg">
-              <h3 className="font-headline-md text-headline-md text-on-surface border-b-2 border-on-surface pb-stack-md mb-stack-md">
-                Step Timeline
-              </h3>
+              <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md">
+                <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
+                {selectedInstance?.details && (
+                  <p className="font-data-mono text-data-mono text-on-surface-variant text-sm mt-1 whitespace-pre-wrap">
+                    {selectedInstance.details}
+                  </p>
+                )}
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[900px]">
                   <thead>

@@ -28,11 +28,13 @@ create table if not exists public.workflow_instances (
   id           text primary key,
   template_id  text,
   title        text,
+  details      text default '',
   started_at   text,
   status       text,
   requested_by text
 );
 alter table public.workflow_instances enable row level security;
+alter table public.workflow_instances add column if not exists details text default '';
 
 create table if not exists public.workflow_step_events (
   id            text primary key,

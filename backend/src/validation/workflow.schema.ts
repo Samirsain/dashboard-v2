@@ -23,6 +23,7 @@ export const createWorkflowTemplateSchema = z.object({
 export const startWorkflowInstanceSchema = z.object({
   templateId: z.string().min(1),
   title: z.string().min(1),
+  details: z.string().default(""),
 });
 
 export const stepNoParamSchema = z.object({

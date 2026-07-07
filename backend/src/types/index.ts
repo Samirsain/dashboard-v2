@@ -201,6 +201,8 @@ export interface WorkflowInstance {
   id: string;
   templateId: string;
   title: string;
+  /** Free-text extra info (e.g. "Video Title: X, Sub Part: Y, Location: Z"). */
+  details: string;
   startedAt: string; // ISO timestamp
   status: WorkflowInstanceStatus;
   requestedBy: string;

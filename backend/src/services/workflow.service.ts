@@ -42,6 +42,7 @@ function toInstance(r: SheetRecord): WorkflowInstance {
     id: r["Instance ID"] ?? "",
     templateId: r["Template ID"] ?? "",
     title: r["Title"] ?? "",
+    details: r["Details"] ?? "",
     startedAt: r["StartedAt"] ?? "",
     status: (r["Status"] as WorkflowInstanceStatus) || "Active",
     requestedBy: r["RequestedBy"] ?? "",
@@ -183,6 +184,7 @@ export const workflowService = {
   async startInstance(input: {
     templateId: string;
     title: string;
+    details?: string;
     requestedBy: string;
   }): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
     const templateSteps = await getStepsForTemplate(input.templateId);
@@ -197,6 +199,7 @@ export const workflowService = {
       "Instance ID": instanceId,
       "Template ID": input.templateId,
       Title: input.title,
+      Details: input.details ?? "",
       StartedAt: startedAt.toISOString(),
       Status: "Active",
       RequestedBy: input.requestedBy,
@@ -233,6 +236,7 @@ export const workflowService = {
       id: instanceId,
       templateId: input.templateId,
       title: input.title,
+      details: input.details ?? "",
       startedAt: startedAt.toISOString(),
       status: "Active",
       requestedBy: input.requestedBy,

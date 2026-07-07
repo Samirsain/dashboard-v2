@@ -15,6 +15,7 @@ export default function StartWorkflowInstanceModal({
 }) {
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,7 +26,7 @@ export default function StartWorkflowInstanceModal({
     try {
       const result = await api.post<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }>(
         "/workflow/instances",
-        { templateId, title }
+        { templateId, title, details }
       );
       onStarted(result);
     } catch (err) {
@@ -79,6 +80,17 @@ export default function StartWorkflowInstanceModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Site Walkthrough Video — Sector 12"
+              className={field}
+            />
+          </div>
+
+          <div>
+            <label className={label}>Details (Optional)</label>
+            <textarea
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              rows={3}
+              placeholder="e.g. Video Title: Sector 12 Walkthrough, Sub Part: Exterior, No of Video: 2, Location: TM Office"
               className={field}
             />
           </div>

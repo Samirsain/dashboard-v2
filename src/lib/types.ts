@@ -162,6 +162,7 @@ export interface WorkflowInstance {
   id: string;
   templateId: string;
   title: string;
+  details: string;
   startedAt: string;
   status: WorkflowInstanceStatus;
   requestedBy: string;
