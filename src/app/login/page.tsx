@@ -30,9 +30,6 @@ export default function LoginPage() {
           <h1 className="font-headline-md text-headline-md font-bold uppercase tracking-tighter text-on-surface">
             ThirtyMilestones
           </h1>
-          <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-            Enterprise RE MIS
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md">

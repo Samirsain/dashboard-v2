@@ -16,8 +16,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ThirtyMilestones - Enterprise RE MIS",
-  description: "Enterprise real estate management information system",
+  title: "ThirtyMilestones",
+  description: "Task management system",
 };
 
 export default function RootLayout({

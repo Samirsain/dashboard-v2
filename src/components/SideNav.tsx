@@ -34,82 +34,53 @@ export default function SideNav({ active }: { active: NavKey }) {
         <h1 className="font-headline-md text-headline-md font-bold uppercase tracking-tighter text-on-surface">
           ThirtyMilestones
         </h1>
-        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-          Enterprise RE MIS
-        </p>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex-1 py-4 flex flex-col gap-1">
+      <div className="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           // Hide admin-only items if user is not Admin
           if (item.adminOnly && user?.role !== "Admin") {
             return null;
           }
-          
+
           const isActive = item.key === active;
+          // Lists are nested directly under their parent nav item.
+          const subLists =
+            item.key === "task-list" ? taskLists : item.key === "checklist" ? checklists : [];
+          const subHref = (id: string) =>
+            item.key === "task-list" ? `/task-list?list=${id}` : `/checklist?list=${id}`;
+
           return (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={
-                isActive
-                  ? "bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 flex items-center gap-3"
-                  : "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
-              }
-            >
-              <span className="material-symbols-outlined" data-icon={item.icon}>
-                {item.icon}
-              </span>
-              <span className="font-headline-md text-headline-md text-base">
-                {item.label}
-              </span>
-            </Link>
+            <div key={item.key}>
+              <Link
+                href={item.href}
+                className={
+                  isActive
+                    ? "bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 flex items-center gap-3"
+                    : "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
+                }
+              >
+                <span className="material-symbols-outlined" data-icon={item.icon}>
+                  {item.icon}
+                </span>
+                <span className="font-headline-md text-headline-md text-base uppercase tracking-tight">
+                  {item.label}
+                </span>
+              </Link>
+
+              {subLists.map((l) => (
+                <Link
+                  key={l.id}
+                  href={subHref(l.id)}
+                  className="text-on-surface-variant pl-12 pr-4 py-2 flex items-center gap-2 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
+                >
+                  <span className="font-body-md text-body-md truncate">{l.name}</span>
+                </Link>
+              ))}
+            </div>
           );
         })}
-
-        {(taskLists.length > 0 || checklists.length > 0) && (
-          <div className="mt-4 border-t-2 border-on-surface pt-3">
-            {taskLists.length > 0 && (
-              <>
-                <p className="px-4 pb-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
-                  Task Lists
-                </p>
-                {taskLists.map((l) => (
-                  <Link
-                    key={l.id}
-                    href={`/task-list?list=${l.id}`}
-                    className="text-on-surface-variant px-4 py-2 flex items-center gap-2 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
-                  >
-                    <span className="material-symbols-outlined text-base" data-icon="folder">
-                      folder
-                    </span>
-                    <span className="font-body-md text-body-md truncate">{l.name}</span>
-                  </Link>
-                ))}
-              </>
-            )}
-            {checklists.length > 0 && (
-              <>
-                <p className="px-4 pt-2 pb-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
-                  Checklists
-                </p>
-                {checklists.map((l) => (
-                  <Link
-                    key={l.id}
-                    href={`/checklist?list=${l.id}`}
-                    className="text-on-surface-variant px-4 py-2 flex items-center gap-2 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
-                  >
-                    <span className="material-symbols-outlined text-base" data-icon="folder">
-                      folder
-                    </span>
-                    <span className="font-body-md text-body-md truncate">{l.name}</span>
-                  </Link>
-                ))}
-              </>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Signed-in user + logout */}
