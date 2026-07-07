@@ -50,6 +50,7 @@ export default function SideNav({ active }: { active: NavKey }) {
             item.key === "task-list" ? taskLists : item.key === "checklist" ? checklists : [];
           const subHref = (id: string) =>
             item.key === "task-list" ? `/task-list?list=${id}` : `/checklist?list=${id}`;
+          const subIcon = item.key === "task-list" ? "assignment" : "checklist";
 
           return (
             <div key={item.key}>
@@ -73,9 +74,12 @@ export default function SideNav({ active }: { active: NavKey }) {
                 <Link
                   key={l.id}
                   href={subHref(l.id)}
-                  className="text-on-surface-variant pl-12 pr-4 py-2 flex items-center gap-2 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
+                  className="text-on-surface-variant pl-8 pr-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
                 >
-                  <span className="font-headline-md text-headline-md text-sm uppercase tracking-tight truncate">
+                  <span className="material-symbols-outlined" data-icon={subIcon}>
+                    {subIcon}
+                  </span>
+                  <span className="font-headline-md text-headline-md text-base uppercase tracking-tight truncate">
                     {l.name}
                   </span>
                 </Link>
