@@ -75,7 +75,9 @@ export default function SideNav({ active }: { active: NavKey }) {
                   href={subHref(l.id)}
                   className="text-on-surface-variant pl-12 pr-4 py-2 flex items-center gap-2 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
                 >
-                  <span className="font-body-md text-body-md truncate">{l.name}</span>
+                  <span className="font-headline-md text-headline-md text-sm uppercase tracking-tight truncate">
+                    {l.name}
+                  </span>
                 </Link>
               ))}
             </div>
