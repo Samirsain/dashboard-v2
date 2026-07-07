@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import CreateListModal from "@/components/CreateListModal";
 import ManageListAccessModal from "@/components/ManageListAccessModal";
+import CreateDoerModal from "@/components/CreateDoerModal";
 import type { DepartmentWiseTaskStat, FullDashboard, List, Task, TaskStatus } from "@/lib/types";
 
 /** Builds and downloads a CSV of the given tasks (client-side, no server round-trip). */
@@ -75,6 +76,7 @@ function DashboardInner() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [showCreateList, setShowCreateList] = useState(false);
+  const [showAddDoer, setShowAddDoer] = useState(false);
   const [manageAccessList, setManageAccessList] = useState<List | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +150,12 @@ function DashboardInner() {
           <div className="flex items-center gap-4">
             {isAdmin && (
               <>
+                <button
+                  onClick={() => setShowAddDoer(true)}
+                  className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                >
+                  + Add Doer
+                </button>
                 <button
                   onClick={() => setShowCreateList(true)}
                   className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
@@ -358,6 +366,13 @@ function DashboardInner() {
             setLists((prev) => [...prev, list]);
             setShowCreateList(false);
           }}
+        />
+      )}
+
+      {showAddDoer && (
+        <CreateDoerModal
+          onClose={() => setShowAddDoer(false)}
+          onCreated={() => setShowAddDoer(false)}
         />
       )}
 

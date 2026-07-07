@@ -8,7 +8,8 @@ export const createUserSchema = z.object({
   department: z.string().min(1),
   role: z.enum(["Admin", "Manager", "PC", "Doer"]),
   status: z.enum(["Active", "Inactive"]).default("Active"),
-  password: z.string().min(8),
+  // Kept short to allow the existing "EM@01" employee-code convention.
+  password: z.string().min(4),
 });
 
 export const updateUserSchema = z.object({

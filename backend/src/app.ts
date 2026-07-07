@@ -11,6 +11,10 @@ import { errorMiddleware } from "./middleware/error.middleware";
 export function createApp() {
   const app = express();
 
+  // Render/other PaaS put us behind a proxy; trust it so client IPs (used by
+  // the login rate limiter) are read from X-Forwarded-For correctly.
+  app.set("trust proxy", 1);
+
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigin === "*" ? true : env.corsOrigin.split(",") }));
   app.use(express.json());
