@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import CreateListModal from "@/components/CreateListModal";
 import ManageListAccessModal from "@/components/ManageListAccessModal";
 import CreateDoerModal from "@/components/CreateDoerModal";
-import type { DepartmentWiseTaskStat, FullDashboard, List, Task, TaskStatus } from "@/lib/types";
+import type { ChecklistInstance, DepartmentWiseTaskStat, FullDashboard, List, Task, TaskStatus } from "@/lib/types";
 
 /** Builds and downloads a CSV of the given tasks (client-side, no server round-trip). */
 function exportTasksToCsv(tasks: Task[]) {
@@ -72,8 +72,8 @@ function DashboardInner() {
   const { user } = useAuth();
   const isAdmin = user?.role === "Admin";
   const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
-  const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [checklistToday, setChecklistToday] = useState<ChecklistInstance[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [showCreateList, setShowCreateList] = useState(false);
   const [showAddDoer, setShowAddDoer] = useState(false);
@@ -86,19 +86,16 @@ function DashboardInner() {
       setLoading(true);
       setError(null);
       try {
-        const [dash, tasks, listsData] = await Promise.all([
+        const [dash, tasks, listsData, checklist] = await Promise.all([
           api.get<FullDashboard>("/dashboard"),
           api.get<Task[]>("/tasks"),
           api.get<List[]>("/lists").catch(() => [] as List[]),
+          api.get<ChecklistInstance[]>("/checklist/today").catch(() => [] as ChecklistInstance[]),
         ]);
         setDashboard(dash);
         setLists(listsData);
         setAllTasks(tasks);
-        setRecentTasks(
-          [...tasks]
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-            .slice(0, 6)
-        );
+        setChecklistToday(checklist);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to load dashboard.");
       } finally {
@@ -117,6 +114,44 @@ function DashboardInner() {
       alert(err instanceof ApiError ? err.message : "Failed to delete list.");
     }
   }
+
+  // Role-based "Task Directory":
+  //  - Admin/PC: every COMPLETED task (a record of what's done).
+  //  - Everyone else (doers): only their own TODAY items (tasks + checklist)
+  //    that are still open — a completed item drops off their to-do view.
+  const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
+  const isPrivileged = user?.role === "Admin" || user?.role === "PC";
+
+  type DirRow = { id: string; description: string; doerName: string; status: TaskStatus };
+  const directoryRows: DirRow[] = isPrivileged
+    ? allTasks
+        .filter((t) => t.status === "Completed")
+        .map((t) => ({
+          id: t.id,
+          description: t.title,
+          doerName: t.doer?.name ?? "Unassigned",
+          status: t.status,
+        }))
+    : [
+        ...allTasks
+          .filter((t) => t.dueDate === today && t.status !== "Completed" && t.status !== "Cancelled")
+          .map((t) => ({
+            id: t.id,
+            description: t.title,
+            doerName: t.doer?.name ?? user?.name ?? "",
+            status: t.status,
+          })),
+        ...checklistToday
+          .filter((c) => c.status !== "Completed")
+          .map((c) => ({
+            id: c.id,
+            description: c.taskName,
+            doerName: c.doer?.name ?? user?.name ?? "",
+            status: "Pending" as TaskStatus,
+          })),
+      ];
+
+  const directoryTitle = isPrivileged ? "Completed Tasks" : "Today's Tasks & Checklist";
 
   const summary = dashboard?.summary;
   const overallPct =
@@ -305,7 +340,7 @@ function DashboardInner() {
             <div className="col-span-12 lg:col-span-7 bg-surface border-2 border-on-surface flex flex-col">
               <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex justify-between items-center">
                 <h3 className="font-headline-md text-headline-md text-on-surface">
-                  Task Directory
+                  {directoryTitle}
                 </h3>
                 <a
                   href="/task-list"
@@ -330,21 +365,21 @@ function DashboardInner() {
                     </tr>
                   </thead>
                   <tbody className="font-body-md text-body-md text-on-surface">
-                    {!loading && recentTasks.length === 0 && (
+                    {!loading && directoryRows.length === 0 && (
                       <tr>
                         <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                          No tasks yet.
+                          {isPrivileged ? "No completed tasks yet." : "Nothing pending for today. 🎉"}
                         </td>
                       </tr>
                     )}
-                    {recentTasks.map((t) => (
+                    {directoryRows.map((t) => (
                       <tr
                         key={t.id}
                         className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-lowest transition-colors"
                       >
-                        <td className="py-4 px-4 font-medium">{t.title}</td>
+                        <td className="py-4 px-4 font-medium">{t.description}</td>
                         <td className="py-4 px-4 text-on-surface-variant">
-                          {t.doer?.name ?? "Unassigned"}
+                          {t.doerName || "Unassigned"}
                         </td>
                         <td className="py-4 px-4 text-right">
                           <StatusBadge status={t.status} />
