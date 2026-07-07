@@ -6,6 +6,7 @@ import checklistRoutes from "./checklist.routes";
 import dashboardRoutes from "./dashboard.routes";
 import activityRoutes from "./activity.routes";
 import listsRoutes from "./lists.routes";
+import workflowRoutes from "./workflow.routes";
 import { hasGoogleCredentials, hasSupabaseCredentials } from "../config/env";
 
 const router = Router();
@@ -30,5 +31,6 @@ router.use("/checklist", checklistRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/activity", activityRoutes);
 router.use("/lists", listsRoutes);
+router.use("/workflow", workflowRoutes);
 
 export default router;

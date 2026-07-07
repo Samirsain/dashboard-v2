@@ -185,6 +185,70 @@ export const sheetsConfig = {
     },
     "ACTIVITY_LOGS"
   ),
+
+  /** WFMS — reusable workflow templates (e.g. "Video Production Pipeline"). */
+  workflowTemplates: entity(
+    "WORKFLOW_TEMPLATES",
+    "workflow_templates",
+    "Template ID",
+    {
+      "Template ID": "id",
+      Name: "name",
+      CreatedAt: "created_at",
+    },
+    "WORKFLOW_TEMPLATES"
+  ),
+  /** WFMS — one row per step of a template: What / Who / How / TAT, in order. */
+  workflowSteps: entity(
+    "WORKFLOW_STEPS",
+    "workflow_steps",
+    "Step ID",
+    {
+      "Step ID": "id",
+      "Template ID": "template_id",
+      "Step No": "step_no",
+      What: "what",
+      "Doer ID": "doer_id",
+      How: "how",
+      TAT: "tat",
+    },
+    "WORKFLOW_STEPS"
+  ),
+  /** WFMS — one row per run (instance) of a template. */
+  workflowInstances: entity(
+    "WORKFLOW_INSTANCES",
+    "workflow_instances",
+    "Instance ID",
+    {
+      "Instance ID": "id",
+      "Template ID": "template_id",
+      Title: "title",
+      StartedAt: "started_at",
+      Status: "status",
+      RequestedBy: "requested_by",
+    },
+    "WORKFLOW_INSTANCES"
+  ),
+  /** WFMS — one row per (instance, step): the live Planned/Actual/Status/Delay record. */
+  workflowStepEvents: entity(
+    "WORKFLOW_STEP_EVENTS",
+    "workflow_step_events",
+    "Event ID",
+    {
+      "Event ID": "id",
+      "Instance ID": "instance_id",
+      "Step No": "step_no",
+      What: "what",
+      "Doer ID": "doer_id",
+      How: "how",
+      TAT: "tat",
+      Planned: "planned",
+      Actual: "actual",
+      Status: "status",
+      "Rework Count": "rework_count",
+    },
+    "WORKFLOW_STEP_EVENTS"
+  ),
 };
 
 export type SheetEntityKey = keyof typeof sheetsConfig;

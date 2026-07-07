@@ -136,3 +136,49 @@ export interface ActivityLog {
   time: string;
   details: string;
 }
+
+// ---- Workflow Monitoring System (WFMS) ------------------------------------
+
+export interface WorkflowStep {
+  id: string;
+  templateId: string;
+  stepNo: number;
+  what: string;
+  doerId: string;
+  how: string;
+  tat: string;
+}
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  createdAt: string;
+  steps: WorkflowStep[];
+}
+
+export type WorkflowInstanceStatus = "Active" | "Complete";
+
+export interface WorkflowInstance {
+  id: string;
+  templateId: string;
+  title: string;
+  startedAt: string;
+  status: WorkflowInstanceStatus;
+  requestedBy: string;
+}
+
+export type WorkflowStepStatus = "Pending" | "Active" | "Complete" | "Blocked" | "Overdue";
+
+export interface WorkflowStepEvent {
+  id: string;
+  instanceId: string;
+  stepNo: number;
+  what: string;
+  doerId: string;
+  how: string;
+  tat: string;
+  planned: string;
+  actual: string;
+  status: WorkflowStepStatus;
+  reworkCount: number;
+}

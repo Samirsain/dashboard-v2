@@ -175,3 +175,49 @@ export interface DepartmentWiseTaskStat {
   completed: number;
   overdue: number;
 }
+
+// ---- Workflow Monitoring System (WFMS) ------------------------------------
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface WorkflowStep {
+  id: string;
+  templateId: string;
+  stepNo: number;
+  what: string;
+  doerId: string;
+  how: string;
+  /** Canonical TAT string: "<n>h", "SAME_DAY", "NEXT_DAY", or "WHENEVER_NEEDED". */
+  tat: string;
+}
+
+export type WorkflowInstanceStatus = "Active" | "Complete";
+
+export interface WorkflowInstance {
+  id: string;
+  templateId: string;
+  title: string;
+  startedAt: string; // ISO timestamp
+  status: WorkflowInstanceStatus;
+  requestedBy: string;
+}
+
+export type WorkflowStepStatus = "Pending" | "Active" | "Complete" | "Blocked" | "Overdue";
+
+export interface WorkflowStepEvent {
+  id: string;
+  instanceId: string;
+  stepNo: number;
+  what: string;
+  doerId: string;
+  how: string;
+  tat: string;
+  planned: string; // ISO timestamp, "" if WHENEVER_NEEDED
+  actual: string; // ISO timestamp, "" until complete
+  status: WorkflowStepStatus;
+  reworkCount: number;
+}
