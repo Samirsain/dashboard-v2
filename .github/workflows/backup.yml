@@ -1,0 +1,37 @@
+name: Backup Supabase to Google Sheets
+
+# Free, reliable automatic backup: GitHub's scheduler hits the backend's
+# /api/backup/run endpoint every 6 hours. The request wakes a sleeping
+# free-tier host and triggers a full Supabase -> Google Sheets snapshot,
+# so backups don't depend on the in-process cron (which can't run while the
+# server is spun down).
+#
+# Setup (one time): add two repo secrets under
+#   Settings -> Secrets and variables -> Actions:
+#     BACKEND_URL   e.g. https://your-app.onrender.com   (no trailing slash)
+#     BACKUP_TOKEN  the same value set as BACKUP_TOKEN on the backend host
+
+on:
+  schedule:
+    - cron: "0 */6 * * *" # every 6 hours (UTC)
+  workflow_dispatch: {} # lets you run it manually from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger backup endpoint
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$BACKUP_TOKEN" ]; then
+            echo "::error::BACKEND_URL and BACKUP_TOKEN repo secrets must be set."
+            exit 1
+          fi
+          # --retry handles the free-tier cold start (first request wakes the server).
+          curl -fsS -X POST "$BACKEND_URL/api/backup/run" \
+            -H "x-backup-token: $BACKUP_TOKEN" \
+            --max-time 180 \
+            --retry 4 --retry-delay 30 --retry-all-errors \
+            -w "\nHTTP %{http_code}\n"

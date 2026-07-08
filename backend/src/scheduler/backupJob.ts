@@ -14,14 +14,21 @@ import { logger } from "../utils/logger";
  * still runs fine on Supabase alone; the backup is a safety net, not a
  * dependency.
  */
-export async function runBackupJob(): Promise<void> {
+export interface BackupResult {
+  ran: boolean;
+  backedUp: number;
+  total: number;
+  reason?: string;
+}
+
+export async function runBackupJob(): Promise<BackupResult> {
   if (!hasSupabaseCredentials()) {
     logger.warn("Skipping backup: Supabase (source) is not configured");
-    return;
+    return { ran: false, backedUp: 0, total: 0, reason: "supabase-not-configured" };
   }
   if (!hasGoogleCredentials()) {
     logger.warn("Skipping backup: Google Sheets (backup target) is not configured");
-    return;
+    return { ran: false, backedUp: 0, total: 0, reason: "google-not-configured" };
   }
 
   logger.info("Backup job starting: Supabase -> Google Sheets");
@@ -40,4 +47,5 @@ export async function runBackupJob(): Promise<void> {
   }
 
   logger.info({ backedUp: ok, total: entities.length }, "Backup job complete");
+  return { ran: true, backedUp: ok, total: entities.length };
 }

@@ -19,6 +19,10 @@ export const env = {
     expiresIn: optional("JWT_EXPIRES_IN", "8h"),
   },
 
+  // Shared secret an external scheduler (e.g. a free GitHub Actions cron) must
+  // present to trigger POST /api/backup/run. If unset, that endpoint is disabled.
+  backupToken: requiredAtRuntime("BACKUP_TOKEN"),
+
   supabase: {
     // The project URL, e.g. https://xxxx.supabase.co
     url: requiredAtRuntime("SUPABASE_URL"),
