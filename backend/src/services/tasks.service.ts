@@ -191,6 +191,24 @@ export const tasksService = {
     return task;
   },
 
+  /**
+   * Rolls a recurring task's own row forward to today instead of spawning a
+   * new row — a repeating task is one durable record whose Due Date advances
+   * each cycle. Creating a fresh row per occurrence (the old behavior) left
+   * the original template sitting in the list forever, showing up alongside
+   * every day's freshly generated copy as duplicate-looking entries.
+   */
+  async advanceRecurring(id: string, dueDate: string): Promise<Task> {
+    const saved = await dataService.updateById(entity, id, {
+      "Due Date": dueDate,
+      Status: "Pending",
+      "Revision Date": "",
+      "Revision Count": "0",
+      UpdatedAt: formatTimestamp(),
+    });
+    return toTask(saved);
+  },
+
   async remove(id: string, actorUserId: string): Promise<void> {
     const task = await this.getById(id);
     await dataService.deleteById(entity, id);

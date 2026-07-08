@@ -65,14 +65,14 @@ function TaskListInner() {
   const [showCreate, setShowCreate] = useState(false);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
+  const [doerFilter, setDoerFilter] = useState("");
   const { user } = useAuth();
   const canCreateTasks =
     user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
-  // Admin/PC/Manager keep seeing completed tasks in the list; a plain doer's
-  // list only shows their open work — completed items move to the admin
+  // Admin/Manager keep seeing completed tasks in the list; PC and plain doers
+  // only see open/pending work here — completed items move to the admin
   // "All Tasks" view.
-  const seesCompleted =
-    user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
+  const seesCompleted = user?.role === "Admin" || user?.role === "Manager";
 
   async function loadData() {
     setLoading(true);
@@ -107,6 +107,7 @@ function TaskListInner() {
   const filtered = tasks
     .filter((t) => (listFilter ? t.listId === listFilter : true))
     .filter((t) => (seesCompleted ? true : t.status !== "Completed"))
+    .filter((t) => (doerFilter ? t.assignedDoerId === doerFilter : true))
     .filter((t) =>
       `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
     );
@@ -146,6 +147,18 @@ function TaskListInner() {
           </div>
 
           <div className="flex items-center gap-stack-md">
+            <select
+              value={doerFilter}
+              onChange={(e) => setDoerFilter(e.target.value)}
+              className="bg-transparent border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+            >
+              <option value="">All Doers</option>
+              {doers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
             <div className="font-data-mono text-data-mono text-on-surface px-3 py-1 border-2 border-on-surface uppercase">
               {new Date().toISOString().split("T")[0]}
             </div>
