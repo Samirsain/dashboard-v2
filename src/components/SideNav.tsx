@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import BrandLogo from "@/components/BrandLogo";
 import type { List } from "@/lib/types";
 
 type NavKey = "dashboard" | "checklist" | "task-list" | "all-tasks" | "workflow" | "team-performance";
@@ -32,9 +33,9 @@ export default function SideNav({ active }: { active: NavKey }) {
     <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
       {/* Brand Area */}
       <div className="p-6 border-b-2 border-on-surface">
-        <h1 className="font-headline-md text-headline-md font-bold uppercase tracking-tighter text-on-surface">
-          ThirtyMilestones
-        </h1>
+        <Link href="/" className="flex items-center gap-3 text-on-surface">
+          <BrandLogo className="h-9 w-auto shrink-0" />
+        </Link>
       </div>
 
       {/* Navigation Tabs */}

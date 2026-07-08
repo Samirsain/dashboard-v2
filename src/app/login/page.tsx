@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useAuth, ApiError } from "@/lib/auth-context";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -26,10 +27,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm bg-surface-container-lowest border-2 border-on-surface p-8">
-        <div className="mb-stack-lg text-center">
-          <h1 className="font-headline-md text-headline-md font-bold uppercase tracking-tighter text-on-surface">
-            ThirtyMilestones
-          </h1>
+        <div className="mb-stack-lg flex justify-center">
+          <BrandLogo className="h-14 w-auto text-on-surface" />
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md">
