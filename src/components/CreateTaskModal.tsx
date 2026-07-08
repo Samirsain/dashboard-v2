@@ -4,6 +4,11 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { Doer, Task, TaskPriority } from "@/lib/types";
 
+type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";
+
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const NTH_OPTIONS = ["First", "Second", "Third", "Fourth", "Last"];
+
 export default function CreateTaskModal({
   doers,
   defaultListId = "",
@@ -19,12 +24,34 @@ export default function CreateTaskModal({
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
   const [priority, setPriority] = useState<TaskPriority>("Normal");
   const [dueDate, setDueDate] = useState("");
+  const [repeatType, setRepeatType] = useState<RepeatType>("None");
+  const [repeatWeekday, setRepeatWeekday] = useState("Monday");
+  const [repeatMonthDate, setRepeatMonthDate] = useState("");
+  const [repeatNth, setRepeatNth] = useState("First");
+  const [repeatNthDay, setRepeatNthDay] = useState("Monday");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function buildRepeatValue(): string {
+    if (repeatType === "None" || repeatType === "Daily") return "";
+    if (repeatType === "Weekly") return repeatWeekday;
+    if (repeatType === "Monthly (By Date)") {
+      if (!repeatMonthDate) return "";
+      return String(parseInt(repeatMonthDate.split("-")[2] ?? "1", 10));
+    }
+    if (repeatType === "Monthly (By Day)") return `${repeatNth} ${repeatNthDay}`;
+    return "";
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (repeatType === "Monthly (By Date)" && !repeatMonthDate) {
+      setError("Please select a date for monthly repeat.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const task = await api.post<Task>("/tasks", {
@@ -33,6 +60,8 @@ export default function CreateTaskModal({
         listId: defaultListId,
         priority,
         dueDate,
+        repeatType,
+        repeatValue: buildRepeatValue(),
       });
       onCreated(task);
     } catch (err) {
@@ -106,11 +135,88 @@ export default function CreateTaskModal({
                 onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 className={field}
               >
+                <option value="Low">Low</option>
                 <option value="Normal">Normal</option>
                 <option value="Urgent">Urgent</option>
+                <option value="Critical">Critical</option>
               </select>
             </div>
           </div>
+
+          <div>
+            <label className={label}>Repeat</label>
+            <select
+              value={repeatType}
+              onChange={(e) => { setRepeatType(e.target.value as RepeatType); }}
+              className={field}
+            >
+              <option value="None">None (One-time)</option>
+              <option value="Daily">Daily</option>
+              <option value="Weekly">Weekly</option>
+              <option value="Monthly (By Date)">Monthly (By Date)</option>
+              <option value="Monthly (By Day)">Monthly (By Day)</option>
+            </select>
+          </div>
+
+          {repeatType === "Weekly" && (
+            <div>
+              <label className={label}>Repeat On</label>
+              <select
+                value={repeatWeekday}
+                onChange={(e) => setRepeatWeekday(e.target.value)}
+                className={field}
+              >
+                {WEEKDAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          )}
+
+          {repeatType === "Monthly (By Date)" && (
+            <div>
+              <label className={label}>Repeat On Date</label>
+              <input
+                type="date"
+                required
+                value={repeatMonthDate}
+                onChange={(e) => setRepeatMonthDate(e.target.value)}
+                className={`${field} font-data-mono`}
+              />
+              <p className="mt-1 font-data-mono text-xs text-on-surface-variant uppercase">
+                Day of month extracted from selected date
+              </p>
+            </div>
+          )}
+
+          {repeatType === "Monthly (By Day)" && (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className={label}>Occurrence</label>
+                <select
+                  value={repeatNth}
+                  onChange={(e) => setRepeatNth(e.target.value)}
+                  className={field}
+                >
+                  {NTH_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className={label}>Day</label>
+                <select
+                  value={repeatNthDay}
+                  onChange={(e) => setRepeatNthDay(e.target.value)}
+                  className={field}
+                >
+                  {WEEKDAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {repeatType !== "None" && (
+            <p className="font-data-mono text-xs text-on-surface-variant border border-on-surface-variant px-3 py-2 uppercase">
+              ℹ️ Recurring task — system will auto-generate a new instance each day it matches.
+            </p>
+          )}
 
           {error && (
             <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">

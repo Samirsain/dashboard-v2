@@ -95,7 +95,8 @@ export function isWithinNextDays(iso: string, days: number, today = todayIso()):
  *
  * frequencyValue conventions (see types.ts ChecklistTemplate for details):
  *  - Weekly:    weekday name, e.g. "Monday"
- *  - Monthly:   day of month, e.g. "15"
+ *  - Monthly / Monthly (By Date): day of month, e.g. "15"
+ *  - Monthly (By Day): "First Monday", "Last Friday", etc.
  *  - Quarterly/HalfYearly/Yearly: comma separated "MM-DD" anchors
  */
 export function shouldGenerateForFrequency(
@@ -116,11 +117,13 @@ export function shouldGenerateForFrequency(
       return true;
     case "Weekly":
       return weekday.toLowerCase() === frequencyValue.trim().toLowerCase();
+    // Plain "Monthly" is an alias for "Monthly (By Date)"
     case "Monthly":
-    case "Monthly (By Date)":
+    case "Monthly (By Date)": {
       const d = parseInt(frequencyValue, 10);
       if (!isNaN(d)) return dayMatches(d);
       return false;
+    }
     case "Monthly (By Day)": {
       if (!frequencyValue) return false;
       const parts = frequencyValue.split(" ");
@@ -129,14 +132,17 @@ export function shouldGenerateForFrequency(
       if (!reqWeekday || !nthStr) return false;
       if (reqWeekday.toLowerCase() !== weekday.toLowerCase()) return false;
   
-      const nth = Math.ceil(day / 7);
+      // Correct nth-weekday: floor((day-1)/7)+1 gives which occurrence of this
+      // weekday in the month (1st, 2nd, 3rd, 4th). Math.ceil(day/7) was wrong
+      // when the weekday first appeared late in week-1 of the month.
+      const nthOccurrence = Math.floor((day - 1) / 7) + 1;
       const isLast = day + 7 > lastDayOfMonth;
   
       const nthLower = nthStr.toLowerCase();
-      if (nthLower === "first" && nth === 1) return true;
-      if (nthLower === "second" && nth === 2) return true;
-      if (nthLower === "third" && nth === 3) return true;
-      if (nthLower === "fourth" && nth === 4) return true;
+      if (nthLower === "first" && nthOccurrence === 1) return true;
+      if (nthLower === "second" && nthOccurrence === 2) return true;
+      if (nthLower === "third" && nthOccurrence === 3) return true;
+      if (nthLower === "fourth" && nthOccurrence === 4) return true;
       if (nthLower === "last" && isLast) return true;
       return false;
     }
@@ -169,15 +175,14 @@ export function shouldGenerateRecurringTask(
   const dayMatches = (anchorDay: number) =>
     anchorDay === day || (anchorDay > lastDayOfMonth && day === lastDayOfMonth);
 
-  if (repeatType === "Daily") {
-    return true;
-  }
+  if (repeatType === "Daily") return true;
 
   if (repeatType === "Weekly") {
     return weekday.toLowerCase() === (repeatValue || "").trim().toLowerCase();
   }
 
-  if (repeatType === "Monthly (By Date)") {
+  // Plain "Monthly" treated same as "Monthly (By Date)"
+  if (repeatType === "Monthly" || repeatType === "Monthly (By Date)") {
     const d = parseInt(repeatValue, 10);
     if (isNaN(d)) return false;
     return dayMatches(d);
@@ -191,14 +196,15 @@ export function shouldGenerateRecurringTask(
     if (!reqWeekday || !nthStr) return false;
     if (reqWeekday.toLowerCase() !== weekday.toLowerCase()) return false;
 
-    const nth = Math.ceil(day / 7);
+    // Correct: floor((day-1)/7)+1 gives true nth occurrence of this weekday
+    const nthOccurrence = Math.floor((day - 1) / 7) + 1;
     const isLast = day + 7 > lastDayOfMonth;
 
     const nthLower = nthStr.toLowerCase();
-    if (nthLower === "first" && nth === 1) return true;
-    if (nthLower === "second" && nth === 2) return true;
-    if (nthLower === "third" && nth === 3) return true;
-    if (nthLower === "fourth" && nth === 4) return true;
+    if (nthLower === "first" && nthOccurrence === 1) return true;
+    if (nthLower === "second" && nthOccurrence === 2) return true;
+    if (nthLower === "third" && nthOccurrence === 3) return true;
+    if (nthLower === "fourth" && nthOccurrence === 4) return true;
     if (nthLower === "last" && isLast) return true;
     return false;
   }
