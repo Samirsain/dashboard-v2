@@ -68,6 +68,11 @@ function TaskListInner() {
   const { user } = useAuth();
   const canCreateTasks =
     user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
+  // Admin/PC/Manager keep seeing completed tasks in the list; a plain doer's
+  // list only shows their open work — completed items move to the admin
+  // "All Tasks" view.
+  const seesCompleted =
+    user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
 
   async function loadData() {
     setLoading(true);
@@ -101,6 +106,7 @@ function TaskListInner() {
 
   const filtered = tasks
     .filter((t) => (listFilter ? t.listId === listFilter : true))
+    .filter((t) => (seesCompleted ? true : t.status !== "Completed"))
     .filter((t) =>
       `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
     );

@@ -6,12 +6,13 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { List } from "@/lib/types";
 
-type NavKey = "dashboard" | "checklist" | "task-list" | "workflow" | "team-performance";
+type NavKey = "dashboard" | "checklist" | "task-list" | "all-tasks" | "workflow" | "team-performance";
 
 const NAV_ITEMS: { key: NavKey; href: string; icon: string; label: string; adminOnly?: boolean }[] = [
   { key: "dashboard", href: "/", icon: "dashboard", label: "Dashboard" },
   { key: "checklist", href: "/checklist", icon: "checklist", label: "Checklist" },
   { key: "task-list", href: "/task-list", icon: "assignment", label: "Task List" },
+  { key: "all-tasks", href: "/all-tasks", icon: "fact_check", label: "All Tasks", adminOnly: true },
   { key: "workflow", href: "/workflow", icon: "account_tree", label: "Workflow" },
   { key: "team-performance", href: "/team-performance", icon: "insights", label: "Team Performance", adminOnly: true },
 ];
