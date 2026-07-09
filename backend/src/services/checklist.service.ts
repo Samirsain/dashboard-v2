@@ -131,7 +131,17 @@ export const checklistService = {
     return toTemplate(saved);
   },
 
+  /**
+   * Permanently removes a recurring checklist task: the template itself (so
+   * it stops generating) plus every instance ever generated from it,
+   * completed or not — the admin deleting a checklist task from the reports
+   * page means "we don't need this at all anymore," not just "stop it going
+   * forward."
+   */
   async removeTemplate(id: string): Promise<void> {
+    const instances = await this.listInstances({});
+    const toDelete = instances.filter((i) => i.templateId === id);
+    await Promise.all(toDelete.map((i) => dataService.deleteById(instancesEntity, i.id)));
     await dataService.deleteById(templatesEntity, id);
   },
 
