@@ -43,6 +43,22 @@ export interface List {
   createdAt: string;
 }
 
+/** A row in the Master Sheet — free-form documentation of a list/system. */
+export interface MasterSheetRow {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  description: string;
+  date: string;
+  videos: string;
+  pc: string;
+  ps: string;
+  access: string;
+  link: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   /** The Task List (list of type "task") this task is filed under, or "". */

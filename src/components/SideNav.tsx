@@ -13,6 +13,7 @@ type NavKey =
   | "task-list"
   | "all-tasks"
   | "workflow"
+  | "master-sheet"
   | "team-performance"
   | "settings";
 
@@ -162,6 +163,14 @@ export default function SideNav({ active }: { active: NavKey }) {
             account_tree
           </span>
           <span className={labelCls}>Workflow</span>
+        </Link>
+
+        {/* Master Sheet */}
+        <Link href="/master-sheet" className={active === "master-sheet" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="table_chart">
+            table_chart
+          </span>
+          <span className={labelCls}>Master Sheet</span>
         </Link>
 
         {/* Admin-only */}

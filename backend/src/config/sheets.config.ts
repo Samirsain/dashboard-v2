@@ -58,6 +58,32 @@ function entity(
 }
 
 export const sheetsConfig = {
+  /**
+   * Master Sheet — a documentation grid describing each list/system: its code
+   * (TL/CL/TL2...), name, type, description, creation date, training video
+   * links, its PC (process coordinator) and PS (problem solver), which doers
+   * have access, and a reference link. Free-form and fully admin-editable.
+   */
+  masterSheets: entity(
+    "MASTER_SHEETS",
+    "master_sheets",
+    "Master ID",
+    {
+      "Master ID": "id",
+      Code: "code",
+      Name: "name",
+      Type: "type",
+      Description: "description",
+      Date: "date",
+      Videos: "videos",
+      PC: "pc",
+      PS: "ps",
+      Access: "access",
+      Link: "link",
+      CreatedAt: "created_at",
+    },
+    "MASTER_SHEET"
+  ),
   /** Named lists (categories) an admin creates — each is a "Task List" or a "Checklist". */
   lists: entity(
     "LISTS",
