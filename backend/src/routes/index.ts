@@ -7,6 +7,7 @@ import dashboardRoutes from "./dashboard.routes";
 import activityRoutes from "./activity.routes";
 import listsRoutes from "./lists.routes";
 import workflowRoutes from "./workflow.routes";
+import masterSheetRoutes from "./masterSheet.routes";
 import backupRoutes from "./backup.routes";
 import { hasGoogleCredentials, hasSupabaseCredentials } from "../config/env";
 
@@ -33,6 +34,7 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/activity", activityRoutes);
 router.use("/lists", listsRoutes);
 router.use("/workflow", workflowRoutes);
+router.use("/master-sheet", masterSheetRoutes);
 router.use("/backup", backupRoutes);
 
 export default router;

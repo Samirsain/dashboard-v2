@@ -13,6 +13,22 @@ export interface Doer {
   createdAt: string;
 }
 
+/** A row in the Master Sheet — free-form documentation of a list/system. */
+export interface MasterSheetRow {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  description: string;
+  date: string;
+  videos: string;
+  pc: string;
+  ps: string;
+  access: string;
+  link: string;
+  createdAt: string;
+}
+
 export type TaskPriority = "Low" | "Normal" | "Urgent" | "Critical";
 export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
 export type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";
