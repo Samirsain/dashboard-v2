@@ -17,6 +17,17 @@ import type {
 const templatesEntity = sheetsConfig.checklistTemplates;
 const instancesEntity = sheetsConfig.checklistInstances;
 
+/**
+ * True when an insert failed because it hit the unique (template_id, date)
+ * index — i.e. another concurrent request already created this occurrence.
+ * Postgres reports unique violations as SQLSTATE 23505; the message also
+ * mentions "duplicate key" as a fallback for wrapped errors.
+ */
+function isDuplicateInstanceError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes("23505") || message.toLowerCase().includes("duplicate key");
+}
+
 function toTemplate(record: SheetRecord): ChecklistTemplate {
   return {
     id: record["Template ID"] ?? "",
@@ -200,8 +211,25 @@ export const checklistService = {
         CompletedAt: "",
       };
 
-      const saved = await dataService.append(instancesEntity, record);
-      created.push(toInstance(saved));
+      try {
+        const saved = await dataService.append(instancesEntity, record);
+        created.push(toInstance(saved));
+      } catch (err) {
+        // Two page loads can call generation for the same day at the same
+        // instant; both pass the existence check above, then both insert.
+        // A unique (template_id, date) index in the DB turns the loser's
+        // insert into a duplicate-key error — swallow it so we never end up
+        // with two instances for the same (template, date). Re-throw anything
+        // that isn't that race.
+        if (isDuplicateInstanceError(err)) {
+          logger.info(
+            { templateId: template.id, date: dateIso },
+            "Skipped duplicate checklist instance (concurrent generation)"
+          );
+          continue;
+        }
+        throw err;
+      }
     }
 
     logger.info(
