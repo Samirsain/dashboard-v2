@@ -104,7 +104,14 @@ function ChecklistInner() {
   const currentList = lists.find((l) => l.id === listFilter) ?? null;
 
   const filtered = instances
-    .filter((t) => (listFilter ? templateListMap[t.templateId] === listFilter : true))
+    .filter((t) => {
+      const tListId = templateListMap[t.templateId] ?? "";
+      // A named list (e.g. Sahil Sir Checklist) shows only its own items.
+      // The main "Daily Checklist" (no list selected) shows only items that
+      // don't belong to any named list — so list-specific items don't leak
+      // into the general view.
+      return listFilter ? tListId === listFilter : tListId === "";
+    })
     .filter((t) =>
       `${t.taskName} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
     );
@@ -150,7 +157,7 @@ function ChecklistInner() {
                 {currentList ? currentList.name : "Daily Checklist"}
               </h2>
               <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
-                {currentList ? `${filtered.length} in this list` : `${instances.length} items`} &bull; System Live
+                {currentList ? `${filtered.length} in this list` : `${filtered.length} items`} &bull; System Live
               </p>
             </div>
             <div className="flex gap-stack-sm">
