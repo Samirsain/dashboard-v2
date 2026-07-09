@@ -26,5 +26,10 @@ export const idParamSchema = z.object({
   id: z.string().min(1),
 });
 
+export const resetPasswordSchema = z.object({
+  newPassword: z.string().min(4),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
