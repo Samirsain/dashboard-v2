@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { usersService } from "../services/users.service";
-import type { CreateUserInput, UpdateUserInput } from "../validation/user.schema";
+import type { CreateUserInput, ResetPasswordInput, UpdateUserInput } from "../validation/user.schema";
 
 export const usersController = {
   list: asyncHandler(async (_req: Request, res: Response) => {
@@ -30,5 +30,11 @@ export const usersController = {
   remove: asyncHandler(async (req: Request, res: Response) => {
     await usersService.remove(req.params.id as string);
     ok(res, { deleted: true });
+  }),
+
+  resetPassword: asyncHandler(async (req: Request, res: Response) => {
+    const { newPassword } = req.body as ResetPasswordInput;
+    await usersService.resetPassword(req.params.id as string, newPassword);
+    ok(res, { reset: true });
   }),
 };

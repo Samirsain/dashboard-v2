@@ -7,12 +7,89 @@ import { api } from "@/lib/api";
 import BrandLogo from "@/components/BrandLogo";
 import type { List } from "@/lib/types";
 
-type NavKey = "dashboard" | "checklist" | "task-list" | "all-tasks" | "workflow" | "team-performance";
+type NavKey =
+  | "dashboard"
+  | "checklist"
+  | "task-list"
+  | "all-tasks"
+  | "workflow"
+  | "team-performance"
+  | "settings";
 
 /** "SAHIL SIR TASKLIST" -> "SAHIL TL"; a named list's short sidebar label. */
 function shortListLabel(name: string, type: "task" | "checklist"): string {
   const first = name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
   return `${first} ${type === "task" ? "TL" : "CL"}`;
+}
+
+const linkBase =
+  "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent";
+const linkActive =
+  "bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 flex items-center gap-3";
+const labelCls = "font-headline-md text-headline-md text-base uppercase tracking-tight";
+
+type OpenState = { "task-list": boolean; checklist: boolean };
+
+// A collapsible parent (Task List / Checklist): clicking toggles the sheets
+// dropdown — the "office" (no-list) view plus every named list, shown as
+// OFFICE TL / SAHIL TL etc.
+function CollapsibleSection({
+  active,
+  open,
+  setOpen,
+  navKey,
+  icon,
+  label,
+  basePath,
+  officeLabel,
+  sectionLists,
+  type,
+}: {
+  active: NavKey;
+  open: OpenState;
+  setOpen: (updater: (p: OpenState) => OpenState) => void;
+  navKey: "task-list" | "checklist";
+  icon: string;
+  label: string;
+  basePath: string;
+  officeLabel: string;
+  sectionLists: List[];
+  type: "task" | "checklist";
+}) {
+  const expanded = open[navKey];
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((p) => ({ ...p, [navKey]: !p[navKey] }))}
+        className={`w-full ${active === navKey ? linkActive : linkBase} justify-between`}
+      >
+        <span className="flex items-center gap-3">
+          <span className="material-symbols-outlined" data-icon={icon}>
+            {icon}
+          </span>
+          <span className={labelCls}>{label}</span>
+        </span>
+        <span className="material-symbols-outlined text-lg">
+          {expanded ? "expand_more" : "chevron_right"}
+        </span>
+      </button>
+
+      {expanded && (
+        <>
+          {/* Office / normal view (no named list) */}
+          <Link href={basePath} className={`${linkBase} pl-12 pr-4`}>
+            <span className={`${labelCls} truncate`}>{officeLabel}</span>
+          </Link>
+          {/* Named lists (e.g. Sahil) */}
+          {sectionLists.map((l) => (
+            <Link key={l.id} href={`${basePath}?list=${l.id}`} className={`${linkBase} pl-12 pr-4`}>
+              <span className={`${labelCls} truncate`}>{shortListLabel(l.name, type)}</span>
+            </Link>
+          ))}
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function SideNav({ active }: { active: NavKey }) {
@@ -31,68 +108,6 @@ export default function SideNav({ active }: { active: NavKey }) {
 
   const taskLists = lists.filter((l) => l.type === "task");
   const checklists = lists.filter((l) => l.type === "checklist");
-
-  const linkBase =
-    "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent";
-  const linkActive =
-    "bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 flex items-center gap-3";
-  const labelCls = "font-headline-md text-headline-md text-base uppercase tracking-tight";
-
-  // A collapsible parent (Task List / Checklist): clicking toggles the sheets
-  // dropdown — the "office" (no-list) view plus every named list, shown as
-  // OFFICE TL / SAHIL TL etc.
-  function CollapsibleSection({
-    navKey,
-    icon,
-    label,
-    basePath,
-    officeLabel,
-    sectionLists,
-    type,
-  }: {
-    navKey: "task-list" | "checklist";
-    icon: string;
-    label: string;
-    basePath: string;
-    officeLabel: string;
-    sectionLists: List[];
-    type: "task" | "checklist";
-  }) {
-    const expanded = open[navKey];
-    return (
-      <div>
-        <button
-          onClick={() => setOpen((p) => ({ ...p, [navKey]: !p[navKey] }))}
-          className={`w-full ${active === navKey ? linkActive : linkBase} justify-between`}
-        >
-          <span className="flex items-center gap-3">
-            <span className="material-symbols-outlined" data-icon={icon}>
-              {icon}
-            </span>
-            <span className={labelCls}>{label}</span>
-          </span>
-          <span className="material-symbols-outlined text-lg">
-            {expanded ? "expand_more" : "chevron_right"}
-          </span>
-        </button>
-
-        {expanded && (
-          <>
-            {/* Office / normal view (no named list) */}
-            <Link href={basePath} className={`${linkBase} pl-12 pr-4`}>
-              <span className={`${labelCls} truncate`}>{officeLabel}</span>
-            </Link>
-            {/* Named lists (e.g. Sahil) */}
-            {sectionLists.map((l) => (
-              <Link key={l.id} href={`${basePath}?list=${l.id}`} className={`${linkBase} pl-12 pr-4`}>
-                <span className={`${labelCls} truncate`}>{shortListLabel(l.name, type)}</span>
-              </Link>
-            ))}
-          </>
-        )}
-      </div>
-    );
-  }
 
   return (
     <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
@@ -115,6 +130,9 @@ export default function SideNav({ active }: { active: NavKey }) {
 
         {/* Task List (dropdown): OFFICE TL + named task lists */}
         <CollapsibleSection
+          active={active}
+          open={open}
+          setOpen={setOpen}
           navKey="task-list"
           icon="assignment"
           label="Task List"
@@ -126,6 +144,9 @@ export default function SideNav({ active }: { active: NavKey }) {
 
         {/* Checklist (dropdown): OFFICE CL + named checklists */}
         <CollapsibleSection
+          active={active}
+          open={open}
+          setOpen={setOpen}
           navKey="checklist"
           icon="checklist"
           label="Checklist"
@@ -187,15 +208,21 @@ export default function SideNav({ active }: { active: NavKey }) {
 
       {/* Footer Tabs */}
       <div className="border-t-2 border-on-surface py-2">
-        <a
-          className="text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors"
-          href="#"
-        >
-          <span className="material-symbols-outlined" data-icon="settings">
-            settings
-          </span>
-          <span className="font-label-sm text-label-sm">Settings</span>
-        </a>
+        {user?.role === "Admin" && (
+          <Link
+            href="/settings"
+            className={
+              active === "settings"
+                ? "bg-secondary-container text-on-secondary-container px-4 py-3 flex items-center gap-3 border-l-4 border-primary"
+                : "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors border-l-4 border-transparent"
+            }
+          >
+            <span className="material-symbols-outlined" data-icon="settings">
+              settings
+            </span>
+            <span className="font-label-sm text-label-sm">Settings</span>
+          </Link>
+        )}
         <a
           className="text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors"
           href="#"

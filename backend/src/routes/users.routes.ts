@@ -3,7 +3,12 @@ import { usersController } from "../controllers/users.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
 import { requireRole } from "../middleware/role.middleware";
-import { createUserSchema, idParamSchema, updateUserSchema } from "../validation/user.schema";
+import {
+  createUserSchema,
+  idParamSchema,
+  resetPasswordSchema,
+  updateUserSchema,
+} from "../validation/user.schema";
 
 const router = Router();
 
@@ -28,6 +33,12 @@ router.delete(
   requireRole("Admin"),
   validate({ params: idParamSchema }),
   usersController.remove
+);
+router.post(
+  "/:id/reset-password",
+  requireRole("Admin"),
+  validate({ params: idParamSchema, body: resetPasswordSchema }),
+  usersController.resetPassword
 );
 
 export default router;

@@ -121,6 +121,18 @@ export const usersService = {
     await dataService.deleteById(entity, id);
   },
 
+  /**
+   * Admin-only password reset. There's no "view password" — bcrypt hashes
+   * aren't reversible, and storing plaintext would be a real security hole —
+   * so the only supported flow is setting a brand new one.
+   */
+  async resetPassword(id: string, newPassword: string): Promise<void> {
+    const exists = await this.exists(id);
+    if (!exists) throw AppError.notFound(`Doer "${id}" not found in DOERLIST`);
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await dataService.updateById(entity, id, { PasswordHash: passwordHash });
+  },
+
   async verifyPassword(user: UserWithSecrets, password: string): Promise<boolean> {
     if (!user.passwordHash) return false;
     return bcrypt.compare(password, user.passwordHash);
