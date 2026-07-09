@@ -6,9 +6,17 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { ChecklistInstance, Doer, Task } from "@/lib/types";
+import type { ChecklistInstance, ChecklistTemplate, Doer, List, Task } from "@/lib/types";
 
 type Tab = "tasks" | "checklist";
+
+/** First word of a list's name, uppercased — how the sidebar groups OFFICE/SAHIL TL+CL together. */
+function listGroupKey(name: string): string {
+  return name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
+}
+
+const ALL_SCOPE = "ALL";
+const OFFICE_SCOPE = "OFFICE";
 
 /** Completion timestamp proxy: updatedAt is stamped when a task is marked Completed. */
 function taskCompletedOn(t: Task): string {
@@ -29,6 +37,8 @@ function AllTasksInner() {
   const [tab, setTab] = useState<Tab>("tasks");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklist, setChecklist] = useState<ChecklistInstance[]>([]);
+  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
+  const [lists, setLists] = useState<List[]>([]);
   const [users, setUsers] = useState<Doer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,19 +48,26 @@ function AllTasksInner() {
   const [doerFilter, setDoerFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  // Which list "group" to show: ALL, OFFICE (no named list), or a named
+  // group like SAHIL — same grouping the sidebar uses for OFFICE/SAHIL TL+CL.
+  const [scope, setScope] = useState<string>(ALL_SCOPE);
 
   useEffect(() => {
     async function load() {
       try {
-        const [taskData, userData, checklistData] = await Promise.all([
+        const [taskData, userData, listData, templateData, checklistData] = await Promise.all([
           api.get<Task[]>("/tasks"),
           api.get<Doer[]>("/users"),
+          api.get<List[]>("/lists").catch(() => [] as List[]),
+          api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
           api
             .get<ChecklistInstance[]>("/checklist/instances?status=Completed")
             .catch(() => [] as ChecklistInstance[]),
         ]);
         setTasks(taskData);
         setUsers(userData);
+        setLists(listData);
+        setTemplates(templateData);
         setChecklist(checklistData);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to load data.");
@@ -67,6 +84,39 @@ function AllTasksInner() {
     return m;
   }, [users]);
 
+  // template id -> list id, so checklist instances can be scoped by list.
+  const templateListMap = useMemo(
+    () => Object.fromEntries(templates.map((t) => [t.id, t.listId])),
+    [templates]
+  );
+
+  // Named-list groups available in the scope dropdown, e.g. { SAHIL: [...] }.
+  const scopeGroups = useMemo(() => {
+    const groups = new Map<string, { key: string; label: string; listIds: Set<string> }>();
+    for (const l of lists) {
+      const key = listGroupKey(l.name);
+      if (!groups.has(key)) groups.set(key, { key, label: key, listIds: new Set() });
+      groups.get(key)!.listIds.add(l.id);
+    }
+    return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [lists]);
+
+  const scopeOptions = useMemo(
+    () => [
+      { key: ALL_SCOPE, label: "All Lists" },
+      { key: OFFICE_SCOPE, label: "Office" },
+      ...scopeGroups.filter((g) => g.key !== OFFICE_SCOPE).map((g) => ({ key: g.key, label: g.label })),
+    ],
+    [scopeGroups]
+  );
+
+  function inScope(listId: string): boolean {
+    if (scope === ALL_SCOPE) return true;
+    if (scope === OFFICE_SCOPE) return !listId;
+    const group = scopeGroups.find((g) => g.key === scope);
+    return group ? group.listIds.has(listId) : true;
+  }
+
   // People who can be assigned work — shown in the doer filter dropdown.
   const doerOptions = useMemo(
     () => users.filter((u) => u.role === "Doer" || u.role === "PC"),
@@ -76,17 +126,20 @@ function AllTasksInner() {
   const completedTasks = useMemo(() => {
     return tasks
       .filter((t) => t.status === "Completed")
+      .filter((t) => inScope(t.listId))
       .filter((t) => (doerFilter ? t.assignedDoerId === doerFilter : true))
       .filter((t) => inRange(taskCompletedOn(t), fromDate, toDate))
       .filter((t) =>
         `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
       )
       .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
-  }, [tasks, doerFilter, fromDate, toDate, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, doerFilter, fromDate, toDate, search, scope, scopeGroups]);
 
   const completedChecklist = useMemo(() => {
     return checklist
       .filter((c) => c.status === "Completed")
+      .filter((c) => inScope(templateListMap[c.templateId] ?? ""))
       .filter((c) => (doerFilter ? c.assignedDoerId === doerFilter : true))
       .filter((c) => inRange(checklistCompletedOn(c), fromDate, toDate))
       .filter((c) =>
@@ -95,7 +148,8 @@ function AllTasksInner() {
           .includes(search.toLowerCase())
       )
       .sort((a, b) => (b.completedAt || b.date || "").localeCompare(a.completedAt || a.date || ""));
-  }, [checklist, doerFilter, fromDate, toDate, search, nameById]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklist, doerFilter, fromDate, toDate, search, nameById, templateListMap, scope, scopeGroups]);
 
   const rows = tab === "tasks" ? completedTasks.length : completedChecklist.length;
 
@@ -104,6 +158,7 @@ function AllTasksInner() {
     setDoerFilter("");
     setFromDate("");
     setToDate("");
+    setScope(ALL_SCOPE);
   }
 
   function exportCSV() {
@@ -183,21 +238,38 @@ function AllTasksInner() {
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2">
-            {(["tasks", "checklist"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={
-                  tab === t
-                    ? "border-2 border-on-surface bg-on-surface text-surface px-4 py-1.5 font-label-sm text-label-sm uppercase"
-                    : "border-2 border-on-surface px-4 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                }
+          {/* Tabs + List scope */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex gap-2">
+              {(["tasks", "checklist"] as Tab[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={
+                    tab === t
+                      ? "border-2 border-on-surface bg-on-surface text-surface px-4 py-1.5 font-label-sm text-label-sm uppercase"
+                      : "border-2 border-on-surface px-4 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                  }
+                >
+                  {t === "tasks" ? "Tasks" : "Checklist"}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">List:</span>
+              <select
+                value={scope}
+                onChange={(e) => setScope(e.target.value)}
+                className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
               >
-                {t === "tasks" ? "Tasks" : "Checklist"}
-              </button>
-            ))}
+                {scopeOptions.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Filters */}
@@ -221,7 +293,7 @@ function AllTasksInner() {
               <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To (completed)</label>
               <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className={inputCls} />
             </div>
-            {(doerFilter || fromDate || toDate || search) && (
+            {(doerFilter || fromDate || toDate || search || scope !== ALL_SCOPE) && (
               <button
                 onClick={clearFilters}
                 className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
