@@ -9,18 +9,21 @@ import type { List } from "@/lib/types";
 
 type NavKey = "dashboard" | "checklist" | "task-list" | "all-tasks" | "workflow" | "team-performance";
 
-const NAV_ITEMS: { key: NavKey; href: string; icon: string; label: string; adminOnly?: boolean }[] = [
-  { key: "dashboard", href: "/", icon: "dashboard", label: "Dashboard" },
-  { key: "checklist", href: "/checklist", icon: "checklist", label: "Checklist" },
-  { key: "task-list", href: "/task-list", icon: "assignment", label: "Task List" },
-  { key: "all-tasks", href: "/all-tasks", icon: "fact_check", label: "All Tasks", adminOnly: true },
-  { key: "workflow", href: "/workflow", icon: "account_tree", label: "Workflow" },
-  { key: "team-performance", href: "/team-performance", icon: "insights", label: "Team Performance", adminOnly: true },
-];
+/** "SAHIL SIR TASKLIST" -> "SAHIL TL"; a named list's short sidebar label. */
+function shortListLabel(name: string, type: "task" | "checklist"): string {
+  const first = name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
+  return `${first} ${type === "task" ? "TL" : "CL"}`;
+}
 
 export default function SideNav({ active }: { active: NavKey }) {
   const { user, logout } = useAuth();
   const [lists, setLists] = useState<List[]>([]);
+  // Which collapsible section is expanded. Open the one matching the current
+  // page by default so the active list is visible on load.
+  const [open, setOpen] = useState<{ "task-list": boolean; checklist: boolean }>({
+    "task-list": active === "task-list",
+    checklist: active === "checklist",
+  });
 
   useEffect(() => {
     api.get<List[]>("/lists").then(setLists).catch(() => setLists([]));
@@ -28,6 +31,68 @@ export default function SideNav({ active }: { active: NavKey }) {
 
   const taskLists = lists.filter((l) => l.type === "task");
   const checklists = lists.filter((l) => l.type === "checklist");
+
+  const linkBase =
+    "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent";
+  const linkActive =
+    "bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 flex items-center gap-3";
+  const labelCls = "font-headline-md text-headline-md text-base uppercase tracking-tight";
+
+  // A collapsible parent (Task List / Checklist): clicking toggles the sheets
+  // dropdown — the "office" (no-list) view plus every named list, shown as
+  // OFFICE TL / SAHIL TL etc.
+  function CollapsibleSection({
+    navKey,
+    icon,
+    label,
+    basePath,
+    officeLabel,
+    sectionLists,
+    type,
+  }: {
+    navKey: "task-list" | "checklist";
+    icon: string;
+    label: string;
+    basePath: string;
+    officeLabel: string;
+    sectionLists: List[];
+    type: "task" | "checklist";
+  }) {
+    const expanded = open[navKey];
+    return (
+      <div>
+        <button
+          onClick={() => setOpen((p) => ({ ...p, [navKey]: !p[navKey] }))}
+          className={`w-full ${active === navKey ? linkActive : linkBase} justify-between`}
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined" data-icon={icon}>
+              {icon}
+            </span>
+            <span className={labelCls}>{label}</span>
+          </span>
+          <span className="material-symbols-outlined text-lg">
+            {expanded ? "expand_more" : "chevron_right"}
+          </span>
+        </button>
+
+        {expanded && (
+          <>
+            {/* Office / normal view (no named list) */}
+            <Link href={basePath} className={`${linkBase} pl-12 pr-4`}>
+              <span className={`${labelCls} truncate`}>{officeLabel}</span>
+            </Link>
+            {/* Named lists (e.g. Sahil) */}
+            {sectionLists.map((l) => (
+              <Link key={l.id} href={`${basePath}?list=${l.id}`} className={`${linkBase} pl-12 pr-4`}>
+                <span className={`${labelCls} truncate`}>{shortListLabel(l.name, type)}</span>
+              </Link>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
@@ -40,55 +105,64 @@ export default function SideNav({ active }: { active: NavKey }) {
 
       {/* Navigation Tabs */}
       <div className="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          // Hide admin-only items if user is not Admin
-          if (item.adminOnly && user?.role !== "Admin") {
-            return null;
-          }
+        {/* Dashboard */}
+        <Link href="/" className={active === "dashboard" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="dashboard">
+            dashboard
+          </span>
+          <span className={labelCls}>Dashboard</span>
+        </Link>
 
-          const isActive = item.key === active;
-          // Lists are nested directly under their parent nav item.
-          const subLists =
-            item.key === "task-list" ? taskLists : item.key === "checklist" ? checklists : [];
-          const subHref = (id: string) =>
-            item.key === "task-list" ? `/task-list?list=${id}` : `/checklist?list=${id}`;
-          const subIcon = item.key === "task-list" ? "assignment" : "checklist";
+        {/* Task List (dropdown): OFFICE TL + named task lists */}
+        <CollapsibleSection
+          navKey="task-list"
+          icon="assignment"
+          label="Task List"
+          basePath="/task-list"
+          officeLabel="OFFICE TL"
+          sectionLists={taskLists}
+          type="task"
+        />
 
-          return (
-            <div key={item.key}>
-              <Link
-                href={item.href}
-                className={
-                  isActive
-                    ? "bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 flex items-center gap-3"
-                    : "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
-                }
-              >
-                <span className="material-symbols-outlined" data-icon={item.icon}>
-                  {item.icon}
-                </span>
-                <span className="font-headline-md text-headline-md text-base uppercase tracking-tight">
-                  {item.label}
-                </span>
-              </Link>
+        {/* Checklist (dropdown): OFFICE CL + named checklists */}
+        <CollapsibleSection
+          navKey="checklist"
+          icon="checklist"
+          label="Checklist"
+          basePath="/checklist"
+          officeLabel="OFFICE CL"
+          sectionLists={checklists}
+          type="checklist"
+        />
 
-              {subLists.map((l) => (
-                <Link
-                  key={l.id}
-                  href={subHref(l.id)}
-                  className="text-on-surface-variant pl-8 pr-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent"
-                >
-                  <span className="material-symbols-outlined" data-icon={subIcon}>
-                    {subIcon}
-                  </span>
-                  <span className="font-headline-md text-headline-md text-base uppercase tracking-tight truncate">
-                    {l.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          );
-        })}
+        {/* Workflow */}
+        <Link href="/workflow" className={active === "workflow" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="account_tree">
+            account_tree
+          </span>
+          <span className={labelCls}>Workflow</span>
+        </Link>
+
+        {/* Admin-only */}
+        {user?.role === "Admin" && (
+          <>
+            <Link href="/all-tasks" className={active === "all-tasks" ? linkActive : linkBase}>
+              <span className="material-symbols-outlined" data-icon="fact_check">
+                fact_check
+              </span>
+              <span className={labelCls}>All Tasks</span>
+            </Link>
+            <Link
+              href="/team-performance"
+              className={active === "team-performance" ? linkActive : linkBase}
+            >
+              <span className="material-symbols-outlined" data-icon="insights">
+                insights
+              </span>
+              <span className={labelCls}>Team Performance</span>
+            </Link>
+          </>
+        )}
       </div>
 
       {/* Signed-in user + logout */}
