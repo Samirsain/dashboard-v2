@@ -153,6 +153,24 @@ function AllTasksInner() {
 
   const rows = tab === "tasks" ? completedTasks.length : completedChecklist.length;
 
+  // Deletes the recurring checklist task entirely (the template + every
+  // instance it ever generated) — used when a daily/monthly checklist item
+  // is no longer needed at all, not just "stop it going forward."
+  async function handleDeleteChecklistTask(instance: ChecklistInstance) {
+    if (
+      !confirm(
+        `Permanently delete "${instance.taskName}"? This removes the recurring checklist task and its full history — it will stop generating and can't be undone.`
+      )
+    )
+      return;
+    try {
+      await api.delete(`/checklist/templates/${instance.templateId}`);
+      setChecklist((prev) => prev.filter((c) => c.templateId !== instance.templateId));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to delete checklist task.");
+    }
+  }
+
   function clearFilters() {
     setSearch("");
     setDoerFilter("");
@@ -362,20 +380,21 @@ function AllTasksInner() {
                     <th className="py-3 px-4 border-r border-surface-variant w-40">Doer</th>
                     <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Scheduled Date</th>
                     <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Completed On</th>
-                    <th className="py-3 px-4 w-40">Completed By</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-40">Completed By</th>
+                    <th className="py-3 px-4 w-32 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-md text-on-surface">
                   {loading && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         Loading...
                       </td>
                     </tr>
                   )}
                   {!loading && completedChecklist.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         No completed checklist items match the filters.
                       </td>
                     </tr>
@@ -388,7 +407,15 @@ function AllTasksInner() {
                       </td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{c.date || "—"}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{checklistCompletedOn(c) || "—"}</td>
-                      <td className="py-3 px-4 text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => handleDeleteChecklistTask(c)}
+                          className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
