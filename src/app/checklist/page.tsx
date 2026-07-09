@@ -41,8 +41,12 @@ function ChecklistInner() {
     setLoading(true);
     setError(null);
     try {
+      // /checklist/today first: it auto-generates today's instances from the
+      // active templates. Then fetch ALL instances so the page shows the full
+      // checklist data (today's to-dos + past history), not just today.
+      await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
       const [checklistData, doerData, listData, templateData] = await Promise.all([
-        api.get<ChecklistInstance[]>("/checklist/today"),
+        api.get<ChecklistInstance[]>("/checklist/instances"),
         api.get<Doer[]>("/users"),
         api.get<List[]>("/lists?type=checklist").catch(() => [] as List[]),
         api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
@@ -58,6 +62,13 @@ function ChecklistInner() {
           ...instance,
           doer: doer ? { id: doer.id, name: doer.name, mobile: doer.mobile, email: doer.email, department: doer.department, role: doer.role } : null,
         };
+      });
+
+      // Open work first (today's to-dos on top), then completed history
+      // newest-first — so the page reads as "do this now" + "what's done".
+      enrichedInstances.sort((a, b) => {
+        if (a.status !== b.status) return a.status === "Pending" ? -1 : 1;
+        return b.date.localeCompare(a.date);
       });
 
       setInstances(enrichedInstances);
@@ -186,7 +197,7 @@ function ChecklistInner() {
                 {!loading && filtered.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                      No checklist items for today.
+                      No checklist items found.
                     </td>
                   </tr>
                 )}
