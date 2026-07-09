@@ -68,6 +68,14 @@ function completionPct(stat: DepartmentWiseTaskStat): number {
   return Math.round((stat.completed / stat.total) * 100);
 }
 
+/** First word of a list's name, uppercased — how the sidebar groups OFFICE/SAHIL TL+CL together. */
+function listGroupKey(name: string): string {
+  return name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
+}
+
+const ALL_SCOPE = "ALL";
+const OFFICE_SCOPE = "OFFICE";
+
 function DashboardInner() {
   const { user } = useAuth();
   const isAdmin = user?.role === "Admin";
@@ -80,6 +88,10 @@ function DashboardInner() {
   const [manageAccessList, setManageAccessList] = useState<List | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Which list "group" the Task Directory card is scoped to — ALL, OFFICE
+  // (no named list), or a named group like SAHIL, same grouping the sidebar
+  // uses (OFFICE TL+CL, SAHIL TL+CL).
+  const [directoryScope, setDirectoryScope] = useState<string>(ALL_SCOPE);
 
   useEffect(() => {
     async function load() {
@@ -115,31 +127,65 @@ function DashboardInner() {
     }
   }
 
+  // Named-list groups available in the scope dropdown, e.g. { SAHIL: [...] }.
+  const scopeGroups = lists.reduce((groups, l) => {
+    const key = listGroupKey(l.name);
+    const existing = groups.find((g) => g.key === key);
+    if (existing) existing.listIds.add(l.id);
+    else groups.push({ key, label: key, listIds: new Set([l.id]) });
+    return groups;
+  }, [] as { key: string; label: string; listIds: Set<string> }[]);
+  scopeGroups.sort((a, b) => a.label.localeCompare(b.label));
+
+  const scopeOptions = [
+    { key: ALL_SCOPE, label: "All Lists" },
+    { key: OFFICE_SCOPE, label: "Office" },
+    ...scopeGroups.filter((g) => g.key !== OFFICE_SCOPE).map((g) => ({ key: g.key, label: g.label })),
+  ];
+
+  function inDirectoryScope(listId: string): boolean {
+    if (directoryScope === ALL_SCOPE) return true;
+    if (directoryScope === OFFICE_SCOPE) return !listId;
+    const group = scopeGroups.find((g) => g.key === directoryScope);
+    return group ? group.listIds.has(listId) : true;
+  }
+
+  function listLabelFor(listId: string): string {
+    if (!listId) return "Office";
+    const list = lists.find((l) => l.id === listId);
+    return list ? listGroupKey(list.name) : "Office";
+  }
+
   // Role-based "Task Directory":
-  //  - Admin/Manager: every COMPLETED task (a record of what's done).
+  //  - Admin/Manager: today's PENDING tasks (what's due right now, across
+  //    every list, filterable by list).
   //  - Everyone else (PC + doers): all their still-open (Pending) tasks plus
   //    today's open checklist — a completed item drops off the view.
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
   const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
 
-  type DirRow = { id: string; description: string; doerName: string; status: TaskStatus };
+  type DirRow = { id: string; description: string; doerName: string; status: TaskStatus; listLabel: string };
   const directoryRows: DirRow[] = isPrivileged
     ? allTasks
-        .filter((t) => t.status === "Completed")
+        .filter((t) => t.status !== "Completed" && t.status !== "Cancelled" && t.dueDate === today)
+        .filter((t) => inDirectoryScope(t.listId))
         .map((t) => ({
           id: t.id,
           description: t.title,
           doerName: t.doer?.name ?? "Unassigned",
           status: t.status,
+          listLabel: listLabelFor(t.listId),
         }))
     : [
         ...allTasks
           .filter((t) => t.status !== "Completed" && t.status !== "Cancelled")
+          .filter((t) => inDirectoryScope(t.listId))
           .map((t) => ({
             id: t.id,
             description: t.title,
             doerName: t.doer?.name ?? user?.name ?? "",
             status: t.status,
+            listLabel: listLabelFor(t.listId),
           })),
         ...checklistToday
           .filter((c) => c.status !== "Completed")
@@ -148,10 +194,11 @@ function DashboardInner() {
             description: c.taskName,
             doerName: c.doer?.name ?? user?.name ?? "",
             status: "Pending" as TaskStatus,
+            listLabel: "Office",
           })),
       ];
 
-  const directoryTitle = isPrivileged ? "Completed Tasks" : "Pending Tasks";
+  const directoryTitle = isPrivileged ? "Today's Pending Tasks" : "Pending Tasks";
 
   const summary = dashboard?.summary;
   const overallPct =
@@ -338,16 +385,29 @@ function DashboardInner() {
 
             {/* Task Directory Table */}
             <div className="col-span-12 lg:col-span-7 bg-surface border-2 border-on-surface flex flex-col">
-              <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex justify-between items-center">
+              <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-wrap justify-between items-center gap-3">
                 <h3 className="font-headline-md text-headline-md text-on-surface">
                   {directoryTitle}
                 </h3>
-                <a
-                  href="/task-list"
-                  className="font-label-sm text-label-sm uppercase border-2 border-on-surface px-4 py-2 hover:bg-on-surface hover:text-on-primary transition-colors"
-                >
-                  View All
-                </a>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={directoryScope}
+                    onChange={(e) => setDirectoryScope(e.target.value)}
+                    className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                  >
+                    {scopeOptions.map((o) => (
+                      <option key={o.key} value={o.key}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <a
+                    href="/task-list"
+                    className="font-label-sm text-label-sm uppercase border-2 border-on-surface px-4 py-2 hover:bg-on-surface hover:text-on-primary transition-colors"
+                  >
+                    View All
+                  </a>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -359,6 +419,9 @@ function DashboardInner() {
                       <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">
                         Doer
                       </th>
+                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-center">
+                        List
+                      </th>
                       <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-right">
                         Status
                       </th>
@@ -367,8 +430,8 @@ function DashboardInner() {
                   <tbody className="font-body-md text-body-md text-on-surface">
                     {!loading && directoryRows.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                          {isPrivileged ? "No completed tasks yet." : "Nothing pending. 🎉"}
+                        <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                          {isPrivileged ? "Nothing pending today. 🎉" : "Nothing pending. 🎉"}
                         </td>
                       </tr>
                     )}
@@ -380,6 +443,11 @@ function DashboardInner() {
                         <td className="py-4 px-4 font-medium">{t.description}</td>
                         <td className="py-4 px-4 text-on-surface-variant">
                           {t.doerName || "Unassigned"}
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant border border-on-surface-variant px-2 py-0.5">
+                            {t.listLabel}
+                          </span>
                         </td>
                         <td className="py-4 px-4 text-right">
                           <StatusBadge status={t.status} />
