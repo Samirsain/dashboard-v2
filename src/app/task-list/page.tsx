@@ -7,6 +7,7 @@ import SideNav from "@/components/SideNav";
 import InitialsAvatar from "@/components/InitialsAvatar";
 import AuthGuard from "@/components/AuthGuard";
 import CreateTaskModal from "@/components/CreateTaskModal";
+import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { Doer, List, Task } from "@/lib/types";
@@ -22,6 +23,7 @@ function TaskListInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
   const [doerFilter, setDoerFilter] = useState("");
   const { user } = useAuth();
@@ -219,12 +221,20 @@ function TaskListInner() {
                     </td>
                     <td className="py-3 px-4 text-center">
                       {task.status !== "Cancelled" && (
-                        <button
-                          onClick={() => handleMarkDone(task.id)}
-                          className="px-3 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
-                        >
-                          Done
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleMarkDone(task.id)}
+                            className="px-3 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                          >
+                            Done
+                          </button>
+                          <button
+                            onClick={() => setTaskToRevise(task)}
+                            className="px-3 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                          >
+                            Revise
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -244,6 +254,17 @@ function TaskListInner() {
             const doer = doers.find((d) => d.id === task.assignedDoerId) ?? null;
             setTasks((prev) => [{ ...task, doer }, ...prev]);
             setShowCreate(false);
+          }}
+        />
+      )}
+
+      {taskToRevise && (
+        <ReviseTaskModal
+          task={taskToRevise}
+          onClose={() => setTaskToRevise(null)}
+          onRevised={() => {
+            setTaskToRevise(null);
+            loadData(); // refresh tasks to show new revision info and due date
           }}
         />
       )}
