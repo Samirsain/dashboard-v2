@@ -7,53 +7,12 @@ import SideNav from "@/components/SideNav";
 import InitialsAvatar from "@/components/InitialsAvatar";
 import AuthGuard from "@/components/AuthGuard";
 import CreateTaskModal from "@/components/CreateTaskModal";
-import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { Doer, List, Task, TaskPriority, TaskStatus } from "@/lib/types";
+import type { Doer, List, Task } from "@/lib/types";
 
-function PriorityBadge({ priority }: { priority: TaskPriority }) {
-  if (priority === "Urgent" || priority === "Critical") {
-    return (
-      <span className="inline-block bg-error text-on-error font-label-sm text-label-sm uppercase px-2 py-0.5">
-        {priority}
-      </span>
-    );
-  }
-  if (priority === "Normal") {
-    return (
-      <span className="inline-block bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase px-2 py-0.5">
-        Normal
-      </span>
-    );
-  }
-  return (
-    <span className="inline-block border border-on-surface text-on-surface font-label-sm text-label-sm uppercase px-2 py-0.5">
-      {priority}
-    </span>
-  );
-}
-
-function StatusPill({ status }: { status: TaskStatus }) {
-  if (status === "Completed") {
-    return (
-      <span className="inline-block border-2 border-on-surface bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase px-3 py-1">
-        Completed
-      </span>
-    );
-  }
-  if (status === "Cancelled") {
-    return (
-      <span className="inline-block border-2 border-error text-error font-label-sm text-label-sm uppercase px-3 py-1">
-        Cancelled
-      </span>
-    );
-  }
-  return (
-    <span className="inline-block border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase px-3 py-1">
-      {status}
-    </span>
-  );
+function isUrgentPriority(priority: Task["priority"]): boolean {
+  return priority === "Urgent" || priority === "Critical";
 }
 
 function TaskListInner() {
@@ -63,16 +22,11 @@ function TaskListInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
   const [doerFilter, setDoerFilter] = useState("");
   const { user } = useAuth();
   const canCreateTasks =
     user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
-  // Admin/Manager keep seeing completed tasks in the list; PC and plain doers
-  // only see open/pending work here — completed items move to the admin
-  // "All Tasks" view.
-  const seesCompleted = user?.role === "Admin" || user?.role === "Manager";
 
   async function loadData() {
     setLoading(true);
@@ -104,9 +58,11 @@ function TaskListInner() {
   const listFilter = useSearchParams().get("list") ?? "";
   const currentList = lists.find((l) => l.id === listFilter) ?? null;
 
+  // Completed tasks never show here, for anyone — they move to the admin
+  // "All Tasks" report and stay off the active list.
   const filtered = tasks
     .filter((t) => (listFilter ? t.listId === listFilter : true))
-    .filter((t) => (seesCompleted ? true : t.status !== "Completed"))
+    .filter((t) => t.status !== "Completed")
     .filter((t) => (doerFilter ? t.assignedDoerId === doerFilter : true))
     .filter((t) =>
       `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
@@ -215,29 +171,22 @@ function TaskListInner() {
                   </th>
                   <th className="py-3 px-4 w-40 border-r border-surface-variant">Doer</th>
                   <th className="py-3 px-4 w-32 border-r border-surface-variant text-center">
-                    Priority
-                  </th>
-                  <th className="py-3 px-4 w-32 border-r border-surface-variant text-center">
                     Due Date
                   </th>
-                  <th className="py-3 px-4 w-32 border-r border-surface-variant text-center">
-                    Repeat
-                  </th>
-                  <th className="py-3 px-4 w-40 border-r border-surface-variant text-center">Status</th>
                   <th className="py-3 px-4 w-40 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No tasks found.
                     </td>
                   </tr>
@@ -245,9 +194,11 @@ function TaskListInner() {
                 {filtered.map((task, i) => (
                   <tr
                     key={task.id}
-                    className={`hover:bg-surface-container-low transition-colors group ${
-                      i !== filtered.length - 1 ? "border-b border-surface-variant" : ""
-                    }`}
+                    className={`transition-colors group ${
+                      isUrgentPriority(task.priority)
+                        ? "bg-red-100 hover:bg-red-200"
+                        : "hover:bg-surface-container-low"
+                    } ${i !== filtered.length - 1 ? "border-b border-surface-variant" : ""}`}
                   >
                     <td className="py-3 px-4 border-r border-surface-variant group-hover:underline cursor-pointer">
                       {task.title}
@@ -263,43 +214,18 @@ function TaskListInner() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <PriorityBadge priority={task.priority} />
-                    </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                       {task.dueDate}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      {task.repeatType && task.repeatType !== "None" ? (
-                        <span className="font-label-sm text-label-sm uppercase">
-                          {task.repeatType === "Daily" ? "Daily" : `${task.repeatType}: ${task.repeatValue}`}
-                        </span>
-                      ) : (
-                        <span className="text-on-surface-variant">-</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <StatusPill status={task.status} />
-                    </td>
                     <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {task.status !== "Completed" && task.status !== "Cancelled" && (
-                          <button
-                            onClick={() => handleMarkDone(task.id)}
-                            className="px-3 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
-                          >
-                            Mark Done
-                          </button>
-                        )}
-                        {task.status !== "Completed" && task.status !== "Cancelled" && (
-                          <button
-                            onClick={() => setTaskToRevise(task)}
-                            className="px-3 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
-                          >
-                            Revise
-                          </button>
-                        )}
-                      </div>
+                      {task.status !== "Cancelled" && (
+                        <button
+                          onClick={() => handleMarkDone(task.id)}
+                          className="px-3 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                        >
+                          Done
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -318,17 +244,6 @@ function TaskListInner() {
             const doer = doers.find((d) => d.id === task.assignedDoerId) ?? null;
             setTasks((prev) => [{ ...task, doer }, ...prev]);
             setShowCreate(false);
-          }}
-        />
-      )}
-
-      {taskToRevise && (
-        <ReviseTaskModal
-          task={taskToRevise}
-          onClose={() => setTaskToRevise(null)}
-          onRevised={() => {
-            setTaskToRevise(null);
-            loadData(); // refresh tasks to show new revision info and due date
           }}
         />
       )}
