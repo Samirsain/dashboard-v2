@@ -116,11 +116,11 @@ function DashboardInner() {
   }
 
   // Role-based "Task Directory":
-  //  - Admin/PC: every COMPLETED task (a record of what's done).
-  //  - Everyone else (doers): only their own TODAY items (tasks + checklist)
-  //    that are still open — a completed item drops off their to-do view.
+  //  - Admin/Manager: every COMPLETED task (a record of what's done).
+  //  - Everyone else (PC + doers): all their still-open (Pending) tasks plus
+  //    today's open checklist — a completed item drops off the view.
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
-  const isPrivileged = user?.role === "Admin" || user?.role === "PC";
+  const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
 
   type DirRow = { id: string; description: string; doerName: string; status: TaskStatus };
   const directoryRows: DirRow[] = isPrivileged
@@ -134,7 +134,7 @@ function DashboardInner() {
         }))
     : [
         ...allTasks
-          .filter((t) => t.dueDate === today && t.status !== "Completed" && t.status !== "Cancelled")
+          .filter((t) => t.status !== "Completed" && t.status !== "Cancelled")
           .map((t) => ({
             id: t.id,
             description: t.title,
@@ -151,7 +151,7 @@ function DashboardInner() {
           })),
       ];
 
-  const directoryTitle = isPrivileged ? "Completed Tasks" : "Today's Tasks & Checklist";
+  const directoryTitle = isPrivileged ? "Completed Tasks" : "Pending Tasks";
 
   const summary = dashboard?.summary;
   const overallPct =
@@ -368,7 +368,7 @@ function DashboardInner() {
                     {!loading && directoryRows.length === 0 && (
                       <tr>
                         <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                          {isPrivileged ? "No completed tasks yet." : "Nothing pending for today. 🎉"}
+                          {isPrivileged ? "No completed tasks yet." : "Nothing pending. 🎉"}
                         </td>
                       </tr>
                     )}

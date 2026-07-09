@@ -8,34 +8,19 @@ import { logger } from "../utils/logger";
 async function generateRecurringTasks(): Promise<number> {
   const allTasks = await tasksService.listRaw();
   const today = todayIso();
-  
-  const recurringTemplates = allTasks.filter(t => t.repeatType && t.repeatType !== "None");
-  
+
+  // Only rows that repeat and haven't already been rolled forward today —
+  // this is the row itself, not a template producing separate copies, so
+  // there's nothing to dedupe against: it just moves.
+  const recurringTasks = allTasks.filter(
+    (t) => t.repeatType && t.repeatType !== "None" && t.dueDate !== today
+  );
+
   let generatedCount = 0;
-  for (const template of recurringTemplates) {
-    if (shouldGenerateRecurringTask(template.repeatType, template.repeatValue)) {
-      const alreadyExists = allTasks.some(
-        t => 
-          t.title === template.title && 
-          t.dueDate === today && 
-          t.assignedDoerId === template.assignedDoerId &&
-          t.department === template.department
-      );
-      
-      if (!alreadyExists) {
-        await tasksService.create({
-          title: template.title,
-          description: template.description,
-          assignedDoerId: template.assignedDoerId,
-          priority: template.priority,
-          dueDate: today,
-          department: template.department,
-          createdBy: template.createdBy || "system",
-          repeatType: "None", 
-          repeatValue: "",
-        });
-        generatedCount++;
-      }
+  for (const task of recurringTasks) {
+    if (shouldGenerateRecurringTask(task.repeatType, task.repeatValue)) {
+      await tasksService.advanceRecurring(task.id, today);
+      generatedCount++;
     }
   }
   return generatedCount;
