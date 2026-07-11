@@ -9,7 +9,15 @@ import CreateDoerModal from "@/components/CreateDoerModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { Doer, List } from "@/lib/types";
+import type { ChecklistTemplate, Doer, List, Task } from "@/lib/types";
+
+/** First word of a list's name, uppercased — "SAHIL SIR TASKLIST" -> "SAHIL". */
+function listGroupKey(name: string): string {
+  return name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
+}
+
+/** One column in the membership view: a specific list's task or checklist side. */
+type Bucket = { key: string; label: string; kind: "task" | "checklist"; listId: string };
 
 function StatusPill({ status }: { status: Doer["status"] }) {
   if (status === "Inactive") {
@@ -30,6 +38,8 @@ function SettingsInner() {
   const { user: currentUser } = useAuth();
   const [doers, setDoers] = useState<Doer[]>([]);
   const [lists, setLists] = useState<List[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddDoer, setShowAddDoer] = useState(false);
@@ -37,18 +47,21 @@ function SettingsInner() {
   const [resetNotice, setResetNotice] = useState<string | null>(null);
   // Which doer's "Lists" dropdown is currently open.
   const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
-  const [savingListId, setSavingListId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
     setError(null);
     try {
-      const [doerData, listData] = await Promise.all([
+      const [doerData, listData, taskData, templateData] = await Promise.all([
         api.get<Doer[]>("/users"),
         api.get<List[]>("/lists").catch(() => [] as List[]),
+        api.get<Task[]>("/tasks").catch(() => [] as Task[]),
+        api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
       ]);
       setDoers(doerData);
       setLists(listData);
+      setTasks(taskData);
+      setTemplates(templateData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load doers.");
     } finally {
@@ -64,17 +77,46 @@ function SettingsInner() {
     });
   }, []);
 
-  // Every list a doer is a member of, e.g. "SAHIL SIR TASKLIST, SAHIL SIR CHECKLIST".
-  const listsByDoer = useMemo(() => {
-    const map = new Map<string, string[]>();
+  // The full set of list "buckets" shown for every doer: Office (no named
+  // list) plus each named list, split into a Task-List (TL) and Checklist (CL)
+  // side — mirroring the sidebar's OFFICE TL / SAHIL TL / OFFICE CL / SAHIL CL.
+  const buckets = useMemo<Bucket[]>(() => {
+    const taskBuckets: Bucket[] = [
+      { key: "office-task", label: "OFFICE TL", kind: "task", listId: "" },
+    ];
+    const checklistBuckets: Bucket[] = [
+      { key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: "" },
+    ];
     for (const l of lists) {
-      for (const memberId of l.memberIds) {
-        if (!map.has(memberId)) map.set(memberId, []);
-        map.get(memberId)!.push(l.name);
+      const short = listGroupKey(l.name);
+      if (l.type === "task") {
+        taskBuckets.push({ key: `t-${l.id}`, label: `${short} TL`, kind: "task", listId: l.id });
+      } else {
+        checklistBuckets.push({ key: `c-${l.id}`, label: `${short} CL`, kind: "checklist", listId: l.id });
       }
     }
-    return map;
+    return [...taskBuckets, ...checklistBuckets];
   }, [lists]);
+
+  // A doer "is in" a bucket if they have any task (for TL) or checklist
+  // template (for CL) assigned to them under that bucket's list. Derived from
+  // real work, so it's always accurate — no manual membership to keep in sync.
+  const bucketsByDoer = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const add = (doerId: string, key: string) => {
+      if (!map.has(doerId)) map.set(doerId, new Set());
+      map.get(doerId)!.add(key);
+    };
+    for (const t of tasks) {
+      const bucket = buckets.find((b) => b.kind === "task" && b.listId === (t.listId || ""));
+      if (bucket && t.assignedDoerId) add(t.assignedDoerId, bucket.key);
+    }
+    for (const tpl of templates) {
+      const bucket = buckets.find((b) => b.kind === "checklist" && b.listId === (tpl.listId || ""));
+      if (bucket && tpl.assignedDoerId) add(tpl.assignedDoerId, bucket.key);
+    }
+    return map;
+  }, [tasks, templates, buckets]);
 
   async function handleDelete(doer: Doer) {
     if (doer.id === currentUser?.id) {
@@ -88,22 +130,6 @@ function SettingsInner() {
       setDoers((prev) => prev.filter((d) => d.id !== doer.id));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to delete doer.");
-    }
-  }
-
-  // Add/remove a doer from a list by rewriting that list's member set.
-  async function toggleListMembership(list: List, doerId: string, shouldBeMember: boolean) {
-    const memberIds = shouldBeMember
-      ? Array.from(new Set([...list.memberIds, doerId]))
-      : list.memberIds.filter((id) => id !== doerId);
-    setSavingListId(list.id);
-    try {
-      const updated = await api.patch<List>(`/lists/${list.id}/members`, { memberIds });
-      setLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to update list access.");
-    } finally {
-      setSavingListId(null);
     }
   }
 
@@ -198,58 +224,54 @@ function SettingsInner() {
                       <StatusPill status={d.status} />
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant align-top">
-                      <div className="relative">
-                        <button
-                          onClick={() =>
-                            setOpenListsDoerId((prev) => (prev === d.id ? null : d.id))
-                          }
-                          className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                        >
-                          <span className="truncate">
-                            {(listsByDoer.get(d.id) ?? []).length} list
-                            {(listsByDoer.get(d.id) ?? []).length === 1 ? "" : "s"}
-                          </span>
-                          <span className="material-symbols-outlined text-base">
-                            {openListsDoerId === d.id ? "expand_less" : "expand_more"}
-                          </span>
-                        </button>
+                      {(() => {
+                        const inKeys = bucketsByDoer.get(d.id) ?? new Set<string>();
+                        const inCount = buckets.filter((b) => inKeys.has(b.key)).length;
+                        return (
+                          <div className="relative">
+                            <button
+                              onClick={() =>
+                                setOpenListsDoerId((prev) => (prev === d.id ? null : d.id))
+                              }
+                              className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                            >
+                              <span className="truncate">
+                                {inCount} list{inCount === 1 ? "" : "s"}
+                              </span>
+                              <span className="material-symbols-outlined text-base">
+                                {openListsDoerId === d.id ? "expand_less" : "expand_more"}
+                              </span>
+                            </button>
 
-                        {openListsDoerId === d.id && (
-                          <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
-                            {lists.length === 0 && (
-                              <p className="p-3 font-label-sm text-label-sm text-on-surface-variant uppercase">
-                                No lists exist yet.
-                              </p>
+                            {openListsDoerId === d.id && (
+                              <div className="absolute z-20 mt-1 left-0 w-60 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
+                                {buckets.map((b) => {
+                                  const inIt = inKeys.has(b.key);
+                                  return (
+                                    <div
+                                      key={b.key}
+                                      className={`flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 ${
+                                        inIt ? "bg-secondary-container" : ""
+                                      }`}
+                                    >
+                                      <span className="material-symbols-outlined text-base">
+                                        {inIt ? "check_box" : "check_box_outline_blank"}
+                                      </span>
+                                      <span
+                                        className={`font-label-sm text-label-sm uppercase ${
+                                          inIt ? "text-on-secondary-container" : "text-on-surface-variant"
+                                        }`}
+                                      >
+                                        {b.label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
-                            {lists.map((l) => {
-                              const isMember = l.memberIds.includes(d.id);
-                              return (
-                                <label
-                                  key={l.id}
-                                  className="flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isMember}
-                                    disabled={savingListId === l.id}
-                                    onChange={(e) =>
-                                      toggleListMembership(l, d.id, e.target.checked)
-                                    }
-                                  />
-                                  <span className="flex-1 min-w-0">
-                                    <span className="block font-body-md text-body-md text-on-surface truncate">
-                                      {l.name}
-                                    </span>
-                                    <span className="block font-label-sm text-label-sm uppercase text-on-surface-variant">
-                                      {l.type === "task" ? "Task List" : "Checklist"}
-                                    </span>
-                                  </span>
-                                </label>
-                              );
-                            })}
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
