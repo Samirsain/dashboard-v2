@@ -15,7 +15,8 @@ type NavKey =
   | "workflow"
   | "master-sheet"
   | "team-performance"
-  | "settings";
+  | "settings"
+  | "help-ticket";
 
 /** "SAHIL SIR TASKLIST" -> "SAHIL TL"; a named list's short sidebar label. */
 function shortListLabel(name: string, type: "task" | "checklist"): string {
@@ -193,9 +194,10 @@ export default function SideNav({ active }: { active: NavKey }) {
             </Link>
           </>
         )}
+
       </div>
 
-      {/* Signed-in user + logout */}
+      {/* Signed-in user */}
       {user && (
         <div className="px-4 py-3 border-t-2 border-on-surface flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -206,42 +208,8 @@ export default function SideNav({ active }: { active: NavKey }) {
               {user.employeeCode || user.role}
             </p>
           </div>
-          <button
-            onClick={logout}
-            className="font-label-sm text-label-sm uppercase border-2 border-on-surface px-2 py-1 hover:bg-on-surface hover:text-on-primary transition-colors shrink-0"
-          >
-            Logout
-          </button>
         </div>
       )}
-
-      {/* Footer Tabs */}
-      <div className="border-t-2 border-on-surface py-2">
-        {user?.role === "Admin" && (
-          <Link
-            href="/settings"
-            className={
-              active === "settings"
-                ? "bg-secondary-container text-on-secondary-container px-4 py-3 flex items-center gap-3 border-l-4 border-primary"
-                : "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors border-l-4 border-transparent"
-            }
-          >
-            <span className="material-symbols-outlined" data-icon="settings">
-              settings
-            </span>
-            <span className="font-label-sm text-label-sm">Settings</span>
-          </Link>
-        )}
-        <a
-          className="text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container transition-colors"
-          href="#"
-        >
-          <span className="material-symbols-outlined" data-icon="help">
-            help
-          </span>
-          <span className="font-label-sm text-label-sm">Support</span>
-        </a>
-      </div>
     </nav>
   );
 }

@@ -99,6 +99,28 @@ create table if not exists public.activity_logs (
   details text
 );
 create index if not exists activity_logs_date_idx on public.activity_logs (date);
+create index if not exists activity_logs_task_idx on public.activity_logs (task);
+
+create table if not exists public.tickets (
+  id              text primary key,
+  employee_id     text,
+  employee_name   text,
+  department      text,
+  title           text,
+  description     text,
+  solution_option1 text,
+  solution_option2 text,
+  blanket_required text,
+  priority        text,
+  attachment_url  text,
+  status          text,
+  solution        text,
+  solution_type   text,
+  created_at      text,
+  updated_at      text
+);
+create index if not exists tickets_status_idx on public.tickets (status);
+create index if not exists tickets_employee_idx on public.tickets (employee_id);
 
 -- Lock the tables down: enable RLS with no policies, so only the backend's
 -- service_role key (which bypasses RLS) can touch the data.

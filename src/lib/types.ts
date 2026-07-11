@@ -199,3 +199,36 @@ export interface WorkflowStepEvent {
   status: WorkflowStepStatus;
   reworkCount: number;
 }
+
+// ---- Help Ticket System --------------------------------------------------
+
+export type TicketStatus = "Pending" | "Waiting for Employee" | "Reopened" | "Completed";
+export type TicketPriority = "Low" | "Medium" | "High" | "Urgent";
+
+export interface Ticket {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  department: string;
+  title: string;
+  description: string;
+  solution_option1: string;
+  solution_option2: string;
+  blanket_required: string;
+  priority: TicketPriority;
+  attachment_url: string;
+  status: TicketStatus;
+  solution: string;
+  solution_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketDashboardStats {
+  total: number;
+  pending: number;
+  waiting: number;
+  reopened: number;
+  completedToday: number;
+}
+

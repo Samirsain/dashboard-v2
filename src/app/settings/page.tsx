@@ -6,6 +6,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import InitialsAvatar from "@/components/InitialsAvatar";
 import CreateDoerModal from "@/components/CreateDoerModal";
+import CreateListModal from "@/components/CreateListModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -43,6 +44,7 @@ function SettingsInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddDoer, setShowAddDoer] = useState(false);
+  const [showCreateList, setShowCreateList] = useState(false);
   const [doerToReset, setDoerToReset] = useState<Doer | null>(null);
   const [resetNotice, setResetNotice] = useState<string | null>(null);
   // Which doer's "Lists" dropdown is currently open.
@@ -143,12 +145,20 @@ function SettingsInner() {
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Settings — Doer Management
           </div>
-          <button
-            onClick={() => setShowAddDoer(true)}
-            className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
-          >
-            + Add Doer
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowCreateList(true)}
+              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+            >
+              + Create List
+            </button>
+            <button
+              onClick={() => setShowAddDoer(true)}
+              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+            >
+              + Add Doer
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
@@ -156,12 +166,20 @@ function SettingsInner() {
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
               Doer Management
             </h2>
-            <button
-              onClick={() => setShowAddDoer(true)}
-              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
-            >
-              + Add
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCreateList(true)}
+                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
+              >
+                + List
+              </button>
+              <button
+                onClick={() => setShowAddDoer(true)}
+                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
+              >
+                + Doer
+              </button>
+            </div>
           </div>
 
           {resetNotice && (
@@ -181,9 +199,7 @@ function SettingsInner() {
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant">Name</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-32">User ID</th>
-                  <th className="py-3 px-4 border-r border-surface-variant w-36">Department</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
-                  <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Status</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
                   <th className="py-3 px-4 w-56 text-center">Action</th>
                 </tr>
@@ -191,14 +207,14 @@ function SettingsInner() {
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && doers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No doers found.
                     </td>
                   </tr>
@@ -214,14 +230,8 @@ function SettingsInner() {
                     <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
                       {d.employeeCode || "—"}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
-                      {d.department || "—"}
-                    </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
                       <span className="font-label-sm text-label-sm uppercase">{d.role}</span>
-                    </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <StatusPill status={d.status} />
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant align-top">
                       {(() => {
@@ -303,6 +313,16 @@ function SettingsInner() {
           onCreated={(doer) => {
             setDoers((prev) => [...prev, doer]);
             setShowAddDoer(false);
+          }}
+        />
+      )}
+
+      {showCreateList && (
+        <CreateListModal
+          onClose={() => setShowCreateList(false)}
+          onCreated={(list) => {
+            setLists((prev) => [...prev, list]);
+            setShowCreateList(false);
           }}
         />
       )}
