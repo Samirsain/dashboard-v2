@@ -10,15 +10,26 @@ import CreateListModal from "@/components/CreateListModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { ChecklistTemplate, Doer, List, Task } from "@/lib/types";
+import type { Doer, List } from "@/lib/types";
 
 /** First word of a list's name, uppercased — "SAHIL SIR TASKLIST" -> "SAHIL". */
 function listGroupKey(name: string): string {
   return name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
 }
 
-/** One column in the membership view: a specific list's task or checklist side. */
-type Bucket = { key: string; label: string; kind: "task" | "checklist"; listId: string };
+/**
+ * One access row in a doer's Lists dropdown. `isOffice` buckets are the
+ * implicit default (no list record — everyone has them), so they're shown
+ * checked and can't be toggled. Named buckets map to a real list whose
+ * member set the admin grants/revokes.
+ */
+type Bucket = {
+  key: string;
+  label: string;
+  kind: "task" | "checklist";
+  listId: string;
+  isOffice: boolean;
+};
 
 function StatusPill({ status }: { status: Doer["status"] }) {
   if (status === "Inactive") {
@@ -39,8 +50,6 @@ function SettingsInner() {
   const { user: currentUser } = useAuth();
   const [doers, setDoers] = useState<Doer[]>([]);
   const [lists, setLists] = useState<List[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddDoer, setShowAddDoer] = useState(false);
@@ -49,21 +58,19 @@ function SettingsInner() {
   const [resetNotice, setResetNotice] = useState<string | null>(null);
   // Which doer's "Lists" dropdown is currently open.
   const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
+  // "doerId:listId" currently being saved, so its checkbox disables briefly.
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
     setError(null);
     try {
-      const [doerData, listData, taskData, templateData] = await Promise.all([
+      const [doerData, listData] = await Promise.all([
         api.get<Doer[]>("/users"),
         api.get<List[]>("/lists").catch(() => [] as List[]),
-        api.get<Task[]>("/tasks").catch(() => [] as Task[]),
-        api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
       ]);
       setDoers(doerData);
       setLists(listData);
-      setTasks(taskData);
-      setTemplates(templateData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load doers.");
     } finally {
@@ -79,46 +86,53 @@ function SettingsInner() {
     });
   }, []);
 
-  // The full set of list "buckets" shown for every doer: Office (no named
-  // list) plus each named list, split into a Task-List (TL) and Checklist (CL)
-  // side — mirroring the sidebar's OFFICE TL / SAHIL TL / OFFICE CL / SAHIL CL.
+  // The full set of access rows shown for every doer: Office (implicit, no
+  // list record) plus each named list, split into a Task-List (TL) and
+  // Checklist (CL) side — mirroring the sidebar's OFFICE/SAHIL TL & CL.
   const buckets = useMemo<Bucket[]>(() => {
     const taskBuckets: Bucket[] = [
-      { key: "office-task", label: "OFFICE TL", kind: "task", listId: "" },
+      { key: "office-task", label: "OFFICE TL", kind: "task", listId: "", isOffice: true },
     ];
     const checklistBuckets: Bucket[] = [
-      { key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: "" },
+      { key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: "", isOffice: true },
     ];
     for (const l of lists) {
       const short = listGroupKey(l.name);
       if (l.type === "task") {
-        taskBuckets.push({ key: `t-${l.id}`, label: `${short} TL`, kind: "task", listId: l.id });
+        taskBuckets.push({ key: `t-${l.id}`, label: `${short} TL`, kind: "task", listId: l.id, isOffice: false });
       } else {
-        checklistBuckets.push({ key: `c-${l.id}`, label: `${short} CL`, kind: "checklist", listId: l.id });
+        checklistBuckets.push({ key: `c-${l.id}`, label: `${short} CL`, kind: "checklist", listId: l.id, isOffice: false });
       }
     }
     return [...taskBuckets, ...checklistBuckets];
   }, [lists]);
 
-  // A doer "is in" a bucket if they have any task (for TL) or checklist
-  // template (for CL) assigned to them under that bucket's list. Derived from
-  // real work, so it's always accurate — no manual membership to keep in sync.
-  const bucketsByDoer = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    const add = (doerId: string, key: string) => {
-      if (!map.has(doerId)) map.set(doerId, new Set());
-      map.get(doerId)!.add(key);
-    };
-    for (const t of tasks) {
-      const bucket = buckets.find((b) => b.kind === "task" && b.listId === (t.listId || ""));
-      if (bucket && t.assignedDoerId) add(t.assignedDoerId, bucket.key);
+  // Whether a doer currently has access to a bucket: Office is always yes;
+  // a named list is yes if the doer is in its member set.
+  function hasAccess(doerId: string, bucket: Bucket): boolean {
+    if (bucket.isOffice) return true;
+    const list = lists.find((l) => l.id === bucket.listId);
+    return list ? list.memberIds.includes(doerId) : false;
+  }
+
+  // Grant/revoke a doer's access to a named list by rewriting its member set.
+  async function toggleAccess(doerId: string, bucket: Bucket, shouldHaveAccess: boolean) {
+    if (bucket.isOffice) return; // office is implicit — nothing to toggle
+    const list = lists.find((l) => l.id === bucket.listId);
+    if (!list) return;
+    const memberIds = shouldHaveAccess
+      ? Array.from(new Set([...list.memberIds, doerId]))
+      : list.memberIds.filter((id) => id !== doerId);
+    setSavingKey(`${doerId}:${bucket.listId}`);
+    try {
+      const updated = await api.patch<List>(`/lists/${list.id}/members`, { memberIds });
+      setLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to update access.");
+    } finally {
+      setSavingKey(null);
     }
-    for (const tpl of templates) {
-      const bucket = buckets.find((b) => b.kind === "checklist" && b.listId === (tpl.listId || ""));
-      if (bucket && tpl.assignedDoerId) add(tpl.assignedDoerId, bucket.key);
-    }
-    return map;
-  }, [tasks, templates, buckets]);
+  }
 
   async function handleDelete(doer: Doer) {
     if (doer.id === currentUser?.id) {
@@ -235,8 +249,7 @@ function SettingsInner() {
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant align-top">
                       {(() => {
-                        const inKeys = bucketsByDoer.get(d.id) ?? new Set<string>();
-                        const inCount = buckets.filter((b) => inKeys.has(b.key)).length;
+                        const accessCount = buckets.filter((b) => hasAccess(d.id, b)).length;
                         return (
                           <div className="relative">
                             <button
@@ -246,7 +259,7 @@ function SettingsInner() {
                               className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
                             >
                               <span className="truncate">
-                                {inCount} list{inCount === 1 ? "" : "s"}
+                                {accessCount} list{accessCount === 1 ? "" : "s"}
                               </span>
                               <span className="material-symbols-outlined text-base">
                                 {openListsDoerId === d.id ? "expand_less" : "expand_more"}
@@ -254,27 +267,32 @@ function SettingsInner() {
                             </button>
 
                             {openListsDoerId === d.id && (
-                              <div className="absolute z-20 mt-1 left-0 w-60 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
+                              <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
                                 {buckets.map((b) => {
-                                  const inIt = inKeys.has(b.key);
+                                  const checked = hasAccess(d.id, b);
+                                  const busy = savingKey === `${d.id}:${b.listId}`;
                                   return (
-                                    <div
+                                    <label
                                       key={b.key}
                                       className={`flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 ${
-                                        inIt ? "bg-secondary-container" : ""
+                                        b.isOffice ? "opacity-70" : "hover:bg-surface-container cursor-pointer"
                                       }`}
                                     >
-                                      <span className="material-symbols-outlined text-base">
-                                        {inIt ? "check_box" : "check_box_outline_blank"}
-                                      </span>
-                                      <span
-                                        className={`font-label-sm text-label-sm uppercase ${
-                                          inIt ? "text-on-secondary-container" : "text-on-surface-variant"
-                                        }`}
-                                      >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        disabled={b.isOffice || busy}
+                                        onChange={(e) => toggleAccess(d.id, b, e.target.checked)}
+                                      />
+                                      <span className="font-label-sm text-label-sm uppercase text-on-surface">
                                         {b.label}
                                       </span>
-                                    </div>
+                                      {b.isOffice && (
+                                        <span className="ml-auto font-label-sm text-[10px] uppercase text-on-surface-variant">
+                                          Default
+                                        </span>
+                                      )}
+                                    </label>
                                   );
                                 })}
                               </div>
