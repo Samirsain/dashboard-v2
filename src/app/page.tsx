@@ -7,9 +7,8 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import CreateListModal from "@/components/CreateListModal";
-import ManageListAccessModal from "@/components/ManageListAccessModal";
 import CreateDoerModal from "@/components/CreateDoerModal";
-import type { ChecklistInstance, DepartmentWiseTaskStat, FullDashboard, List, Task, TaskStatus } from "@/lib/types";
+import type { ChecklistInstance, FullDashboard, List, Task, TaskStatus } from "@/lib/types";
 
 /** Builds and downloads a CSV of the given tasks (client-side, no server round-trip). */
 function exportTasksToCsv(tasks: Task[]) {
@@ -63,11 +62,6 @@ function StatusBadge({ status }: { status: TaskStatus }) {
   );
 }
 
-function completionPct(stat: DepartmentWiseTaskStat): number {
-  if (stat.total === 0) return 0;
-  return Math.round((stat.completed / stat.total) * 100);
-}
-
 /** First word of a list's name, uppercased — how the sidebar groups OFFICE/SAHIL TL+CL together. */
 function listGroupKey(name: string): string {
   return name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
@@ -85,7 +79,6 @@ function DashboardInner() {
   const [lists, setLists] = useState<List[]>([]);
   const [showCreateList, setShowCreateList] = useState(false);
   const [showAddDoer, setShowAddDoer] = useState(false);
-  const [manageAccessList, setManageAccessList] = useState<List | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Which list "group" the Task Directory card is scoped to — ALL, OFFICE
@@ -116,16 +109,6 @@ function DashboardInner() {
     }
     load();
   }, []);
-
-  async function handleDeleteList(id: string) {
-    if (!confirm("Delete this list? Tasks/checklists in it will stay, just un-filed.")) return;
-    try {
-      await api.delete(`/lists/${id}`);
-      setLists((prev) => prev.filter((l) => l.id !== id));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to delete list.");
-    }
-  }
 
   // Named-list groups available in the scope dropdown, e.g. { SAHIL: [...] }.
   const scopeGroups = lists.reduce((groups, l) => {
@@ -301,90 +284,8 @@ function DashboardInner() {
               ))}
             </div>
 
-            {/* Lists */}
-            <div className="col-span-12 bg-surface border-2 border-on-surface p-stack-lg flex flex-col">
-              <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md flex justify-between items-end">
-                <h3 className="font-headline-md text-headline-md text-on-surface">Lists</h3>
-                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  {lists.length} total
-                </span>
-              </div>
-              {lists.length === 0 ? (
-                <p className="font-data-mono text-data-mono text-on-surface-variant">
-                  No lists yet. {isAdmin ? 'Use "+ Create List" above to add one.' : ""}
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {lists.map((l) => (
-                    <div
-                      key={l.id}
-                      className="border-2 border-on-surface p-stack-md flex items-center justify-between gap-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-body-md text-body-md text-on-surface truncate">{l.name}</div>
-                        <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                          {l.type === "task" ? "Task List" : "Checklist"} &bull; {l.memberIds.length} member{l.memberIds.length === 1 ? "" : "s"}
-                        </span>
-                      </div>
-                      {isAdmin && (
-                        <div className="flex gap-1 shrink-0">
-                          <button
-                            onClick={() => setManageAccessList(l)}
-                            className="border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                          >
-                            Access
-                          </button>
-                          <button
-                            onClick={() => handleDeleteList(l.id)}
-                            className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Department Performance */}
-            <div className="col-span-12 lg:col-span-5 bg-surface border-2 border-on-surface p-stack-lg flex flex-col">
-              <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md flex justify-between items-end">
-                <h3 className="font-headline-md text-headline-md text-on-surface">
-                  Department Performance
-                </h3>
-                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  By Completion %
-                </span>
-              </div>
-              <div className="flex flex-col gap-6 flex-1 justify-center">
-                {(dashboard?.breakdowns.departmentWiseTasks ?? []).length === 0 && (
-                  <p className="font-data-mono text-data-mono text-on-surface-variant text-center">
-                    No department data yet.
-                  </p>
-                )}
-                {dashboard?.breakdowns.departmentWiseTasks.map((d) => (
-                  <div key={d.department} className="flex items-center gap-4">
-                    <span className="font-data-mono text-data-mono w-20 truncate">
-                      {d.department}
-                    </span>
-                    <div className="flex-1 h-4 bg-surface-container border-2 border-on-surface relative">
-                      <div
-                        className="absolute top-0 left-0 h-full bg-on-surface"
-                        style={{ width: `${completionPct(d)}%` }}
-                      />
-                    </div>
-                    <span className="font-data-mono text-data-mono w-10 text-right">
-                      {completionPct(d)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Task Directory Table */}
-            <div className="col-span-12 lg:col-span-7 bg-surface border-2 border-on-surface flex flex-col">
+            <div className="col-span-12 bg-surface border-2 border-on-surface flex flex-col">
               <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-wrap justify-between items-center gap-3">
                 <h3 className="font-headline-md text-headline-md text-on-surface">
                   {directoryTitle}
@@ -476,17 +377,6 @@ function DashboardInner() {
         <CreateDoerModal
           onClose={() => setShowAddDoer(false)}
           onCreated={() => setShowAddDoer(false)}
-        />
-      )}
-
-      {manageAccessList && (
-        <ManageListAccessModal
-          list={manageAccessList}
-          onClose={() => setManageAccessList(null)}
-          onSaved={(updated) => {
-            setLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-            setManageAccessList(null);
-          }}
         />
       )}
     </>

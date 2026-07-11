@@ -35,6 +35,9 @@ function SettingsInner() {
   const [showAddDoer, setShowAddDoer] = useState(false);
   const [doerToReset, setDoerToReset] = useState<Doer | null>(null);
   const [resetNotice, setResetNotice] = useState<string | null>(null);
+  // Which doer's "Lists" dropdown is currently open.
+  const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
+  const [savingListId, setSavingListId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -85,6 +88,22 @@ function SettingsInner() {
       setDoers((prev) => prev.filter((d) => d.id !== doer.id));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to delete doer.");
+    }
+  }
+
+  // Add/remove a doer from a list by rewriting that list's member set.
+  async function toggleListMembership(list: List, doerId: string, shouldBeMember: boolean) {
+    const memberIds = shouldBeMember
+      ? Array.from(new Set([...list.memberIds, doerId]))
+      : list.memberIds.filter((id) => id !== doerId);
+    setSavingListId(list.id);
+    try {
+      const updated = await api.patch<List>(`/lists/${list.id}/members`, { memberIds });
+      setLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to update list access.");
+    } finally {
+      setSavingListId(null);
     }
   }
 
@@ -178,10 +197,59 @@ function SettingsInner() {
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
                       <StatusPill status={d.status} />
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
-                      {(listsByDoer.get(d.id) ?? []).length > 0
-                        ? (listsByDoer.get(d.id) ?? []).join(", ")
-                        : "—"}
+                    <td className="py-3 px-4 border-r border-surface-variant align-top">
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setOpenListsDoerId((prev) => (prev === d.id ? null : d.id))
+                          }
+                          className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                        >
+                          <span className="truncate">
+                            {(listsByDoer.get(d.id) ?? []).length} list
+                            {(listsByDoer.get(d.id) ?? []).length === 1 ? "" : "s"}
+                          </span>
+                          <span className="material-symbols-outlined text-base">
+                            {openListsDoerId === d.id ? "expand_less" : "expand_more"}
+                          </span>
+                        </button>
+
+                        {openListsDoerId === d.id && (
+                          <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
+                            {lists.length === 0 && (
+                              <p className="p-3 font-label-sm text-label-sm text-on-surface-variant uppercase">
+                                No lists exist yet.
+                              </p>
+                            )}
+                            {lists.map((l) => {
+                              const isMember = l.memberIds.includes(d.id);
+                              return (
+                                <label
+                                  key={l.id}
+                                  className="flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isMember}
+                                    disabled={savingListId === l.id}
+                                    onChange={(e) =>
+                                      toggleListMembership(l, d.id, e.target.checked)
+                                    }
+                                  />
+                                  <span className="flex-1 min-w-0">
+                                    <span className="block font-body-md text-body-md text-on-surface truncate">
+                                      {l.name}
+                                    </span>
+                                    <span className="block font-label-sm text-label-sm uppercase text-on-surface-variant">
+                                      {l.type === "task" ? "Task List" : "Checklist"}
+                                    </span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
