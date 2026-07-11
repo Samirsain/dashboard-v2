@@ -390,7 +390,6 @@ function TeamPerformanceInner() {
                   <tr><td colSpan={7} className="py-6 text-center font-data-mono">No doers found.</td></tr>
                 )}
                 {doerStats.map((s, i) => {
-                  const badge = getScoreBadge(s.score);
                   return (
                     <tr
                       key={s.doer.id}
@@ -416,12 +415,9 @@ function TeamPerformanceInner() {
                         {s.overdue}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="font-data-mono font-bold px-1.5 py-0.5 border border-on-surface">
-                            {s.score}
-                          </span>
-                          <span className={`text-[9px] uppercase px-1.5 py-0.5 ${badge.color}`}>{badge.label}</span>
-                        </div>
+                        <span className="font-data-mono font-bold px-1.5 py-0.5 border border-on-surface">
+                          {s.score}
+                        </span>
                       </td>
                     </tr>
                   );
