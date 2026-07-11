@@ -9,15 +9,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import type { Ticket } from "@/lib/types";
 
-const PREDEFINED_SOLUTIONS = [
-  "Restart the Computer",
-  "Clear Browser Cache",
-  "Restart Attendance Machine",
-  "Check Network Cable",
-  "Reset Password",
-  "Contact IT Team",
-  "Update Software",
-];
+const PREDEFINED_SOLUTIONS: string[] = []; // Not used anymore
 
 function StatusBadge({ status }: { status: Ticket["status"] }) {
   const colors = {
@@ -44,8 +36,7 @@ function TicketDetailsInner() {
   const [error, setError] = useState<string | null>(null);
 
   // Admin solution form state
-  const [solutionType, setSolutionType] = useState<"predefined" | "custom">("predefined");
-  const [predefinedSol, setPredefinedSol] = useState("");
+  const [solutionType, setSolutionType] = useState<"opt1" | "opt2" | "custom">("custom");
   const [customSol, setCustomSol] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -64,7 +55,10 @@ function TicketDetailsInner() {
   }, [id]);
 
   async function handleAdminSubmitSolution() {
-    const finalSolution = solutionType === "predefined" ? predefinedSol : customSol;
+    let finalSolution = customSol;
+    if (solutionType === "opt1") finalSolution = ticket?.solution_option1 || "";
+    if (solutionType === "opt2") finalSolution = ticket?.solution_option2 || "";
+    
     if (!finalSolution.trim()) {
       alert("Please provide a solution.");
       return;
@@ -73,7 +67,7 @@ function TicketDetailsInner() {
     try {
       const updated = await api.patch<Ticket>(`/tickets/${id}/solution`, {
         solution: finalSolution,
-        solutionType,
+        solutionType: solutionType === "custom" ? "custom" : "suggestion",
       });
       setTicket(updated);
       alert("Solution submitted successfully!");
@@ -165,13 +159,13 @@ function TicketDetailsInner() {
                   </div>
                   {ticket.solution_option1 && (
                     <div className="col-span-2">
-                      <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Opt 1</p>
+                      <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Suggestion 1</p>
                       <p className="text-on-surface">{ticket.solution_option1}</p>
                     </div>
                   )}
                   {ticket.solution_option2 && (
                     <div className="col-span-2">
-                      <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Opt 2</p>
+                      <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Suggestion 2</p>
                       <p className="text-on-surface">{ticket.solution_option2}</p>
                     </div>
                   )}
@@ -220,39 +214,41 @@ function TicketDetailsInner() {
                 <div className="border-2 border-on-surface bg-surface p-6 flex flex-col gap-6">
                   <h4 className="font-headline-md text-headline-md text-on-surface uppercase">Provide Solution</h4>
                   
-                  <div className="flex gap-4 border-b-2 border-surface-variant pb-4">
-                    <label className="flex items-center gap-2 cursor-pointer font-label-md text-label-md uppercase">
-                      <input
-                        type="radio"
-                        checked={solutionType === "predefined"}
-                        onChange={() => setSolutionType("predefined")}
-                        className="accent-primary w-4 h-4"
-                      />
-                      Predefined Solution
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer font-label-md text-label-md uppercase">
+                  <div className="flex flex-col gap-4 border-b-2 border-surface-variant pb-4">
+                    {ticket.solution_option1 && (
+                      <label className="flex items-center gap-3 cursor-pointer font-body-lg text-body-lg text-on-surface">
+                        <input
+                          type="radio"
+                          checked={solutionType === "opt1"}
+                          onChange={() => setSolutionType("opt1")}
+                          className="accent-primary w-5 h-5"
+                        />
+                        {ticket.solution_option1}
+                      </label>
+                    )}
+                    {ticket.solution_option2 && (
+                      <label className="flex items-center gap-3 cursor-pointer font-body-lg text-body-lg text-on-surface">
+                        <input
+                          type="radio"
+                          checked={solutionType === "opt2"}
+                          onChange={() => setSolutionType("opt2")}
+                          className="accent-primary w-5 h-5"
+                        />
+                        {ticket.solution_option2}
+                      </label>
+                    )}
+                    <label className="flex items-center gap-3 cursor-pointer font-body-lg text-body-lg text-on-surface font-bold">
                       <input
                         type="radio"
                         checked={solutionType === "custom"}
                         onChange={() => setSolutionType("custom")}
-                        className="accent-primary w-4 h-4"
+                        className="accent-primary w-5 h-5"
                       />
                       Custom Solution
                     </label>
                   </div>
 
-                  {solutionType === "predefined" ? (
-                    <select
-                      value={predefinedSol}
-                      onChange={(e) => setPredefinedSol(e.target.value)}
-                      className="border-2 border-on-surface bg-surface p-3 font-body-lg text-body-lg text-on-surface focus:outline-none focus:border-primary"
-                    >
-                      <option value="">-- Select Solution --</option>
-                      {PREDEFINED_SOLUTIONS.map(sol => (
-                        <option key={sol} value={sol}>{sol}</option>
-                      ))}
-                    </select>
-                  ) : (
+                  {solutionType === "custom" && (
                     <textarea
                       value={customSol}
                       onChange={(e) => setCustomSol(e.target.value)}

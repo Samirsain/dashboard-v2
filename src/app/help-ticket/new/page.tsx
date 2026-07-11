@@ -132,32 +132,25 @@ function NewTicketInner() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col gap-2">
-                <label className="font-label-md text-label-md uppercase text-on-surface">Solution Option 1</label>
-                <select
+                <label className="font-label-md text-label-md uppercase text-on-surface">Solution Suggestion 1</label>
+                <input
+                  type="text"
                   value={solutionOpt1}
                   onChange={(e) => setSolutionOpt1(e.target.value)}
                   className="border-2 border-on-surface bg-surface p-3 font-body-lg text-body-lg text-on-surface focus:outline-none focus:border-primary transition-colors"
-                >
-                  <option value="">-- Select --</option>
-                  <option value="Restart the Computer">Restart the Computer</option>
-                  <option value="Clear Browser Cache">Clear Browser Cache</option>
-                  <option value="Check Network Cable">Check Network Cable</option>
-                  <option value="Reset Password">Reset Password</option>
-                </select>
+                  placeholder="Optional suggestion..."
+                />
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="font-label-md text-label-md uppercase text-on-surface">Solution Option 2</label>
-                <select
+                <label className="font-label-md text-label-md uppercase text-on-surface">Solution Suggestion 2</label>
+                <input
+                  type="text"
                   value={solutionOpt2}
                   onChange={(e) => setSolutionOpt2(e.target.value)}
                   className="border-2 border-on-surface bg-surface p-3 font-body-lg text-body-lg text-on-surface focus:outline-none focus:border-primary transition-colors"
-                >
-                  <option value="">-- Select --</option>
-                  <option value="Contact IT Team">Contact IT Team</option>
-                  <option value="Update Software">Update Software</option>
-                  <option value="Restart Attendance Machine">Restart Attendance Machine</option>
-                </select>
+                  placeholder="Optional suggestion..."
+                />
               </div>
             </div>
 
