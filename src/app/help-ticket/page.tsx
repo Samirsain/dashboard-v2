@@ -23,20 +23,6 @@ function StatusBadge({ status }: { status: Ticket["status"] }) {
   );
 }
 
-function PriorityBadge({ priority }: { priority: Ticket["priority"] }) {
-  const colors = {
-    Low: "text-on-surface-variant border-on-surface-variant",
-    Medium: "text-primary border-primary",
-    High: "text-warning border-warning",
-    Urgent: "text-error border-error bg-error/10",
-  };
-  return (
-    <span className={`inline-block font-label-sm text-label-sm uppercase px-2 py-0.5 border-2 ${colors[priority] || colors.Low}`}>
-      {priority}
-    </span>
-  );
-}
-
 function HelpTicketInner() {
   const { user } = useAuth();
   const isAdmin = user?.role === "Admin";
@@ -162,7 +148,6 @@ function HelpTicketInner() {
                   <th className="py-3 px-4 border-r border-surface-variant w-32">Ticket ID</th>
                   <th className="py-3 px-4 border-r border-surface-variant">Title</th>
                   {isAdmin && <th className="py-3 px-4 border-r border-surface-variant w-40">Employee</th>}
-                  <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Priority</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-40">Created</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-40 text-center">Status</th>
                   <th className="py-3 px-4 w-32 text-center">Action</th>
@@ -194,12 +179,8 @@ function HelpTicketInner() {
                     {isAdmin && (
                       <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
                         {t.employee_name}
-                        {t.department && <span className="block text-[11px] opacity-70">{t.department}</span>}
                       </td>
                     )}
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <PriorityBadge priority={t.priority} />
-                    </td>
                     <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono text-[12px]">
                       {t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : "—"}
                     </td>

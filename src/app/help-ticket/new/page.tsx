@@ -14,9 +14,7 @@ function NewTicketInner() {
   const [error, setError] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
-  const [department, setDepartment] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<TicketPriority>("Low");
   const [solutionOpt1, setSolutionOpt1] = useState("");
   const [solutionOpt2, setSolutionOpt2] = useState("");
 
@@ -32,9 +30,8 @@ function NewTicketInner() {
     try {
       await api.post("/tickets", {
         title: title.trim(),
-        department: department.trim(),
         description: description.trim(),
-        priority,
+        priority: "Normal", // Default priority so DB constraints don't fail if any
         solution_option1: solutionOpt1,
         solution_option2: solutionOpt2,
       });
@@ -87,33 +84,6 @@ function NewTicketInner() {
                 placeholder="E.g., Printer not working"
                 required
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="flex flex-col gap-2">
-                <label className="font-label-md text-label-md uppercase text-on-surface">Department</label>
-                <input
-                  type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className="border-2 border-on-surface bg-surface p-3 font-body-lg text-body-lg text-on-surface focus:outline-none focus:border-primary transition-colors"
-                  placeholder="Optional"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="font-label-md text-label-md uppercase text-on-surface">Priority *</label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TicketPriority)}
-                  className="border-2 border-on-surface bg-surface p-3 font-body-lg text-body-lg text-on-surface focus:outline-none focus:border-primary transition-colors"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
-              </div>
             </div>
 
             <div className="flex flex-col gap-2">

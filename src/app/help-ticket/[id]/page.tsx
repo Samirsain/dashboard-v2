@@ -145,14 +145,6 @@ function TicketDetailsInner() {
                     <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Employee</p>
                     <p className="font-medium text-on-surface">{ticket.employee_name}</p>
                   </div>
-                  <div>
-                    <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Department</p>
-                    <p className="font-medium text-on-surface">{ticket.department || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Priority</p>
-                    <p className="font-medium text-on-surface">{ticket.priority}</p>
-                  </div>
                   {ticket.solution_option1 && (
                     <div className="col-span-2">
                       <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Suggestion 1</p>
