@@ -153,10 +153,6 @@ function TicketDetailsInner() {
                     <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Priority</p>
                     <p className="font-medium text-on-surface">{ticket.priority}</p>
                   </div>
-                  <div>
-                    <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Blanket Required</p>
-                    <p className="font-medium text-on-surface">{ticket.blanket_required === "true" ? "Yes" : "No"}</p>
-                  </div>
                   {ticket.solution_option1 && (
                     <div className="col-span-2">
                       <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Suggestion 1</p>

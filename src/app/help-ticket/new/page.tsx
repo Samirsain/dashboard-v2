@@ -19,7 +19,6 @@ function NewTicketInner() {
   const [priority, setPriority] = useState<TicketPriority>("Low");
   const [solutionOpt1, setSolutionOpt1] = useState("");
   const [solutionOpt2, setSolutionOpt2] = useState("");
-  const [blanketRequired, setBlanketRequired] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +37,6 @@ function NewTicketInner() {
         priority,
         solution_option1: solutionOpt1,
         solution_option2: solutionOpt2,
-        blanket_required: blanketRequired ? "true" : "false",
       });
       router.push("/help-ticket");
     } catch (err) {
@@ -152,22 +150,6 @@ function NewTicketInner() {
                   placeholder="Optional suggestion..."
                 />
               </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setBlanketRequired(!blanketRequired)}
-                className="flex items-center justify-center w-6 h-6 border-2 border-on-surface focus:outline-none"
-              >
-                {blanketRequired && <span className="material-symbols-outlined text-primary text-sm">check</span>}
-              </button>
-              <label
-                onClick={() => setBlanketRequired(!blanketRequired)}
-                className="font-label-md text-label-md uppercase text-on-surface cursor-pointer select-none"
-              >
-                Blanket Required?
-              </label>
             </div>
 
             <div className="pt-4 border-t-2 border-on-surface">
