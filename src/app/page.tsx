@@ -171,8 +171,16 @@ function DashboardInner() {
       })),
   ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
+  /** An item is overdue if it's still open and its due date is before today. */
+  const isOverdue = (dueDate: string) => !!dueDate && dueDate < today;
+
+  // "today" view = today's items PLUS every overdue (past, still-pending) item.
+  // allPending is sorted by dueDate ascending, so overdue rows (earlier dates)
+  // naturally list before today's rows.
   const pendingRows =
-    pendingFilter === "today" ? allPending.filter((r) => r.dueDate === today) : allPending;
+    pendingFilter === "today"
+      ? allPending.filter((r) => r.dueDate === today || isOverdue(r.dueDate))
+      : allPending;
 
   const summary = dashboard?.summary;
   const overallPct =
@@ -324,12 +332,20 @@ function DashboardInner() {
                         </td>
                       </tr>
                     )}
-                    {pendingRows.map((r) => (
+                    {pendingRows.map((r) => {
+                      const overdue = isOverdue(r.dueDate);
+                      return (
                       <tr
                         key={`${r.kind}-${r.id}`}
-                        className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-lowest transition-colors"
+                        className={`border-b border-outline-variant last:border-b-0 transition-colors ${
+                          overdue
+                            ? "bg-red-50 border-l-4 border-l-red-600 hover:bg-red-100"
+                            : "hover:bg-surface-container-lowest"
+                        }`}
                       >
-                        <td className="py-3 px-4 font-medium">{r.task}</td>
+                        <td className={`py-3 px-4 font-medium ${overdue ? "text-red-700" : ""}`}>
+                          {r.task}
+                        </td>
                         <td className="py-3 px-4">
                           <span className="font-label-sm text-label-sm uppercase text-on-surface-variant border border-on-surface-variant px-2 py-0.5">
                             {r.systemName}
@@ -339,7 +355,16 @@ function DashboardInner() {
                           {r.systemType}
                         </td>
                         <td className="py-3 px-4 text-center font-data-mono text-data-mono">
-                          {r.dueDate || "—"}
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={overdue ? "text-red-700 font-bold" : ""}>
+                              {r.dueDate || "—"}
+                            </span>
+                            {overdue && (
+                              <span className="inline-block bg-red-600 text-white font-label-sm text-[10px] uppercase px-2 py-0.5">
+                                Overdue
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-2">
@@ -362,7 +387,8 @@ function DashboardInner() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
