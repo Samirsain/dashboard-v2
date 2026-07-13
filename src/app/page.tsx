@@ -354,17 +354,12 @@ function DashboardInner() {
                         <td className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant">
                           {r.systemType}
                         </td>
-                        <td className="py-3 px-4 text-center font-data-mono text-data-mono">
-                          <div className="flex flex-col items-center gap-1">
-                            <span className={overdue ? "text-red-700 font-bold" : ""}>
-                              {r.dueDate || "—"}
-                            </span>
-                            {overdue && (
-                              <span className="inline-block bg-red-600 text-white font-label-sm text-[10px] uppercase px-2 py-0.5">
-                                Overdue
-                              </span>
-                            )}
-                          </div>
+                        <td
+                          className={`py-3 px-4 text-center font-data-mono text-data-mono whitespace-nowrap ${
+                            overdue ? "text-red-700 font-bold" : ""
+                          }`}
+                        >
+                          {r.dueDate || "—"}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-2">
