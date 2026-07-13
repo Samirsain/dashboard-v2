@@ -21,6 +21,7 @@ const EMPTY_DRAFT: Draft = {
   ps: "",
   access: "",
   link: "",
+  threePercent: "",
 };
 
 /** Split a multi-line / comma list of URLs into individual links. */
@@ -54,6 +55,11 @@ function LinkList({ raw }: { raw: string }) {
 function MasterSheetInner() {
   const { user } = useAuth();
   const canEdit = user?.role === "Admin" || user?.role === "Manager";
+  const show3Pct =
+    user?.role === "Admin" ||
+    user?.role === "PC" ||
+    user?.role === "Manager" ||
+    user?.employeeCode?.toUpperCase() === "TM03";
 
   const [rows, setRows] = useState<MasterSheetRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +105,7 @@ function MasterSheetInner() {
       ps: row.ps,
       access: row.access,
       link: row.link,
+      threePercent: row.threePercent,
     });
   }
 
@@ -181,6 +188,11 @@ function MasterSheetInner() {
         <td className={cell}>
           <input value={draft.link} onChange={(e) => setDraft({ ...draft, link: e.target.value })} placeholder="https://..." className={inputCls} />
         </td>
+        {show3Pct && (
+          <td className={cell}>
+            <input value={draft.threePercent} onChange={(e) => setDraft({ ...draft, threePercent: e.target.value })} placeholder="3% info" className={inputCls} />
+          </td>
+        )}
         <td className="py-3 px-3 text-center align-top">
           <div className="flex flex-col gap-1">
             <button onClick={saveDraft} disabled={saving} className="px-2 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50">
@@ -250,20 +262,23 @@ function MasterSheetInner() {
                   <th className="py-3 px-3 border-r border-surface-variant w-32">PS</th>
                   <th className="py-3 px-3 border-r border-surface-variant w-40">Access</th>
                   <th className="py-3 px-3 border-r border-surface-variant w-32">Link</th>
+                  {show3Pct && (
+                    <th className="py-3 px-3 border-r border-surface-variant w-28">3%</th>
+                  )}
                   <th className="py-3 px-3 w-28 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={11} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={show3Pct ? 12 : 11} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && rows.length === 0 && !adding && (
                   <tr>
-                    <td colSpan={11} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={show3Pct ? 12 : 11} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No entries yet.{canEdit ? ' Use "+ Add Row" to create one.' : ""}
                     </td>
                   </tr>
@@ -284,6 +299,9 @@ function MasterSheetInner() {
                       <td className={cell}>{row.ps || "—"}</td>
                       <td className={`${cell} whitespace-pre-line`}>{row.access || "—"}</td>
                       <td className={cell}><LinkList raw={row.link} /></td>
+                      {show3Pct && (
+                        <td className={`${cell} whitespace-pre-line`}>{row.threePercent || "—"}</td>
+                      )}
                       <td className="py-3 px-3 text-center align-top">
                         {canEdit ? (
                           <div className="flex flex-col gap-1">
