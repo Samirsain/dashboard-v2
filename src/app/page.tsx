@@ -58,6 +58,12 @@ function listGroupKey(name: string): string {
   return name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
 }
 
+/** "2026-07-09" -> "09-07-2026" (day-month-year). Passes through anything else. */
+function formatDayMonthYear(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : iso || "—";
+}
+
 function DashboardInner() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "Admin";
@@ -359,7 +365,7 @@ function DashboardInner() {
                             overdue ? "text-red-700 font-bold" : ""
                           }`}
                         >
-                          {r.dueDate || "—"}
+                          {formatDayMonthYear(r.dueDate)}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-2">
