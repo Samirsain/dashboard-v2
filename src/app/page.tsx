@@ -11,6 +11,7 @@ import ReviseTaskModal from "@/components/ReviseTaskModal";
 import type {
   ChecklistInstance,
   ChecklistTemplate,
+  Doer,
   FullDashboard,
   List,
   Task,
@@ -72,6 +73,7 @@ function DashboardInner() {
   const [pendingChecklist, setPendingChecklist] = useState<ChecklistInstance[]>([]);
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [lists, setLists] = useState<List[]>([]);
+  const [doers, setDoers] = useState<Doer[]>([]);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +85,7 @@ function DashboardInner() {
     setLoading(true);
     setError(null);
     try {
-      const [dash, tasks, listsData, checklist, templateData] = await Promise.all([
+      const [dash, tasks, listsData, checklist, templateData, doerData] = await Promise.all([
         api.get<FullDashboard>("/dashboard"),
         api.get<Task[]>("/tasks"),
         api.get<List[]>("/lists").catch(() => [] as List[]),
@@ -91,12 +93,14 @@ function DashboardInner() {
           .get<ChecklistInstance[]>("/checklist/instances?status=Pending")
           .catch(() => [] as ChecklistInstance[]),
         api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
+        api.get<Doer[]>("/users").catch(() => [] as Doer[]),
       ]);
       setDashboard(dash);
       setLists(listsData);
       setAllTasks(tasks);
       setPendingChecklist(checklist);
       setTemplates(templateData);
+      setDoers(doerData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load dashboard.");
     } finally {
@@ -131,6 +135,11 @@ function DashboardInner() {
   }
 
   const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
+  const showDoerColumn =
+    user?.role === "Admin" ||
+    user?.role === "PC" ||
+    user?.role === "Manager" ||
+    user?.employeeCode?.toUpperCase() === "TM03";
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
 
   /** "Office" for no list, else the list's group name (e.g. "SAHIL"). */
@@ -151,6 +160,7 @@ function DashboardInner() {
     systemType: string;
     dueDate: string;
     taskObj?: Task;
+    assignedDoerId?: string;
   };
 
   const allPending: PendRow[] = [
@@ -164,6 +174,7 @@ function DashboardInner() {
         systemType: "Task List",
         dueDate: t.dueDate,
         taskObj: t,
+        assignedDoerId: t.assignedDoerId,
       })),
     ...pendingChecklist
       .filter((c) => c.status !== "Completed")
@@ -174,6 +185,7 @@ function DashboardInner() {
         systemName: listLabelFor(templateListMap.get(c.templateId) ?? ""),
         systemType: "Checklist",
         dueDate: c.date,
+        assignedDoerId: c.assignedDoerId,
       })),
   ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
@@ -319,6 +331,9 @@ function DashboardInner() {
                       <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">Task</th>
                       <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">System Name</th>
                       <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">System Type</th>
+                      {showDoerColumn && (
+                        <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">Doer Name</th>
+                      )}
                       <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-center">Due Date</th>
                       <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-center">Action</th>
                     </tr>
@@ -326,14 +341,14 @@ function DashboardInner() {
                   <tbody className="font-body-md text-body-md text-on-surface">
                     {loading && (
                       <tr>
-                        <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                        <td colSpan={showDoerColumn ? 6 : 5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                           Loading...
                         </td>
                       </tr>
                     )}
                     {!loading && pendingRows.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                        <td colSpan={showDoerColumn ? 6 : 5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                           {pendingFilter === "today" ? "Nothing pending today. 🎉" : "Nothing pending. 🎉"}
                         </td>
                       </tr>
@@ -360,6 +375,15 @@ function DashboardInner() {
                         <td className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant">
                           {r.systemType}
                         </td>
+                        {showDoerColumn && (
+                          <td className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                            {r.kind === "task" && r.taskObj?.doer?.name
+                              ? r.taskObj.doer.name
+                              : doers.find((d) => d.id === r.assignedDoerId)?.name ||
+                                r.assignedDoerId ||
+                                "—"}
+                          </td>
+                        )}
                         <td
                           className={`py-3 px-4 text-center font-data-mono text-data-mono whitespace-nowrap ${
                             overdue ? "text-red-700 font-bold" : ""
