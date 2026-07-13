@@ -26,7 +26,6 @@ export interface MasterSheetRow {
   ps: string;
   access: string;
   link: string;
-  threePercent: string;
   createdAt: string;
 }
 

@@ -18,7 +18,6 @@ function toRow(record: SheetRecord): MasterSheetRow {
     ps: record["PS"] ?? "",
     access: record["Access"] ?? "",
     link: record["Link"] ?? "",
-    threePercent: record["3%"] ?? "",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -45,7 +44,6 @@ export const masterSheetService = {
       PS: input.ps,
       Access: input.access,
       Link: input.link,
-      "3%": input.threePercent ?? "",
       CreatedAt: new Date().toISOString(),
     };
     const saved = await dataService.append(entity, record);
@@ -64,7 +62,6 @@ export const masterSheetService = {
     if (updates.ps !== undefined) patch["PS"] = updates.ps;
     if (updates.access !== undefined) patch["Access"] = updates.access;
     if (updates.link !== undefined) patch["Link"] = updates.link;
-    if (updates.threePercent !== undefined) patch["3%"] = updates.threePercent;
 
     const saved = await dataService.updateById(entity, id, patch);
     return toRow(saved);
