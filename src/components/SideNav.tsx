@@ -95,7 +95,7 @@ function CollapsibleSection({
 }
 
 export default function SideNav({ active }: { active: NavKey }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [lists, setLists] = useState<List[]>([]);
   // Which collapsible section is expanded. Open the one matching the current
   // page by default so the active list is visible on load.
@@ -130,33 +130,37 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Dashboard</span>
         </Link>
 
-        {/* Task List (dropdown): OFFICE TL + named task lists */}
-        <CollapsibleSection
-          active={active}
-          open={open}
-          setOpen={setOpen}
-          navKey="task-list"
-          icon="assignment"
-          label="Task List"
-          basePath="/task-list"
-          officeLabel="OFFICE TL"
-          sectionLists={taskLists}
-          type="task"
-        />
+        {/* Task List + Checklist are for task creators/managers; plain doers
+            work off the dashboard's Pending Tasks instead. */}
+        {user?.role !== "Doer" && (
+          <>
+            <CollapsibleSection
+              active={active}
+              open={open}
+              setOpen={setOpen}
+              navKey="task-list"
+              icon="assignment"
+              label="Task List"
+              basePath="/task-list"
+              officeLabel="OFFICE TL"
+              sectionLists={taskLists}
+              type="task"
+            />
 
-        {/* Checklist (dropdown): OFFICE CL + named checklists */}
-        <CollapsibleSection
-          active={active}
-          open={open}
-          setOpen={setOpen}
-          navKey="checklist"
-          icon="checklist"
-          label="Checklist"
-          basePath="/checklist"
-          officeLabel="OFFICE CL"
-          sectionLists={checklists}
-          type="checklist"
-        />
+            <CollapsibleSection
+              active={active}
+              open={open}
+              setOpen={setOpen}
+              navKey="checklist"
+              icon="checklist"
+              label="Checklist"
+              basePath="/checklist"
+              officeLabel="OFFICE CL"
+              sectionLists={checklists}
+              type="checklist"
+            />
+          </>
+        )}
 
         {/* Workflow */}
         <Link href="/workflow" className={active === "workflow" ? linkActive : linkBase}>
