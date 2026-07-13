@@ -13,7 +13,7 @@
   --color-on-secondary-fixed: #1b1b1b;
   --color-surface-variant: #e2e2e2;
   --color-secondary-container: #e2e2e2;
-  --color-background: #f9f9f9;
+  --color-background: #E4E2D6;
   --color-surface-container-high: #e8e8e8;
   --color-on-secondary-fixed-variant: #474747;
   --color-on-surface: #1a1c1c;
@@ -115,7 +115,7 @@
 }
 
 body {
-  background-color: #f9f9f9;
+  background-color: #E4E2D6;
   color: #1a1c1c;
   font-family: var(--font-geist), sans-serif;
 }
