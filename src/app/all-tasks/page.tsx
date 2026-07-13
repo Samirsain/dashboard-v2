@@ -84,29 +84,6 @@ function AllTasksInner() {
     [templates]
   );
 
-  const scopeOptions = useMemo(() => {
-    if (tab === "tasks") {
-      const taskLists = lists.filter((l) => l.type === "task");
-      return [
-        { key: "ALL", label: "All TL" },
-        { key: "OFFICE", label: "Office TL" },
-        ...taskLists.map((l) => {
-          const first = l.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
-          return { key: l.id, label: `${first} TL` };
-        }),
-      ];
-    } else {
-      const checklistLists = lists.filter((l) => l.type === "checklist");
-      return [
-        { key: "ALL", label: "All CL" },
-        { key: "OFFICE", label: "Office CL" },
-        ...checklistLists.map((l) => {
-          const first = l.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
-          return { key: l.id, label: `${first} CL` };
-        }),
-      ];
-    }
-  }, [tab, lists]);
 
   function inScope(listId: string): boolean {
     if (scope === "ALL") return true;
@@ -253,36 +230,71 @@ function AllTasksInner() {
             </div>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs as dropdown filters */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex gap-2">
-              {(["tasks", "checklist"] as Tab[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={
-                    tab === t
-                      ? "border-2 border-on-surface bg-on-surface text-surface px-4 py-1.5 font-label-sm text-label-sm uppercase"
-                      : "border-2 border-on-surface px-4 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                  }
-                >
-                  {t === "tasks" ? "Tasks" : "Checklist"}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">List:</span>
               <select
-                value={scope}
-                onChange={(e) => setScope(e.target.value)}
-                className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                value={tab === "tasks" ? scope : "ALL"}
+                onMouseDown={() => {
+                  if (tab !== "tasks") {
+                    setTab("tasks");
+                    setScope("ALL");
+                  }
+                }}
+                onChange={(e) => {
+                  setTab("tasks");
+                  setScope(e.target.value);
+                }}
+                className={
+                  tab === "tasks"
+                    ? "border-2 border-on-surface bg-on-surface text-surface px-4 py-1.5 font-label-sm text-label-sm uppercase focus:outline-none cursor-pointer"
+                    : "border-2 border-on-surface px-4 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors focus:outline-none cursor-pointer"
+                }
               >
-                {scopeOptions.map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {o.label}
-                  </option>
-                ))}
+                <option value="ALL">Tasks (All TL)</option>
+                <option value="OFFICE">Tasks (Office TL)</option>
+                {lists
+                  .filter((l) => l.type === "task")
+                  .map((l) => {
+                    const first = l.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
+                    return (
+                      <option key={l.id} value={l.id}>
+                        Tasks ({first} TL)
+                      </option>
+                    );
+                  })}
+              </select>
+
+              <select
+                value={tab === "checklist" ? scope : "ALL"}
+                onMouseDown={() => {
+                  if (tab !== "checklist") {
+                    setTab("checklist");
+                    setScope("ALL");
+                  }
+                }}
+                onChange={(e) => {
+                  setTab("checklist");
+                  setScope(e.target.value);
+                }}
+                className={
+                  tab === "checklist"
+                    ? "border-2 border-on-surface bg-on-surface text-surface px-4 py-1.5 font-label-sm text-label-sm uppercase focus:outline-none cursor-pointer"
+                    : "border-2 border-on-surface px-4 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors focus:outline-none cursor-pointer"
+                }
+              >
+                <option value="ALL">Checklist (All CL)</option>
+                <option value="OFFICE">Checklist (Office CL)</option>
+                {lists
+                  .filter((l) => l.type === "checklist")
+                  .map((l) => {
+                    const first = l.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
+                    return (
+                      <option key={l.id} value={l.id}>
+                        Checklist ({first} CL)
+                      </option>
+                    );
+                  })}
               </select>
             </div>
           </div>
