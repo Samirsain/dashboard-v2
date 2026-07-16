@@ -485,6 +485,22 @@ class GoogleSheetsService {
     return this.readAll(entity);
   }
 
+  /** Title of a spreadsheet's first tab — used when a form's tab name is left blank. */
+  async firstTabName(spreadsheetId: string): Promise<string> {
+    if (!spreadsheetId) {
+      throw AppError.badRequest("A Spreadsheet ID is required.");
+    }
+    return this.withErrorHandling(`firstTabName`, async () => {
+      const client = await this.getClient();
+      const meta = await client.spreadsheets.get({ spreadsheetId });
+      const title = meta.data.sheets?.[0]?.properties?.title;
+      if (!title) {
+        throw AppError.badRequest("This spreadsheet has no sheets/tabs.");
+      }
+      return title;
+    });
+  }
+
   /**
    * Reads a spreadsheet tab's values WITHOUT creating anything — used for
    * external sheets we only observe (e.g. a Google Form's response sheet).

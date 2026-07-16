@@ -15,9 +15,17 @@ export const formResponsesService = {
       throw AppError.notFound(`Form "${formConfigId}" not found.`);
     }
 
+    // Tab name is optional — blank means "use the form's main (first) tab",
+    // which is what Google Forms writes to. This spares users from typing an
+    // exact, case-sensitive tab name for every form.
+    let sheetName = (config.sheetName ?? "").trim();
+    if (!sheetName) {
+      sheetName = await googleSheetsService.firstTabName(config.spreadsheetId);
+    }
+
     const { headers, rows } = await googleSheetsService.readValues(
       config.spreadsheetId,
-      config.sheetName
+      sheetName
     );
 
     return { headers, rows };
