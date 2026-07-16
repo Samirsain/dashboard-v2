@@ -5,14 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
-import type { List } from "@/lib/types";
-
-/** "SAHIL SIR TASKLIST" -> "SAHIL TL" */
-function shortListLabel(name: string, type: "task" | "checklist"): string {
-  const first = name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
-  return `${first} ${type === "task" ? "TL" : "CL"}`;
-}
 
 /**
  * Mobile top bar + slide-in navigation drawer. The desktop SideNav is hidden
@@ -22,15 +14,6 @@ export default function MobileHeader() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [lists, setLists] = useState<List[]>([]);
-  const [sub, setSub] = useState<{ task: boolean; checklist: boolean }>({
-    task: false,
-    checklist: false,
-  });
-
-  useEffect(() => {
-    api.get<List[]>("/lists").then(setLists).catch(() => setLists([]));
-  }, []);
 
   // Close the drawer whenever the route changes (after a nav tap).
   useEffect(() => {
@@ -38,8 +21,6 @@ export default function MobileHeader() {
     setOpen(false);
   }, [pathname]);
 
-  const taskLists = lists.filter((l) => l.type === "task");
-  const checklists = lists.filter((l) => l.type === "checklist");
   const isAdmin = user?.role === "Admin";
 
   const rowBase =
@@ -50,7 +31,6 @@ export default function MobileHeader() {
         ? "border-primary bg-secondary-container text-on-secondary-container"
         : "border-transparent text-on-surface-variant hover:bg-surface-container"
     }`;
-  const subRow = `${rowBase} pl-10 border-transparent text-on-surface-variant hover:bg-surface-container`;
 
   return (
     <>
@@ -86,56 +66,6 @@ export default function MobileHeader() {
               <Link href="/" className={rowFor("/")}>
                 Dashboard
               </Link>
-
-              {/* Task List + Checklist: hidden for plain doers (they use the
-                  dashboard's Pending Tasks instead). */}
-              {user?.role !== "Doer" && (
-                <>
-                  <button
-                    onClick={() => setSub((p) => ({ ...p, task: !p.task }))}
-                    className={`w-full text-left flex items-center justify-between ${rowFor("/task-list")}`}
-                  >
-                    <span>Task List</span>
-                    <span className="material-symbols-outlined text-lg">
-                      {sub.task ? "expand_less" : "expand_more"}
-                    </span>
-                  </button>
-                  {sub.task && (
-                    <>
-                      <Link href="/task-list" className={subRow}>
-                        OFFICE TL
-                      </Link>
-                      {taskLists.map((l) => (
-                        <Link key={l.id} href={`/task-list?list=${l.id}`} className={subRow}>
-                          {shortListLabel(l.name, "task")}
-                        </Link>
-                      ))}
-                    </>
-                  )}
-
-                  <button
-                    onClick={() => setSub((p) => ({ ...p, checklist: !p.checklist }))}
-                    className={`w-full text-left flex items-center justify-between ${rowFor("/checklist")}`}
-                  >
-                    <span>Checklist</span>
-                    <span className="material-symbols-outlined text-lg">
-                      {sub.checklist ? "expand_less" : "expand_more"}
-                    </span>
-                  </button>
-                  {sub.checklist && (
-                    <>
-                      <Link href="/checklist" className={subRow}>
-                        OFFICE CL
-                      </Link>
-                      {checklists.map((l) => (
-                        <Link key={l.id} href={`/checklist?list=${l.id}`} className={subRow}>
-                          {shortListLabel(l.name, "checklist")}
-                        </Link>
-                      ))}
-                    </>
-                  )}
-                </>
-              )}
 
               <Link href="/workflow" className={rowFor("/workflow")}>
                 Workflow
