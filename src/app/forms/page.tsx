@@ -153,14 +153,17 @@ function AddFormModal({
           </div>
 
           <div>
-            <label className={label}>Sheet / Tab Name</label>
+            <label className={label}>Sheet / Tab Name (optional)</label>
             <input
-              required
               value={sheetName}
               onChange={(e) => setSheetName(e.target.value)}
-              placeholder="e.g. Form Responses 1"
+              placeholder="Leave blank to use the form's main tab"
               className={`${field} font-data-mono text-data-mono`}
             />
+            <p className="mt-1 font-data-mono text-xs text-on-surface-variant">
+              Blank = the spreadsheet&apos;s first tab (where the form writes). Only set this if
+              responses are on a different tab.
+            </p>
           </div>
 
           <div className="border border-on-surface-variant px-3 py-2 flex flex-col gap-1">
