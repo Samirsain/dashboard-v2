@@ -188,7 +188,8 @@ class GoogleSheetsService {
       }
       if (status === 404) {
         throw new AppError(
-          "Spreadsheet not found. Check GOOGLE_SPREADSHEET_ID in your .env file.",
+          "Spreadsheet or sheet/tab not found. Check the Spreadsheet ID and the exact " +
+            "Sheet/Tab name, and make sure the sheet is shared with the service account.",
           502,
           "SHEETS_SPREADSHEET_NOT_FOUND"
         );
