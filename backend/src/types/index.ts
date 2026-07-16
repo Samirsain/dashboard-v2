@@ -59,6 +59,21 @@ export interface MasterSheetRow {
   createdAt: string;
 }
 
+/** A registered Google Form — points at the Sheet its responses land in. */
+export interface FormConfig {
+  id: string;
+  name: string;
+  spreadsheetId: string;
+  sheetName: string;
+  createdAt: string;
+}
+
+/** A form's responses, read live from its linked Google Sheet. */
+export interface FormResponses {
+  headers: string[];
+  rows: Array<{ row: number; data: Record<string, string> }>;
+}
+
 export interface Task {
   id: string;
   /** The Task List (list of type "task") this task is filed under, or "". */

@@ -84,6 +84,24 @@ export const sheetsConfig = {
     },
     "MASTER_SHEET"
   ),
+  /**
+   * Registered Google Forms — each row just points at the Google Sheet a
+   * form's responses land in (spreadsheet ID + tab name). Actual responses
+   * are never copied in here; they're read live from that sheet on request.
+   */
+  formConfigs: entity(
+    "FORM_CONFIGS",
+    "form_configs",
+    "Form ID",
+    {
+      "Form ID": "id",
+      Name: "name",
+      "Spreadsheet ID": "spreadsheet_id",
+      "Sheet Name": "sheet_name",
+      CreatedAt: "created_at",
+    },
+    "FORM_CONFIGS"
+  ),
   /** Named lists (categories) an admin creates — each is a "Task List" or a "Checklist". */
   lists: entity(
     "LISTS",

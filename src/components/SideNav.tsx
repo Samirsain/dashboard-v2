@@ -11,6 +11,7 @@ type NavKey =
   | "all-tasks"
   | "workflow"
   | "master-sheet"
+  | "forms"
   | "team-performance"
   | "settings"
   | "help-ticket";
@@ -57,6 +58,14 @@ export default function SideNav({ active }: { active: NavKey }) {
             table_chart
           </span>
           <span className={labelCls}>Master Sheet</span>
+        </Link>
+
+        {/* Form Responses */}
+        <Link href="/forms" className={active === "forms" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="quiz">
+            quiz
+          </span>
+          <span className={labelCls}>Form</span>
         </Link>
 
         {/* Admin-only */}

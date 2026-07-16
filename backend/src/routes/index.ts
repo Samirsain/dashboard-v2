@@ -8,6 +8,7 @@ import activityRoutes from "./activity.routes";
 import listsRoutes from "./lists.routes";
 import workflowRoutes from "./workflow.routes";
 import masterSheetRoutes from "./masterSheet.routes";
+import formConfigRoutes from "./formConfig.routes";
 import backupRoutes from "./backup.routes";
 import ticketRoutes from "./ticket.routes";
 import { hasGoogleCredentials, hasSupabaseCredentials } from "../config/env";
@@ -36,6 +37,7 @@ router.use("/activity", activityRoutes);
 router.use("/lists", listsRoutes);
 router.use("/workflow", workflowRoutes);
 router.use("/master-sheet", masterSheetRoutes);
+router.use("/forms", formConfigRoutes);
 router.use("/backup", backupRoutes);
 router.use("/tickets", ticketRoutes);
 
