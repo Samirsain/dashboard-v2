@@ -123,6 +123,128 @@ function AddFormModal({
   );
 }
 
+/** Self-contained: fetches + polls one form's responses and renders its table. */
+function FormResponsesSection({
+  form,
+  search,
+  canDelete,
+  onDelete,
+}: {
+  form: FormConfig;
+  search: string;
+  canDelete: boolean;
+  onDelete: (form: FormConfig) => void;
+}) {
+  const [responses, setResponses] = useState<FormResponses | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load(opts: { silent?: boolean } = {}) {
+    if (!opts.silent) setLoading(true);
+    setError(null);
+    try {
+      const data = await api.get<FormResponses>(`/forms/${form.id}/responses`);
+      setResponses(data);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load responses.");
+    } finally {
+      if (!opts.silent) setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      load();
+    });
+    const interval = setInterval(() => load({ silent: true }), POLL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.id]);
+
+  const filteredRows =
+    responses?.rows.filter((r) =>
+      search
+        ? Object.values(r.data).some((v) => v.toLowerCase().includes(search.toLowerCase()))
+        : true
+    ) ?? [];
+
+  return (
+    <div className="w-full bg-surface-container-lowest border-2 border-on-surface flex flex-col">
+      <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-wrap justify-between items-center gap-3">
+        <h3 className="font-headline-md text-headline-md text-on-surface">{form.name}</h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => load()}
+            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+          >
+            Refresh
+          </button>
+          {canDelete && (
+            <button
+              onClick={() => onDelete(form)}
+              className="px-3 py-1.5 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <p className="font-label-sm text-label-sm text-error px-4 py-2">{error}</p>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[720px]">
+          <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+            <tr>
+              {(responses?.headers ?? []).map((h) => (
+                <th key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="font-body-md text-body-md text-on-surface">
+            {loading && (
+              <tr>
+                <td
+                  colSpan={Math.max(responses?.headers.length ?? 1, 1)}
+                  className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
+                >
+                  Loading...
+                </td>
+              </tr>
+            )}
+            {!loading && filteredRows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={Math.max(responses?.headers.length ?? 1, 1)}
+                  className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
+                >
+                  No responses yet.
+                </td>
+              </tr>
+            )}
+            {filteredRows.map((r) => (
+              <tr
+                key={r.row}
+                className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors"
+              >
+                {(responses?.headers ?? []).map((h) => (
+                  <td key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
+                    {r.data[h] || "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function FormsInner() {
   const { user } = useAuth();
   const canManage =
@@ -130,10 +252,8 @@ function FormsInner() {
   const canDelete = user?.role === "Admin" || user?.role === "Manager";
 
   const [forms, setForms] = useState<FormConfig[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
-  const [responses, setResponses] = useState<FormResponses | null>(null);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [loadingForms, setLoadingForms] = useState(true);
-  const [loadingResponses, setLoadingResponses] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -143,25 +263,13 @@ function FormsInner() {
     try {
       const data = await api.get<FormConfig[]>("/forms");
       setForms(data);
-      setSelectedId((prev) => prev || data[0]?.id || "");
+      // First load: nothing picked yet — default to the first form so the
+      // page isn't empty.
+      setCheckedIds((prev) => (prev.length > 0 ? prev : data[0] ? [data[0].id] : []));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load forms.");
     } finally {
       setLoadingForms(false);
-    }
-  }
-
-  async function loadResponses(id: string, opts: { silent?: boolean } = {}) {
-    if (!id) return;
-    if (!opts.silent) setLoadingResponses(true);
-    setError(null);
-    try {
-      const data = await api.get<FormResponses>(`/forms/${id}/responses`);
-      setResponses(data);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load responses.");
-    } finally {
-      if (!opts.silent) setLoadingResponses(false);
     }
   }
 
@@ -171,14 +279,9 @@ function FormsInner() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!selectedId) return;
-    queueMicrotask(() => {
-      loadResponses(selectedId);
-    });
-    const interval = setInterval(() => loadResponses(selectedId, { silent: true }), POLL_MS);
-    return () => clearInterval(interval);
-  }, [selectedId]);
+  function toggleChecked(id: string) {
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   async function handleDelete(form: FormConfig) {
     if (!confirm(`Remove "${form.name}" from the Form list? The Google Sheet itself is untouched.`))
@@ -186,18 +289,13 @@ function FormsInner() {
     try {
       await api.delete(`/forms/${form.id}`);
       setForms((prev) => prev.filter((f) => f.id !== form.id));
-      setSelectedId((prev) => (prev === form.id ? "" : prev));
+      setCheckedIds((prev) => prev.filter((id) => id !== form.id));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to remove form.");
     }
   }
 
-  const filteredRows =
-    responses?.rows.filter((r) =>
-      search
-        ? Object.values(r.data).some((v) => v.toLowerCase().includes(search.toLowerCase()))
-        : true
-    ) ?? [];
+  const checkedForms = forms.filter((f) => checkedIds.includes(f.id));
 
   return (
     <>
@@ -247,99 +345,51 @@ function FormsInner() {
           )}
 
           {forms.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={selectedId}
-                onChange={(e) => {
-                  setSelectedId(e.target.value);
-                  setResponses(null);
-                }}
-                className="border-2 border-on-surface bg-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
-              >
+            <div className="w-full bg-surface border-2 border-on-surface p-stack-md flex flex-col gap-stack-md">
+              <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                Pick which forms to show
+              </p>
+              <div className="flex flex-wrap gap-3">
                 {forms.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
+                  <label
+                    key={f.id}
+                    className="flex items-center gap-2 border-2 border-on-surface px-3 py-2 cursor-pointer hover:bg-surface-container transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.includes(f.id)}
+                      onChange={() => toggleChecked(f.id)}
+                    />
+                    <span className="font-label-sm text-label-sm uppercase text-on-surface">
+                      {f.name}
+                    </span>
+                  </label>
                 ))}
-              </select>
-
+              </div>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search responses..."
-                className="flex-1 min-w-[180px] border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+                placeholder="Search responses across the selected forms..."
+                className="w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
               />
-
-              <button
-                onClick={() => loadResponses(selectedId)}
-                className="px-3 py-2 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-              >
-                Refresh
-              </button>
-
-              {canDelete && selectedId && (
-                <button
-                  onClick={() => {
-                    const form = forms.find((f) => f.id === selectedId);
-                    if (form) handleDelete(form);
-                  }}
-                  className="px-3 py-2 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                >
-                  Remove Form
-                </button>
-              )}
             </div>
           )}
 
-          {selectedId && (
-            <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[720px]">
-                <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
-                  <tr>
-                    {(responses?.headers ?? []).map((h) => (
-                      <th key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="font-body-md text-body-md text-on-surface">
-                  {loadingResponses && (
-                    <tr>
-                      <td
-                        colSpan={Math.max(responses?.headers.length ?? 1, 1)}
-                        className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
-                      >
-                        Loading...
-                      </td>
-                    </tr>
-                  )}
-                  {!loadingResponses && filteredRows.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={Math.max(responses?.headers.length ?? 1, 1)}
-                        className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
-                      >
-                        No responses yet.
-                      </td>
-                    </tr>
-                  )}
-                  {filteredRows.map((r) => (
-                    <tr
-                      key={r.row}
-                      className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors"
-                    >
-                      {(responses?.headers ?? []).map((h) => (
-                        <td key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
-                          {r.data[h] || "—"}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {checkedForms.length === 0 && forms.length > 0 && (
+            <p className="font-data-mono text-data-mono text-on-surface-variant border-2 border-on-surface px-3 py-6 text-center uppercase">
+              Check a form above to see its responses.
+            </p>
           )}
+
+          {checkedForms.map((f) => (
+            <FormResponsesSection
+              key={f.id}
+              form={f}
+              search={search}
+              canDelete={canDelete}
+              onDelete={handleDelete}
+            />
+          ))}
         </main>
       </div>
 
@@ -348,7 +398,7 @@ function FormsInner() {
           onClose={() => setShowAdd(false)}
           onCreated={(form) => {
             setForms((prev) => [...prev, form]);
-            setSelectedId(form.id);
+            setCheckedIds((prev) => [...prev, form.id]);
             setShowAdd(false);
           }}
         />
