@@ -322,6 +322,69 @@ function SettingsInner() {
               </tbody>
             </table>
           </div>
+
+          <div className="border-b-2 border-on-surface pb-stack-md">
+            <h2 className="font-headline-lg-mobile md:font-headline-md text-headline-lg-mobile md:text-headline-md text-on-surface uppercase tracking-tighter">
+              Lists Overview
+            </h2>
+          </div>
+
+          <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+                <tr>
+                  <th className="py-3 px-4 border-r border-surface-variant">List Name</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Type</th>
+                  <th className="py-3 px-4">Members</th>
+                </tr>
+              </thead>
+              <tbody className="font-body-md text-body-md text-on-surface">
+                {!loading && lists.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      No lists found.
+                    </td>
+                  </tr>
+                )}
+                {lists.map((l) => {
+                  const members = l.memberIds
+                    .map((id) => doers.find((d) => d.id === id))
+                    .filter((d): d is Doer => !!d);
+                  return (
+                    <tr key={l.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                      <td className="py-3 px-4 border-r border-surface-variant font-medium">
+                        {l.name}
+                      </td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-center">
+                        <span className="font-label-sm text-label-sm uppercase">
+                          {l.type === "task" ? "Task List" : "Checklist"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {members.length === 0 ? (
+                          <span className="font-data-mono text-data-mono text-on-surface-variant">
+                            No one assigned
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {members.map((m) => (
+                              <span
+                                key={m.id}
+                                className="inline-flex items-center gap-1.5 border border-on-surface px-2 py-1"
+                              >
+                                <InitialsAvatar name={m.name} className="w-5 h-5 border border-on-surface" />
+                                <span className="font-label-sm text-label-sm uppercase">{m.name}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </main>
       </div>
 
