@@ -29,6 +29,21 @@ export interface MasterSheetRow {
   createdAt: string;
 }
 
+/** A registered Google Form — points at the Sheet its responses land in. */
+export interface FormConfig {
+  id: string;
+  name: string;
+  spreadsheetId: string;
+  sheetName: string;
+  createdAt: string;
+}
+
+/** A form's responses, read live from its linked Google Sheet. */
+export interface FormResponses {
+  headers: string[];
+  rows: Array<{ row: number; data: Record<string, string> }>;
+}
+
 export type TaskPriority = "Low" | "Normal" | "Urgent" | "Critical";
 export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
 export type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";

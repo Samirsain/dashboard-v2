@@ -143,6 +143,9 @@ export default function MobileHeader() {
               <Link href="/master-sheet" className={rowFor("/master-sheet")}>
                 Master Sheet
               </Link>
+              <Link href="/forms" className={rowFor("/forms")}>
+                Form
+              </Link>
 
               {isAdmin && (
                 <>
