@@ -260,6 +260,7 @@ function ChecklistInner() {
       {showCreate && (
         <CreateChecklistModal
           doers={doers}
+          lists={lists}
           defaultListId={listFilter}
           onClose={() => setShowCreate(false)}
           onCreated={() => {
