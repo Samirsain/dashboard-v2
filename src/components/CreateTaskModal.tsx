@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Doer, Task, TaskPriority } from "@/lib/types";
+import type { Doer, List, Task, TaskPriority } from "@/lib/types";
 
 type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";
 
@@ -11,16 +11,20 @@ const NTH_OPTIONS = ["First", "Second", "Third", "Fourth", "Last"];
 
 export default function CreateTaskModal({
   doers,
+  lists = [],
   defaultListId = "",
   onClose,
   onCreated,
 }: {
   doers: Doer[];
+  /** Named task-lists to choose from, in addition to the implicit "Office" bucket. */
+  lists?: List[];
   defaultListId?: string;
   onClose: () => void;
   onCreated: (task: Task) => void;
 }) {
   const [title, setTitle] = useState("");
+  const [listId, setListId] = useState(defaultListId);
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
   const [priority, setPriority] = useState<TaskPriority>("Normal");
   const [dueDate, setDueDate] = useState("");
@@ -57,7 +61,7 @@ export default function CreateTaskModal({
       const task = await api.post<Task>("/tasks", {
         title,
         assignedDoerId,
-        listId: defaultListId,
+        listId,
         priority,
         dueDate,
         repeatType,
@@ -100,6 +104,24 @@ export default function CreateTaskModal({
               className={field}
             />
           </div>
+
+          {lists.length > 0 && (
+            <div>
+              <label className={label}>List</label>
+              <select
+                value={listId}
+                onChange={(e) => setListId(e.target.value)}
+                className={field}
+              >
+                <option value="">Office (Default)</option>
+                {lists.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className={label}>Doer</label>

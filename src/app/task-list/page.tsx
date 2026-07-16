@@ -248,6 +248,7 @@ function TaskListInner() {
       {showCreate && (
         <CreateTaskModal
           doers={doers}
+          lists={lists}
           defaultListId={listFilter}
           onClose={() => setShowCreate(false)}
           onCreated={(task) => {

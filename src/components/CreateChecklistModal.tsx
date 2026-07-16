@@ -2,20 +2,24 @@
 
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Doer } from "@/lib/types";
+import type { Doer, List } from "@/lib/types";
 
 export default function CreateChecklistModal({
   doers,
+  lists = [],
   defaultListId = "",
   onClose,
   onCreated,
 }: {
   doers: Doer[];
+  /** Named checklists to choose from, in addition to the implicit "Office" bucket. */
+  lists?: List[];
   defaultListId?: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [taskName, setTaskName] = useState("");
+  const [listId, setListId] = useState(defaultListId);
   const [frequency, setFrequency] = useState("Daily");
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
   const [calendarDate, setCalendarDate] = useState(""); // YYYY-MM-DD
@@ -81,7 +85,7 @@ export default function CreateChecklistModal({
     try {
       await api.post("/checklist/templates", {
         taskName,
-        listId: defaultListId,
+        listId,
         description: "",
         frequency,
         frequencyValue: finalFreqValue,
@@ -130,6 +134,26 @@ export default function CreateChecklistModal({
               className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
             />
           </div>
+
+          {lists.length > 0 && (
+            <div>
+              <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                List
+              </label>
+              <select
+                value={listId}
+                onChange={(e) => setListId(e.target.value)}
+                className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+              >
+                <option value="">Office (Default)</option>
+                {lists.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-stack-md">
             <div>

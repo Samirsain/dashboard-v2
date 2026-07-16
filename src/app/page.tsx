@@ -8,6 +8,8 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
+import CreateTaskModal from "@/components/CreateTaskModal";
+import CreateChecklistModal from "@/components/CreateChecklistModal";
 import type {
   ChecklistInstance,
   ChecklistTemplate,
@@ -80,6 +82,11 @@ function DashboardInner() {
   // Pending Tasks filter: "all" = every open item (past/today/future);
   // "today" = only items due on today's date.
   const [pendingFilter, setPendingFilter] = useState<"all" | "today">("all");
+  // Create-task flow: pick a type (Task List / Checklist) first, then show
+  // the matching modal with that type's named lists (+ implicit Office) to
+  // choose from.
+  const [showCreatePicker, setShowCreatePicker] = useState(false);
+  const [createMode, setCreateMode] = useState<"task" | "checklist" | null>(null);
 
   async function load() {
     setLoading(true);
@@ -135,6 +142,11 @@ function DashboardInner() {
   }
 
   const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
+  const canCreateTasks =
+    user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
+  const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "PC");
+  const taskLists = lists.filter((l) => l.type === "task");
+  const checklistLists = lists.filter((l) => l.type === "checklist");
   const showDoerColumn =
     user?.role === "Admin" ||
     user?.role === "PC" ||
@@ -230,6 +242,14 @@ function DashboardInner() {
           </div>
 
           <div className="flex items-center gap-3">
+            {canCreateTasks && (
+              <button
+                onClick={() => setShowCreatePicker(true)}
+                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors"
+              >
+                + Create Task
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={() => exportTasksToCsv(allTasks)}
@@ -309,6 +329,14 @@ function DashboardInner() {
               <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-wrap justify-between items-center gap-3">
                 <h3 className="font-headline-md text-headline-md text-on-surface">Pending Tasks</h3>
                 <div className="flex items-center gap-2">
+                  {canCreateTasks && (
+                    <button
+                      onClick={() => setShowCreatePicker(true)}
+                      className="md:hidden px-3 py-1.5 border-2 border-on-surface bg-on-surface text-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                    >
+                      + Create
+                    </button>
+                  )}
                   {(["all", "today"] as const).map((f) => (
                     <button
                       key={f}
@@ -429,6 +457,72 @@ function DashboardInner() {
           onRevised={() => {
             setTaskToRevise(null);
             load(); // refresh so the new due date shows
+          }}
+        />
+      )}
+
+      {showCreatePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm bg-surface-container-lowest border-2 border-on-surface">
+            <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
+              <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
+                Create Task
+              </h3>
+              <button
+                onClick={() => setShowCreatePicker(false)}
+                className="text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm uppercase"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-stack-lg flex flex-col gap-stack-md">
+              <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                Add it to which system?
+              </p>
+              <button
+                onClick={() => {
+                  setShowCreatePicker(false);
+                  setCreateMode("task");
+                }}
+                className="px-4 py-3 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
+              >
+                Task List — one-time or recurring tasks
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreatePicker(false);
+                  setCreateMode("checklist");
+                }}
+                className="px-4 py-3 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
+              >
+                Checklist — repeating checklist item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createMode === "task" && (
+        <CreateTaskModal
+          doers={assignableDoers}
+          lists={taskLists}
+          onClose={() => setCreateMode(null)}
+          onCreated={(task) => {
+            const doer = assignableDoers.find((d) => d.id === task.assignedDoerId) ?? null;
+            setAllTasks((prev) => [{ ...task, doer }, ...prev]);
+            setCreateMode(null);
+          }}
+        />
+      )}
+
+      {createMode === "checklist" && (
+        <CreateChecklistModal
+          doers={assignableDoers}
+          lists={checklistLists}
+          onClose={() => setCreateMode(null)}
+          onCreated={() => {
+            setCreateMode(null);
+            load(); // refresh so the new checklist item shows if due today
           }}
         />
       )}
