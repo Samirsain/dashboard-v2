@@ -134,6 +134,17 @@ function SettingsInner() {
     }
   }
 
+  async function handleDeleteList(bucket: Bucket) {
+    if (bucket.isOffice) return;
+    if (!confirm(`Permanently delete the "${bucket.label}" list? This can't be undone.`)) return;
+    try {
+      await api.delete(`/lists/${bucket.listId}`);
+      setLists((prev) => prev.filter((l) => l.id !== bucket.listId));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to delete list.");
+    }
+  }
+
   async function handleDelete(doer: Doer) {
     if (doer.id === currentUser?.id) {
       alert("You can't delete your own account.");
@@ -335,13 +346,14 @@ function SettingsInner() {
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant">List Name</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Type</th>
-                  <th className="py-3 px-4">Members</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Members</th>
+                  <th className="py-3 px-4 w-32 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
                 {!loading && buckets.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No lists found.
                     </td>
                   </tr>
@@ -358,7 +370,7 @@ function SettingsInner() {
                           {b.kind === "task" ? "Task List" : "Checklist"}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 border-r border-surface-variant">
                         {members.length === 0 ? (
                           <span className="font-data-mono text-data-mono text-on-surface-variant">
                             No one assigned
@@ -375,6 +387,20 @@ function SettingsInner() {
                               </span>
                             ))}
                           </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {b.isOffice ? (
+                          <span className="font-label-sm text-[10px] uppercase text-on-surface-variant">
+                            Default
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteList(b)}
+                            className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                          >
+                            Delete
+                          </button>
                         )}
                       </td>
                     </tr>
