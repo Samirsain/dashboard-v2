@@ -157,10 +157,8 @@ export default function CreateTaskModal({
                 onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 className={field}
               >
-                <option value="Low">Low</option>
                 <option value="Normal">Normal</option>
                 <option value="Urgent">Urgent</option>
-                <option value="Critical">Critical</option>
               </select>
             </div>
           </div>
