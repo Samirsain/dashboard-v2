@@ -188,10 +188,17 @@ class GoogleSheetsService {
       }
       if (status === 404) {
         throw new AppError(
-          "Spreadsheet or sheet/tab not found. Check the Spreadsheet ID and the exact " +
-            "Sheet/Tab name, and make sure the sheet is shared with the service account.",
+          "Spreadsheet not found. Check the Spreadsheet ID, and make sure the sheet is " +
+            "shared with the service account.",
           502,
           "SHEETS_SPREADSHEET_NOT_FOUND"
+        );
+      }
+      if (status === 400 && /range/i.test(apiMessage)) {
+        throw new AppError(
+          "Sheet/Tab not found. Check the exact Sheet/Tab name (it is case-sensitive).",
+          502,
+          "SHEETS_TAB_NOT_FOUND"
         );
       }
       if (status === 429) {
@@ -476,6 +483,41 @@ class GoogleSheetsService {
 
   async readSheet(entity: SheetEntityConfig): Promise<ReadResult> {
     return this.readAll(entity);
+  }
+
+  /**
+   * Reads a spreadsheet tab's values WITHOUT creating anything — used for
+   * external sheets we only observe (e.g. a Google Form's response sheet).
+   * Unlike readAll, it never calls getTabId, so a wrong tab name surfaces an
+   * error instead of silently adding a new empty tab to someone's sheet.
+   */
+  async readValues(spreadsheetId: string, sheetName: string): Promise<ReadResult> {
+    if (!spreadsheetId) {
+      throw AppError.badRequest("A Spreadsheet ID is required.");
+    }
+    return this.withErrorHandling(`readValues(${sheetName})`, async () => {
+      const client = await this.getClient();
+      const response = await client.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${sheetName}'!A1:ZZ`,
+      });
+
+      const values = response.data.values ?? [];
+      if (values.length === 0) return { headers: [], rows: [] };
+
+      const headers = (values[0] ?? []).map((h) => String(h).trim());
+      const rows: ReadResult["rows"] = [];
+      for (let i = 1; i < values.length; i++) {
+        const rawRow = values[i] ?? [];
+        if (rawRow.every((cell) => cell === undefined || cell === "")) continue;
+        const data: SheetRecord = {};
+        headers.forEach((header, colIndex) => {
+          data[header] = String(rawRow[colIndex] ?? "");
+        });
+        rows.push({ row: i + 1, data });
+      }
+      return { headers, rows };
+    });
   }
 
   async appendRow(entity: SheetEntityConfig, record: SheetRecord): Promise<SheetRecord> {

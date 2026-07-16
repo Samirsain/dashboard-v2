@@ -89,6 +89,14 @@ function AddFormModal({
   const [sheetName, setSheetName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [serviceEmail, setServiceEmail] = useState("");
+
+  useEffect(() => {
+    api
+      .get<{ email: string }>("/forms/service-account")
+      .then((r) => setServiceEmail(r.email))
+      .catch(() => setServiceEmail(""));
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -155,10 +163,21 @@ function AddFormModal({
             />
           </div>
 
-          <p className="font-data-mono text-xs text-on-surface-variant border border-on-surface-variant px-3 py-2 uppercase">
-            ℹ️ Share this Google Sheet with the app&apos;s service account (Editor access) first —
-            the same one already used for Master Sheet — or responses won&apos;t load.
-          </p>
+          <div className="border border-on-surface-variant px-3 py-2 flex flex-col gap-1">
+            <p className="font-data-mono text-xs text-on-surface-variant uppercase">
+              ℹ️ First share this Google Sheet (Editor access) with the service account below,
+              or responses won&apos;t load:
+            </p>
+            {serviceEmail ? (
+              <code className="font-data-mono text-xs text-on-surface break-all select-all">
+                {serviceEmail}
+              </code>
+            ) : (
+              <span className="font-data-mono text-xs text-on-surface-variant">
+                (service account email unavailable)
+              </span>
+            )}
+          </div>
 
           {error && (
             <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
