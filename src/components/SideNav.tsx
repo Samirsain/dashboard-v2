@@ -12,7 +12,6 @@ type NavKey =
   | "workflow"
   | "master-sheet"
   | "team-performance"
-  | "three-percent"
   | "settings"
   | "help-ticket";
 
@@ -24,11 +23,6 @@ const labelCls = "font-headline-md text-headline-md text-base uppercase tracking
 
 export default function SideNav({ active }: { active: NavKey }) {
   const { user } = useAuth();
-  const show3Pct =
-    user?.role === "Admin" ||
-    user?.role === "PC" ||
-    user?.role === "Manager" ||
-    user?.employeeCode?.toUpperCase() === "TM03";
 
   return (
     <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
@@ -85,17 +79,6 @@ export default function SideNav({ active }: { active: NavKey }) {
             </Link>
           </>
         )}
-
-        {/* 3% Club */}
-        {show3Pct && (
-          <Link href="/three-percent" className={active === "three-percent" ? linkActive : linkBase}>
-            <span className="material-symbols-outlined" data-icon="percent">
-              percent
-            </span>
-            <span className={labelCls}>3%</span>
-          </Link>
-        )}
-
       </div>
 
       {/* Signed-in user */}
