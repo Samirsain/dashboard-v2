@@ -13,6 +13,7 @@ router.use(requireAuth);
 // Any signed-in user can view registered forms and read their responses;
 // only Admin/Manager/PC register or remove a form.
 router.get("/", formConfigController.list);
+router.get("/service-account", formConfigController.serviceAccount);
 router.get("/:id/responses", validate({ params: idParamSchema }), formConfigController.responses);
 router.post(
   "/",

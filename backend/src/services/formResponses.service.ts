@@ -15,14 +15,10 @@ export const formResponsesService = {
       throw AppError.notFound(`Form "${formConfigId}" not found.`);
     }
 
-    const { headers, rows } = await googleSheetsService.readSheet({
-      table: "", // unused for a plain read
-      columns: {},
-      idColumn: "",
-      expectedHeaders: [],
-      spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName,
-    });
+    const { headers, rows } = await googleSheetsService.readValues(
+      config.spreadsheetId,
+      config.sheetName
+    );
 
     return { headers, rows };
   },
