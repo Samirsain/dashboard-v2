@@ -339,25 +339,23 @@ function SettingsInner() {
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
-                {!loading && lists.length === 0 && (
+                {!loading && buckets.length === 0 && (
                   <tr>
                     <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No lists found.
                     </td>
                   </tr>
                 )}
-                {lists.map((l) => {
-                  const members = l.memberIds
-                    .map((id) => doers.find((d) => d.id === id))
-                    .filter((d): d is Doer => !!d);
+                {buckets.map((b) => {
+                  const members = doers.filter((d) => hasAccess(d.id, b));
                   return (
-                    <tr key={l.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                    <tr key={b.key} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                       <td className="py-3 px-4 border-r border-surface-variant font-medium">
-                        {l.name}
+                        {b.label}
                       </td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center">
                         <span className="font-label-sm text-label-sm uppercase">
-                          {l.type === "task" ? "Task List" : "Checklist"}
+                          {b.kind === "task" ? "Task List" : "Checklist"}
                         </span>
                       </td>
                       <td className="py-3 px-4">
