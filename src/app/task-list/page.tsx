@@ -82,6 +82,18 @@ function TaskListInner() {
     }
   }
 
+  // Reassign a pending task to a different doer — e.g. the original doer
+  // got pulled onto something else and someone else needs to finish it.
+  async function handleReassign(id: string, assignedDoerId: string) {
+    try {
+      const updated = await api.patch<Task>(`/tasks/${id}`, { assignedDoerId });
+      const doer = doers.find((d) => d.id === assignedDoerId) ?? null;
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...updated, doer } : t)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to reassign task.");
+    }
+  }
+
   return (
     <>
       <MobileHeader />
@@ -207,15 +219,29 @@ function TaskListInner() {
                       {task.title}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant">
-                      <div className="flex items-center gap-2">
-                        <InitialsAvatar
-                          name={task.doer?.name ?? "?"}
-                          className="w-6 h-6 border border-on-surface"
-                        />
-                        <span className="font-label-sm text-label-sm uppercase truncate">
-                          {task.doer?.name ?? "Unassigned"}
-                        </span>
-                      </div>
+                      {canCreateTasks ? (
+                        <select
+                          value={task.assignedDoerId}
+                          onChange={(e) => handleReassign(task.id, e.target.value)}
+                          className="w-full border-2 border-on-surface bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                        >
+                          {doers.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <InitialsAvatar
+                            name={task.doer?.name ?? "?"}
+                            className="w-6 h-6 border border-on-surface"
+                          />
+                          <span className="font-label-sm text-label-sm uppercase truncate">
+                            {task.doer?.name ?? "Unassigned"}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                       {formatDMY(task.dueDate)}

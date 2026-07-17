@@ -184,6 +184,26 @@ function AllTasksInner() {
     }
   }
 
+  // Reassign a checklist task to a different doer — e.g. the original doer
+  // got pulled onto something else. The template's future occurrences pick
+  // this up automatically; the backend also carries it onto any instance
+  // that's already generated and still Pending, so it takes effect now too.
+  async function handleReassignChecklistTask(templateId: string, assignedDoerId: string) {
+    try {
+      const updated = await api.patch<ChecklistTemplate>(`/checklist/templates/${templateId}`, {
+        assignedDoerId,
+      });
+      setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
+      setChecklist((prev) =>
+        prev.map((c) =>
+          c.templateId === templateId && c.status === "Pending" ? { ...c, assignedDoerId } : c
+        )
+      );
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to reassign checklist task.");
+    }
+  }
+
   function clearFilters() {
     setSearch("");
     setDoerFilter("");
@@ -487,8 +507,18 @@ function AllTasksInner() {
                     ? pendingChecklistTasks.map((t) => (
                         <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                           <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.taskName}</td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
-                            {nameById.get(t.assignedDoerId) ?? "—"}
+                          <td className="py-3 px-4 border-r border-surface-variant">
+                            <select
+                              value={t.assignedDoerId}
+                              onChange={(e) => handleReassignChecklistTask(t.id, e.target.value)}
+                              className="w-full border-2 border-on-surface bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                            >
+                              {doerOptions.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.name}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(dueDateFor(t))}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase">

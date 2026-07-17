@@ -128,6 +128,23 @@ export const checklistService = {
     if (updates.status !== undefined) patch["Status"] = updates.status;
 
     const saved = await dataService.updateById(templatesEntity, id, patch);
+
+    // Reassigning the doer should take effect immediately, not just for
+    // future occurrences — carry it onto any instance of this template
+    // that's still Pending (already generated but not yet done).
+    if (updates.assignedDoerId !== undefined) {
+      const pendingInstances = await this.listInstances({ status: "Pending" });
+      await Promise.all(
+        pendingInstances
+          .filter((i) => i.templateId === id)
+          .map((i) =>
+            dataService.updateById(instancesEntity, i.id, {
+              "Assigned Doer ID": updates.assignedDoerId as string,
+            })
+          )
+      );
+    }
+
     return toTemplate(saved);
   },
 
