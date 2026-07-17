@@ -199,7 +199,7 @@ function TaskListInner() {
                     key={task.id}
                     className={`transition-colors group ${
                       isUrgentPriority(task.priority)
-                        ? "bg-red-100 hover:bg-red-200"
+                        ? "bg-yellow-100 hover:bg-yellow-200"
                         : "hover:bg-surface-container-low"
                     } ${i !== filtered.length - 1 ? "border-b border-surface-variant" : ""}`}
                   >
