@@ -67,6 +67,8 @@ export interface FormConfig {
   sheetName: string;
   /** The shareable Google Form URL (for copying/sending) — separate from the response Sheet. */
   formLink: string;
+  /** Doer IDs granted access to this form's responses. Admin/Manager/PC always see everything. */
+  memberIds: string[];
   createdAt: string;
 }
 

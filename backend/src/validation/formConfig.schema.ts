@@ -7,6 +7,13 @@ export const createFormConfigSchema = z.object({
   sheetName: z.string().default(""),
   // Optional — the shareable Google Form URL, for copying/sending.
   formLink: z.string().default(""),
+  // Optional — doer IDs granted access; blank = only Admin/Manager/PC can see it.
+  memberIds: z.array(z.string()).optional(),
+});
+
+export const updateFormMembersSchema = z.object({
+  memberIds: z.array(z.string()),
 });
 
 export type CreateFormConfigInput = z.infer<typeof createFormConfigSchema>;
+export type UpdateFormMembersInput = z.infer<typeof updateFormMembersSchema>;
