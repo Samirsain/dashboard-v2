@@ -83,8 +83,6 @@ function DashboardInner() {
   // choose from.
   const [showCreatePicker, setShowCreatePicker] = useState(false);
   const [createMode, setCreateMode] = useState<"task" | "checklist" | null>(null);
-  // Checklists Overview: which checklist's tasks are shown ("" = Office).
-  const [selectedChecklistId, setSelectedChecklistId] = useState("");
 
   async function load() {
     setLoading(true);
@@ -145,14 +143,6 @@ function DashboardInner() {
   const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "PC");
   const taskLists = lists.filter((l) => l.type === "task");
   const checklistLists = lists.filter((l) => l.type === "checklist");
-  // Checklists Overview buckets: Office (implicit) + each named checklist.
-  const checklistBuckets = [
-    { id: "", label: "OFFICE CL" },
-    ...checklistLists.map((l) => ({ id: l.id, label: `${listGroupKey(l.name)} CL` })),
-  ];
-  const checklistTemplatesInBucket = templates.filter(
-    (t) => (t.listId || "") === selectedChecklistId
-  );
   const showDoerColumn =
     user?.role === "Admin" ||
     user?.role === "PC" ||
@@ -448,61 +438,6 @@ function DashboardInner() {
                       </tr>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Checklists Overview — pick a checklist, see its tasks/frequency */}
-            <div className="col-span-12 bg-surface border-2 border-on-surface flex flex-col">
-              <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-wrap justify-between items-center gap-3">
-                <h3 className="font-headline-md text-headline-md text-on-surface">Checklists</h3>
-                <div className="flex items-center gap-3">
-                  <select
-                    value={selectedChecklistId}
-                    onChange={(e) => setSelectedChecklistId(e.target.value)}
-                    className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
-                  >
-                    {checklistBuckets.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="font-data-mono text-data-mono text-on-surface-variant">
-                    {checklistTemplatesInBucket.length} task
-                    {checklistTemplatesInBucket.length === 1 ? "" : "s"} added
-                  </span>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[560px]">
-                  <thead>
-                    <tr className="bg-surface-container-low border-b-2 border-on-surface">
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">Task</th>
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-center">Assigned Date</th>
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-center">Frequency</th>
-                    </tr>
-                  </thead>
-                  <tbody className="font-body-md text-body-md text-on-surface">
-                    {checklistTemplatesInBucket.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                          No checklist tasks in this list.
-                        </td>
-                      </tr>
-                    )}
-                    {checklistTemplatesInBucket.map((t) => (
-                      <tr key={t.id} className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-lowest transition-colors">
-                        <td className="py-3 px-4">{t.taskName}</td>
-                        <td className="py-3 px-4 text-center font-data-mono text-data-mono">
-                          {formatDMY(t.createdAt)}
-                        </td>
-                        <td className="py-3 px-4 text-center font-label-sm text-label-sm uppercase">
-                          {t.frequency}
-                        </td>
-                      </tr>
-                    ))}
                   </tbody>
                 </table>
               </div>
