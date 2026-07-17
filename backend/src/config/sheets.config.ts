@@ -151,10 +151,33 @@ export const sheetsConfig = {
       Role: "role",
       Status: "status",
       "Can View All": "can_view_all",
+      "Is Attendance Manager": "is_attendance_manager",
       PasswordHash: "password_hash",
       CreatedAt: "created_at",
     },
     "DOERLIST"
+  ),
+  /** One row per employee per day, marked by the Attendance Manager (or Admin). */
+  attendance: entity(
+    "ATTENDANCE",
+    "attendance",
+    "Attendance ID",
+    {
+      "Attendance ID": "id",
+      "Employee ID": "employee_id",
+      Date: "date",
+      CheckIn: "check_in",
+      CheckOut: "check_out",
+      Status: "status",
+      "Late Minutes": "late_minutes",
+      "Working Minutes": "working_minutes",
+      "Early Exit Minutes": "early_exit_minutes",
+      Remarks: "remarks",
+      MarkedBy: "marked_by",
+      CreatedAt: "created_at",
+      UpdatedAt: "updated_at",
+    },
+    "ATTENDANCE"
   ),
   /** TASKLIST — master task table. Assigned Doer ID references users."Doer ID". */
   tasks: entity(

@@ -14,7 +14,31 @@ export interface User {
   status: UserStatus;
   /** When true, this doer can see everyone's tasks/checklists (like an admin), without task-create rights. */
   canViewAll: boolean;
+  /** When true, this doer can mark attendance for every employee (Attendance Manager). Admin always can too. */
+  isAttendanceManager: boolean;
   createdAt: string;
+}
+
+export type AttendanceStatus = "Present" | "Late" | "Half Day" | "Absent" | "Leave";
+
+/** One row per employee per day, marked by the Attendance Manager (or Admin) — never self-service. */
+export interface Attendance {
+  id: string;
+  employeeId: string;
+  date: string;
+  /** ISO timestamp, or "" if not checked in. */
+  checkIn: string;
+  /** ISO timestamp, or "" if not checked out. */
+  checkOut: string;
+  status: AttendanceStatus | "";
+  lateMinutes: number;
+  workingMinutes: number;
+  earlyExitMinutes: number;
+  remarks: string;
+  /** Doer ID of whoever marked/last edited this record. */
+  markedBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UserWithSecrets extends User {
@@ -189,6 +213,8 @@ export interface JwtClaims {
   role: UserRole;
   /** Mirrors User.canViewAll so list endpoints can filter without a DB lookup. */
   canViewAll?: boolean;
+  /** Mirrors User.isAttendanceManager so attendance endpoints can check without a DB lookup. */
+  isAttendanceManager?: boolean;
 }
 
 export interface DashboardSummary {

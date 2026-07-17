@@ -20,6 +20,7 @@ function toUser(record: SheetRecord): User {
     role: (record["Role"] as UserRole) || "Doer",
     status: (record["Status"] as UserStatus) || "Active",
     canViewAll: (record["Can View All"] ?? "").toLowerCase() === "true",
+    isAttendanceManager: (record["Is Attendance Manager"] ?? "").toLowerCase() === "true",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -90,6 +91,7 @@ export const usersService = {
       Role: input.role,
       Status: input.status,
       "Can View All": "false",
+      "Is Attendance Manager": "false",
       PasswordHash: passwordHash,
       CreatedAt: todayIso(),
     };
@@ -101,7 +103,17 @@ export const usersService = {
   async update(
     id: string,
     updates: Partial<
-      Pick<User, "name" | "mobile" | "email" | "department" | "role" | "status" | "employeeCode">
+      Pick<
+        User,
+        | "name"
+        | "mobile"
+        | "email"
+        | "department"
+        | "role"
+        | "status"
+        | "employeeCode"
+        | "isAttendanceManager"
+      >
     >
   ): Promise<User> {
     const patch: Partial<SheetRecord> = {};
@@ -112,6 +124,8 @@ export const usersService = {
     if (updates.role !== undefined) patch["Role"] = updates.role;
     if (updates.status !== undefined) patch["Status"] = updates.status;
     if (updates.employeeCode !== undefined) patch["Employee Code"] = updates.employeeCode;
+    if (updates.isAttendanceManager !== undefined)
+      patch["Is Attendance Manager"] = String(updates.isAttendanceManager);
 
     const saved = await dataService.updateById(entity, id, patch);
     return toUser(saved);

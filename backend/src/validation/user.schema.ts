@@ -20,6 +20,7 @@ export const updateUserSchema = z.object({
   department: z.string().min(1).optional(),
   role: z.enum(["Admin", "Doer"]).optional(),
   status: z.enum(["Active", "Inactive"]).optional(),
+  isAttendanceManager: z.boolean().optional(),
 });
 
 export const idParamSchema = z.object({

@@ -146,6 +146,9 @@ export default function MobileHeader() {
               <Link href="/forms" className={rowFor("/forms")}>
                 Google Forms
               </Link>
+              <Link href="/attendance" className={rowFor("/attendance")}>
+                Attendance
+              </Link>
 
               {isAdmin && (
                 <>
