@@ -5,6 +5,7 @@ import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import type { ChecklistInstance, ChecklistTemplate, Doer, List, Task } from "@/lib/types";
 
@@ -367,7 +368,7 @@ function AllTasksInner() {
                     <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                       <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.title}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{t.doer?.name ?? "—"}</td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{t.dueDate || "—"}</td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.dueDate)}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{taskCompletedOn(t) || "—"}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                         {t.revisionCount > 0 ? <span className="text-error font-bold">{t.revisionCount}×</span> : "0"}
@@ -414,7 +415,7 @@ function AllTasksInner() {
                       <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
                         {nameById.get(c.assignedDoerId) ?? "—"}
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{c.date || "—"}</td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(c.date)}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{checklistCompletedOn(c) || "—"}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
                       <td className="py-3 px-4 text-center">

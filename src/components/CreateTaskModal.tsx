@@ -105,23 +105,21 @@ export default function CreateTaskModal({
             />
           </div>
 
-          {lists.length > 0 && (
-            <div>
-              <label className={label}>List</label>
-              <select
-                value={listId}
-                onChange={(e) => setListId(e.target.value)}
-                className={field}
-              >
-                <option value="">Office (Default)</option>
-                {lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div>
+            <label className={label}>List</label>
+            <select
+              value={listId}
+              onChange={(e) => setListId(e.target.value)}
+              className={field}
+            >
+              <option value="">Office (Default)</option>
+              {lists.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <label className={label}>Doer</label>
