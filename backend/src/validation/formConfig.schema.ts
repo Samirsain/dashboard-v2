@@ -5,6 +5,8 @@ export const createFormConfigSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
   // Optional — blank means "use the spreadsheet's first tab".
   sheetName: z.string().default(""),
+  // Optional — the shareable Google Form URL, for copying/sending.
+  formLink: z.string().default(""),
 });
 
 export type CreateFormConfigInput = z.infer<typeof createFormConfigSchema>;

@@ -41,47 +41,39 @@ function exportResponsesToCsv(
   URL.revokeObjectURL(url);
 }
 
-/** Counts of each distinct value in one column, most frequent first (top N). */
-function countByField(rows: ResponseRow[], field: string, topN = 8): Array<{ label: string; count: number }> {
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    const raw = (r.data[field] ?? "").trim();
-    const key = raw === "" ? "(blank)" : raw;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+/** Copies text to the clipboard, falling back to a hidden textarea on older browsers. */
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+    return;
   }
-  return [...counts.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, topN);
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.style.position = "fixed";
+  el.style.opacity = "0";
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand("copy");
+  document.body.removeChild(el);
 }
 
-/** Simple horizontal bar chart in the app's Swiss style — no chart library. */
-function BarChart({ data }: { data: Array<{ label: string; count: number }> }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
-  if (data.length === 0) {
-    return (
-      <p className="font-data-mono text-data-mono text-on-surface-variant px-4 py-3">No data.</p>
-    );
-  }
+function CopyLinkButton({ link }: { link: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!link) return null;
   return (
-    <div className="flex flex-col gap-2 p-stack-md">
-      {data.map((d) => (
-        <div key={d.label} className="flex items-center gap-3">
-          <span className="w-40 shrink-0 truncate font-label-sm text-label-sm uppercase text-on-surface" title={d.label}>
-            {d.label}
-          </span>
-          <div className="flex-1 h-5 bg-surface-container border border-on-surface">
-            <div
-              className="h-full bg-on-surface"
-              style={{ width: `${(d.count / max) * 100}%` }}
-            />
-          </div>
-          <span className="w-10 shrink-0 text-right font-data-mono text-data-mono text-on-surface">
-            {d.count}
-          </span>
-        </div>
-      ))}
-    </div>
+    <button
+      type="button"
+      onClick={async () => {
+        await copyText(link);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      title={link}
+      className="flex items-center gap-1.5 border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+    >
+      <span className="material-symbols-outlined text-base">content_copy</span>
+      {copied ? "Copied!" : "Copy Form Link"}
+    </button>
   );
 }
 
@@ -101,6 +93,7 @@ function AddFormModal({
   const [name, setName] = useState("");
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [sheetName, setSheetName] = useState("");
+  const [formLink, setFormLink] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [serviceEmail, setServiceEmail] = useState("");
@@ -117,7 +110,7 @@ function AddFormModal({
     setError(null);
     setSubmitting(true);
     try {
-      const form = await api.post<FormConfig>("/forms", { name, spreadsheetId, sheetName });
+      const form = await api.post<FormConfig>("/forms", { name, spreadsheetId, sheetName, formLink });
       onCreated(form);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to add form.");
@@ -153,6 +146,20 @@ function AddFormModal({
               placeholder="e.g. Site Visit Feedback"
               className={field}
             />
+          </div>
+
+          <div>
+            <label className={label}>Google Form Link (optional)</label>
+            <input
+              value={formLink}
+              onChange={(e) => setFormLink(e.target.value)}
+              placeholder="https://docs.google.com/forms/d/e/.../viewform"
+              className={`${field} font-data-mono text-data-mono`}
+            />
+            <p className="mt-1 font-data-mono text-xs text-on-surface-variant">
+              The shareable form URL, so it can be copied from here later. Not the response Sheet
+              link below.
+            </p>
           </div>
 
           <div>
@@ -242,17 +249,10 @@ function FormResponsesSection({
   const [statuses, setStatuses] = useState<FormResponseStatusMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Per-column filter: pick a column, then only rows whose cell contains the
-  // value stay. Empty field = no column filter (global search still applies).
-  const [filterField, setFilterField] = useState("");
-  const [filterValue, setFilterValue] = useState("");
   // "Working" / "Complete" enquiry-status filter, so staff can see which
   // enquiries are in progress vs done.
   const [statusFilter, setStatusFilter] = useState<"" | FormResponseStatusValue | "unset">("");
   const [page, setPage] = useState(0);
-  // Analytics: a bar chart of value counts for one chosen column.
-  const [showChart, setShowChart] = useState(false);
-  const [chartField, setChartField] = useState("");
 
   async function load(opts: { silent?: boolean } = {}) {
     if (!opts.silent) setLoading(true);
@@ -298,10 +298,6 @@ function FormResponsesSection({
       const q = search.toLowerCase();
       rows = rows.filter((r) => Object.values(r.data).some((v) => v.toLowerCase().includes(q)));
     }
-    if (filterField && filterValue) {
-      const q = filterValue.toLowerCase();
-      rows = rows.filter((r) => (r.data[filterField] ?? "").toLowerCase().includes(q));
-    }
     if (statusFilter) {
       rows = rows.filter((r) => {
         const s = statuses[r.row] ?? "";
@@ -309,14 +305,12 @@ function FormResponsesSection({
       });
     }
     return rows;
-  }, [responses, search, filterField, filterValue, statusFilter, statuses]);
+  }, [responses, search, statusFilter, statuses]);
 
   // Keep the page in range as filters shrink the result set.
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedRows = filteredRows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-
-  const chartData = chartField ? countByField(filteredRows, chartField) : [];
 
   return (
     <div className="w-full bg-surface-container-lowest border-2 border-on-surface flex flex-col">
@@ -328,12 +322,7 @@ function FormResponsesSection({
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowChart((v) => !v)}
-            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-          >
-            {showChart ? "Hide Chart" : "Chart"}
-          </button>
+          <CopyLinkButton link={form.formLink} />
           <button
             onClick={() => exportResponsesToCsv(form.name, headers, filteredRows, statuses)}
             disabled={filteredRows.length === 0}
@@ -358,51 +347,10 @@ function FormResponsesSection({
         </div>
       </div>
 
-      {/* Column filter */}
+      {/* Status filter — which enquiries are still in progress */}
       {headers.length > 0 && (
         <div className="border-b border-surface-variant p-stack-md flex flex-wrap items-center gap-2">
-          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">Filter</span>
-          <select
-            value={filterField}
-            onChange={(e) => {
-              setFilterField(e.target.value);
-              setPage(0);
-            }}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
-          >
-            <option value="">Any column</option>
-            {headers.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
-          <input
-            value={filterValue}
-            onChange={(e) => {
-              setFilterValue(e.target.value);
-              setPage(0);
-            }}
-            disabled={!filterField}
-            placeholder="Value contains..."
-            className="flex-1 min-w-[160px] border-2 border-on-surface bg-surface px-3 py-1.5 text-on-surface focus:outline-none disabled:opacity-50"
-          />
-          {(filterField || filterValue) && (
-            <button
-              onClick={() => {
-                setFilterField("");
-                setFilterValue("");
-                setPage(0);
-              }}
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-            >
-              Clear
-            </button>
-          )}
-
-          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant ml-2">
-            Status
-          </span>
+          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">Status</span>
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -416,36 +364,6 @@ function FormResponsesSection({
             <option value="Working">Working</option>
             <option value="Complete">Complete</option>
           </select>
-        </div>
-      )}
-
-      {/* Analytics chart */}
-      {showChart && headers.length > 0 && (
-        <div className="border-b-2 border-on-surface bg-surface">
-          <div className="p-stack-md flex flex-wrap items-center gap-2 border-b border-surface-variant">
-            <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-              Count by column
-            </span>
-            <select
-              value={chartField}
-              onChange={(e) => setChartField(e.target.value)}
-              className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
-            >
-              <option value="">Select a column</option>
-              {headers.map((h) => (
-                <option key={h} value={h}>
-                  {h}
-                </option>
-              ))}
-            </select>
-          </div>
-          {chartField ? (
-            <BarChart data={chartData} />
-          ) : (
-            <p className="font-data-mono text-data-mono text-on-surface-variant px-4 py-3">
-              Pick a column to see a breakdown of its answers.
-            </p>
-          )}
         </div>
       )}
 
