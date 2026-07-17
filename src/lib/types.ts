@@ -44,6 +44,10 @@ export interface FormResponses {
   rows: Array<{ row: number; data: Record<string, string> }>;
 }
 
+export type FormResponseStatusValue = "" | "Working" | "Complete";
+/** Row number (in the sheet) -> its dashboard-only Working/Complete status. */
+export type FormResponseStatusMap = Record<number, FormResponseStatusValue>;
+
 export type TaskPriority = "Low" | "Normal" | "Urgent" | "Critical";
 export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Cancelled";
 export type RepeatType = "None" | "Daily" | "Weekly" | "Monthly (By Date)" | "Monthly (By Day)";

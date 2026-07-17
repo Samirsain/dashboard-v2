@@ -4,7 +4,9 @@ import { ok, created } from "../utils/response";
 import { env } from "../config/env";
 import { formConfigService } from "../services/formConfig.service";
 import { formResponsesService } from "../services/formResponses.service";
+import { formResponseStatusService } from "../services/formResponseStatus.service";
 import type { CreateFormConfigInput } from "../validation/formConfig.schema";
+import type { SetFormResponseStatusInput } from "../validation/formResponseStatus.schema";
 
 /** The service account email a form's Sheet must be shared with. Not secret. */
 function resolveServiceAccountEmail(): string {
@@ -41,5 +43,16 @@ export const formConfigController = {
 
   responses: asyncHandler(async (req: Request, res: Response) => {
     ok(res, await formResponsesService.getResponses(req.params.id as string));
+  }),
+
+  statuses: asyncHandler(async (req: Request, res: Response) => {
+    ok(res, await formResponseStatusService.listForForm(req.params.id as string));
+  }),
+
+  setStatus: asyncHandler(async (req: Request, res: Response) => {
+    const { status } = req.body as SetFormResponseStatusInput;
+    const row = Number(req.params.row);
+    const saved = await formResponseStatusService.setStatus(req.params.id as string, row, status);
+    ok(res, saved);
   }),
 };

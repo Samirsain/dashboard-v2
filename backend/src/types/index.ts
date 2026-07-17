@@ -74,6 +74,16 @@ export interface FormResponses {
   rows: Array<{ row: number; data: Record<string, string> }>;
 }
 
+export type FormResponseStatusValue = "" | "Working" | "Complete";
+
+/** Dashboard-only per-response status, keyed by the sheet row it marks. */
+export interface FormResponseStatus {
+  formId: string;
+  row: number;
+  status: FormResponseStatusValue;
+  updatedAt: string;
+}
+
 export interface Task {
   id: string;
   /** The Task List (list of type "task") this task is filed under, or "". */

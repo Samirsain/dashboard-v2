@@ -6,7 +6,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { FormConfig, FormResponses } from "@/lib/types";
+import type { FormConfig, FormResponses, FormResponseStatusMap, FormResponseStatusValue } from "@/lib/types";
 
 // New submissions land in the Sheet at any time — re-check periodically so
 // they show up without a manual refresh.
@@ -16,12 +16,20 @@ const PAGE_SIZE = 25;
 
 type ResponseRow = FormResponses["rows"][number];
 
-/** Builds and downloads a CSV of the given rows for one form. */
-function exportResponsesToCsv(formName: string, headers: string[], rows: ResponseRow[]) {
+/** Builds and downloads a CSV of the given rows for one form, including their status. */
+function exportResponsesToCsv(
+  formName: string,
+  headers: string[],
+  rows: ResponseRow[],
+  statuses: FormResponseStatusMap
+) {
   const escape = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
+  const allHeaders = [...headers, "Status"];
   const lines = [
-    headers.map(escape).join(","),
-    ...rows.map((r) => headers.map((h) => escape(r.data[h] ?? "")).join(",")),
+    allHeaders.map(escape).join(","),
+    ...rows.map((r) =>
+      [...headers.map((h) => r.data[h] ?? ""), statuses[r.row] || ""].map(escape).join(",")
+    ),
   ];
   const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -76,6 +84,12 @@ function BarChart({ data }: { data: Array<{ label: string; count: number }> }) {
     </div>
   );
 }
+
+const STATUS_LABELS: Record<FormResponseStatusValue, string> = {
+  "": "— Not set",
+  Working: "Working",
+  Complete: "Complete",
+};
 
 function AddFormModal({
   onClose,
@@ -215,20 +229,26 @@ function FormResponsesSection({
   form,
   search,
   canDelete,
+  canEditStatus,
   onDelete,
 }: {
   form: FormConfig;
   search: string;
   canDelete: boolean;
+  canEditStatus: boolean;
   onDelete: (form: FormConfig) => void;
 }) {
   const [responses, setResponses] = useState<FormResponses | null>(null);
+  const [statuses, setStatuses] = useState<FormResponseStatusMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Per-column filter: pick a column, then only rows whose cell contains the
   // value stay. Empty field = no column filter (global search still applies).
   const [filterField, setFilterField] = useState("");
   const [filterValue, setFilterValue] = useState("");
+  // "Working" / "Complete" enquiry-status filter, so staff can see which
+  // enquiries are in progress vs done.
+  const [statusFilter, setStatusFilter] = useState<"" | FormResponseStatusValue | "unset">("");
   const [page, setPage] = useState(0);
   // Analytics: a bar chart of value counts for one chosen column.
   const [showChart, setShowChart] = useState(false);
@@ -238,8 +258,12 @@ function FormResponsesSection({
     if (!opts.silent) setLoading(true);
     setError(null);
     try {
-      const data = await api.get<FormResponses>(`/forms/${form.id}/responses`);
+      const [data, statusMap] = await Promise.all([
+        api.get<FormResponses>(`/forms/${form.id}/responses`),
+        api.get<FormResponseStatusMap>(`/forms/${form.id}/statuses`).catch(() => ({})),
+      ]);
       setResponses(data);
+      setStatuses(statusMap);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load responses.");
     } finally {
@@ -256,6 +280,16 @@ function FormResponsesSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.id]);
 
+  async function handleStatusChange(row: number, status: FormResponseStatusValue) {
+    setStatuses((prev) => ({ ...prev, [row]: status }));
+    try {
+      await api.patch(`/forms/${form.id}/statuses/${row}`, { status });
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to update status.");
+      load({ silent: true }); // roll back to the server's actual state
+    }
+  }
+
   const headers = responses?.headers ?? [];
 
   const filteredRows = useMemo(() => {
@@ -268,8 +302,14 @@ function FormResponsesSection({
       const q = filterValue.toLowerCase();
       rows = rows.filter((r) => (r.data[filterField] ?? "").toLowerCase().includes(q));
     }
+    if (statusFilter) {
+      rows = rows.filter((r) => {
+        const s = statuses[r.row] ?? "";
+        return statusFilter === "unset" ? !s : s === statusFilter;
+      });
+    }
     return rows;
-  }, [responses, search, filterField, filterValue]);
+  }, [responses, search, filterField, filterValue, statusFilter, statuses]);
 
   // Keep the page in range as filters shrink the result set.
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
@@ -295,7 +335,7 @@ function FormResponsesSection({
             {showChart ? "Hide Chart" : "Chart"}
           </button>
           <button
-            onClick={() => exportResponsesToCsv(form.name, headers, filteredRows)}
+            onClick={() => exportResponsesToCsv(form.name, headers, filteredRows, statuses)}
             disabled={filteredRows.length === 0}
             className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50"
           >
@@ -359,6 +399,23 @@ function FormResponsesSection({
               Clear
             </button>
           )}
+
+          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant ml-2">
+            Status
+          </span>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as typeof statusFilter);
+              setPage(0);
+            }}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+          >
+            <option value="">All</option>
+            <option value="unset">Not set</option>
+            <option value="Working">Working</option>
+            <option value="Complete">Complete</option>
+          </select>
         </div>
       )}
 
@@ -403,13 +460,14 @@ function FormResponsesSection({
                   {h}
                 </th>
               ))}
+              <th className="py-3 px-4 whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody className="font-body-md text-body-md text-on-surface">
             {loading && (
               <tr>
                 <td
-                  colSpan={Math.max(headers.length, 1)}
+                  colSpan={Math.max(headers.length, 1) + 1}
                   className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
                 >
                   Loading...
@@ -419,25 +477,55 @@ function FormResponsesSection({
             {!loading && filteredRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={Math.max(headers.length, 1)}
+                  colSpan={Math.max(headers.length, 1) + 1}
                   className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
                 >
                   No responses yet.
                 </td>
               </tr>
             )}
-            {pagedRows.map((r) => (
-              <tr
-                key={r.row}
-                className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors"
-              >
-                {headers.map((h) => (
-                  <td key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
-                    {r.data[h] || "—"}
+            {pagedRows.map((r) => {
+              const status = statuses[r.row] ?? "";
+              return (
+                <tr
+                  key={r.row}
+                  className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors"
+                >
+                  {headers.map((h) => (
+                    <td key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
+                      {r.data[h] || "—"}
+                    </td>
+                  ))}
+                  <td className="py-3 px-4 whitespace-nowrap">
+                    {canEditStatus ? (
+                      <select
+                        value={status}
+                        onChange={(e) =>
+                          handleStatusChange(r.row, e.target.value as FormResponseStatusValue)
+                        }
+                        className={`border-2 px-2 py-1 font-label-sm text-label-sm uppercase focus:outline-none ${
+                          status === "Complete"
+                            ? "border-on-surface bg-on-surface text-surface"
+                            : status === "Working"
+                              ? "border-primary text-primary bg-surface"
+                              : "border-on-surface-variant text-on-surface-variant bg-surface"
+                        }`}
+                      >
+                        {(Object.keys(STATUS_LABELS) as FormResponseStatusValue[]).map((v) => (
+                          <option key={v} value={v}>
+                            {STATUS_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                        {STATUS_LABELS[status]}
+                      </span>
+                    )}
                   </td>
-                ))}
-              </tr>
-            ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -616,6 +704,7 @@ function FormsInner() {
               form={f}
               search={search}
               canDelete={canDelete}
+              canEditStatus={canManage}
               onDelete={handleDelete}
             />
           ))}
