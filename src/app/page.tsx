@@ -383,13 +383,19 @@ function DashboardInner() {
                     )}
                     {pendingRows.map((r) => {
                       const overdue = isOverdue(r.dueDate);
+                      const urgent =
+                        !overdue &&
+                        r.kind === "task" &&
+                        (r.taskObj?.priority === "Urgent" || r.taskObj?.priority === "Critical");
                       return (
                       <tr
                         key={`${r.kind}-${r.id}`}
                         className={`border-b border-outline-variant last:border-b-0 transition-colors ${
                           overdue
                             ? "bg-red-50 border-l-4 border-l-red-600 hover:bg-red-100"
-                            : "hover:bg-surface-container-lowest"
+                            : urgent
+                              ? "bg-yellow-50 border-l-4 border-l-yellow-500 hover:bg-yellow-100"
+                              : "hover:bg-surface-container-lowest"
                         }`}
                       >
                         <td className={`py-3 px-4 font-medium ${overdue ? "text-red-700" : ""}`}>
