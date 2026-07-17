@@ -60,6 +60,7 @@ export interface ChecklistTemplate {
   assignedDoerId: string;
   frequency: string;
   status: string;
+  createdAt: string;
 }
 
 export interface ChecklistInstance {
