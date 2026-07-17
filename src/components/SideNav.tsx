@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import BrandLogo from "@/components/BrandLogo";
+import GoogleFormsIcon from "@/components/GoogleFormsIcon";
 
 type NavKey =
   | "dashboard"
@@ -62,10 +63,8 @@ export default function SideNav({ active }: { active: NavKey }) {
 
         {/* Form Responses */}
         <Link href="/forms" className={active === "forms" ? linkActive : linkBase}>
-          <span className="material-symbols-outlined" data-icon="quiz">
-            quiz
-          </span>
-          <span className={labelCls}>Form</span>
+          <GoogleFormsIcon className="w-6 h-6 shrink-0" />
+          <span className={labelCls}>Google Forms</span>
         </Link>
 
         {/* Admin-only */}
