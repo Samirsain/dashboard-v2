@@ -99,6 +99,7 @@ export const sheetsConfig = {
       "Spreadsheet ID": "spreadsheet_id",
       "Sheet Name": "sheet_name",
       "Form Link": "form_link",
+      Members: "member_ids",
       CreatedAt: "created_at",
     },
     "FORM_CONFIGS"

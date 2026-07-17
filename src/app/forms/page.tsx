@@ -6,7 +6,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { FormConfig, FormResponses, FormResponseStatusMap, FormResponseStatusValue } from "@/lib/types";
+import type { Doer, FormConfig, FormResponses, FormResponseStatusMap, FormResponseStatusValue } from "@/lib/types";
 
 // New submissions land in the Sheet at any time — re-check periodically so
 // they show up without a manual refresh.
@@ -486,12 +486,19 @@ function FormsInner() {
     user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
   const canDelete = user?.role === "Admin" || user?.role === "Manager";
 
+  const canManageAccess = user?.role === "Admin" || user?.role === "Manager";
+
   const [forms, setForms] = useState<FormConfig[]>([]);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [loadingForms, setLoadingForms] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+
+  // Access control: which doers can see which form's responses.
+  const [doers, setDoers] = useState<Doer[]>([]);
+  const [openAccessId, setOpenAccessId] = useState<string | null>(null);
+  const [savingAccessKey, setSavingAccessKey] = useState<string | null>(null);
 
   async function loadForms() {
     setLoadingForms(true);
@@ -512,7 +519,29 @@ function FormsInner() {
     queueMicrotask(() => {
       loadForms();
     });
+    if (canManageAccess) {
+      api
+        .get<Doer[]>("/users")
+        .then((all) => setDoers(all.filter((d) => d.role === "Doer" || d.role === "PC")))
+        .catch(() => setDoers([]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function toggleFormAccess(form: FormConfig, doerId: string, shouldHaveAccess: boolean) {
+    const memberIds = shouldHaveAccess
+      ? Array.from(new Set([...form.memberIds, doerId]))
+      : form.memberIds.filter((id) => id !== doerId);
+    setSavingAccessKey(`${form.id}:${doerId}`);
+    try {
+      const updated = await api.patch<FormConfig>(`/forms/${form.id}/members`, { memberIds });
+      setForms((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to update access.");
+    } finally {
+      setSavingAccessKey(null);
+    }
+  }
 
   function toggleChecked(id: string) {
     setCheckedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -577,6 +606,82 @@ function FormsInner() {
             <p className="font-data-mono text-data-mono text-on-surface-variant border-2 border-on-surface px-3 py-6 text-center uppercase">
               No forms registered yet.{canManage ? " Add one to see its responses here." : ""}
             </p>
+          )}
+
+          {canManageAccess && forms.length > 0 && (
+            <div className="flex flex-col gap-stack-sm">
+              <h3 className="font-headline-md text-headline-md text-on-surface">Form Access</h3>
+              <p className="font-data-mono text-xs text-on-surface-variant uppercase">
+                Which doers can see each form&apos;s responses. Admin/Manager/PC always see everything.
+              </p>
+            </div>
+          )}
+
+          {canManageAccess && forms.length > 0 && (
+            <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[600px]">
+                <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+                  <tr>
+                    <th className="py-3 px-4 border-r border-surface-variant">Form</th>
+                    <th className="py-3 px-4 w-56">Access</th>
+                  </tr>
+                </thead>
+                <tbody className="font-body-md text-body-md text-on-surface">
+                  {forms.map((f) => (
+                    <tr key={f.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                      <td className="py-3 px-4 border-r border-surface-variant font-medium">{f.name}</td>
+                      <td className="py-3 px-4 align-top">
+                        <div className="relative">
+                          <button
+                            onClick={() => setOpenAccessId((prev) => (prev === f.id ? null : f.id))}
+                            className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                          >
+                            <span className="truncate">
+                              {f.memberIds.length === 0
+                                ? "Admin/Manager/PC only"
+                                : `${f.memberIds.length} doer${f.memberIds.length === 1 ? "" : "s"}`}
+                            </span>
+                            <span className="material-symbols-outlined text-base">
+                              {openAccessId === f.id ? "expand_less" : "expand_more"}
+                            </span>
+                          </button>
+
+                          {openAccessId === f.id && (
+                            <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
+                              {doers.length === 0 && (
+                                <p className="px-3 py-2 font-data-mono text-xs text-on-surface-variant uppercase">
+                                  No doers to grant access to.
+                                </p>
+                              )}
+                              {doers.map((d) => {
+                                const checked = f.memberIds.includes(d.id);
+                                const busy = savingAccessKey === `${f.id}:${d.id}`;
+                                return (
+                                  <label
+                                    key={d.id}
+                                    className="flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={busy}
+                                      onChange={(e) => toggleFormAccess(f, d.id, e.target.checked)}
+                                    />
+                                    <span className="font-label-sm text-label-sm uppercase text-on-surface">
+                                      {d.name}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {forms.length > 0 && (

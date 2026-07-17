@@ -1,7 +1,7 @@
 import { googleSheetsService } from "./googleSheets.service";
 import { formConfigService } from "./formConfig.service";
 import { AppError } from "../utils/AppError";
-import type { FormResponses } from "../types";
+import type { FormResponses, JwtClaims } from "../types";
 
 /**
  * Reads a registered form's responses live from its linked Google Sheet —
@@ -9,10 +9,13 @@ import type { FormResponses } from "../types";
  * the next fetch with no import step.
  */
 export const formResponsesService = {
-  async getResponses(formConfigId: string): Promise<FormResponses> {
+  async getResponses(formConfigId: string, user?: JwtClaims): Promise<FormResponses> {
     const config = await formConfigService.findById(formConfigId);
     if (!config) {
       throw AppError.notFound(`Form "${formConfigId}" not found.`);
+    }
+    if (!formConfigService.canAccess(config, user)) {
+      throw AppError.forbidden("You don't have access to this form.");
     }
 
     // Tab name is optional — blank means "use the form's main (first) tab",

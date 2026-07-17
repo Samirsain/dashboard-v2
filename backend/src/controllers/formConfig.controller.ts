@@ -23,8 +23,8 @@ function resolveServiceAccountEmail(): string {
 }
 
 export const formConfigController = {
-  list: asyncHandler(async (_req: Request, res: Response) => {
-    ok(res, await formConfigService.list());
+  list: asyncHandler(async (req: Request, res: Response) => {
+    ok(res, await formConfigService.list({ user: req.user }));
   }),
 
   serviceAccount: asyncHandler(async (_req: Request, res: Response) => {
@@ -41,8 +41,13 @@ export const formConfigController = {
     ok(res, { deleted: true });
   }),
 
+  updateMembers: asyncHandler(async (req: Request, res: Response) => {
+    const { memberIds } = req.body as { memberIds: string[] };
+    ok(res, await formConfigService.updateMembers(req.params.id as string, memberIds));
+  }),
+
   responses: asyncHandler(async (req: Request, res: Response) => {
-    ok(res, await formResponsesService.getResponses(req.params.id as string));
+    ok(res, await formResponsesService.getResponses(req.params.id as string, req.user));
   }),
 
   statuses: asyncHandler(async (req: Request, res: Response) => {

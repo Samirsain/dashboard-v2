@@ -4,16 +4,18 @@ import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
 import { requireRole } from "../middleware/role.middleware";
 import { idParamSchema } from "../validation/user.schema";
-import { createFormConfigSchema } from "../validation/formConfig.schema";
+import { createFormConfigSchema, updateFormMembersSchema } from "../validation/formConfig.schema";
 import { setFormResponseStatusSchema, rowParamSchema } from "../validation/formResponseStatus.schema";
 
 const router = Router();
 
 router.use(requireAuth);
 
-// Any signed-in user can view registered forms and read their responses;
-// only Admin/Manager/PC register or remove a form, or set a response's
-// Working/Complete status.
+// Reading forms/responses is scoped per-user in the service (a doer only
+// sees forms they've been granted access to; Admin/Manager/PC see all).
+// Registering a form is Admin/Manager/PC; removing or managing access is
+// Admin/Manager; setting a response's Working/Complete status is
+// Admin/Manager/PC.
 router.get("/", formConfigController.list);
 router.get("/service-account", formConfigController.serviceAccount);
 router.get("/:id/responses", validate({ params: idParamSchema }), formConfigController.responses);
@@ -29,6 +31,12 @@ router.post(
   requireRole("Admin", "Manager", "PC"),
   validate({ body: createFormConfigSchema }),
   formConfigController.create
+);
+router.patch(
+  "/:id/members",
+  requireRole("Admin", "Manager"),
+  validate({ params: idParamSchema, body: updateFormMembersSchema }),
+  formConfigController.updateMembers
 );
 router.delete(
   "/:id",
