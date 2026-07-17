@@ -145,6 +145,17 @@ function SettingsInner() {
     }
   }
 
+  async function toggleAttendanceManager(doer: Doer) {
+    const next = !doer.isAttendanceManager;
+    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, isAttendanceManager: next } : d)));
+    try {
+      await api.patch<Doer>(`/users/${doer.id}`, { isAttendanceManager: next });
+    } catch (err) {
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, isAttendanceManager: !next } : d)));
+      alert(err instanceof ApiError ? err.message : "Failed to update Attendance Manager.");
+    }
+  }
+
   async function handleDelete(doer: Doer) {
     if (doer.id === currentUser?.id) {
       alert("You can't delete your own account.");
@@ -226,20 +237,21 @@ function SettingsInner() {
                   <th className="py-3 px-4 border-r border-surface-variant w-32">User ID</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Attendance Mgr</th>
                   <th className="py-3 px-4 w-56 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && doers.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No doers found.
                     </td>
                   </tr>
@@ -311,6 +323,14 @@ function SettingsInner() {
                           </div>
                         );
                       })()}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center">
+                      <input
+                        type="checkbox"
+                        checked={d.isAttendanceManager}
+                        onChange={() => toggleAttendanceManager(d)}
+                        title="Can mark attendance for every employee"
+                      />
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">

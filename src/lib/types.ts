@@ -10,7 +10,32 @@ export interface Doer {
   department: string;
   role: UserRole;
   status: UserStatus;
+  isAttendanceManager: boolean;
   createdAt: string;
+}
+
+export type AttendanceStatus = "Present" | "Late" | "Half Day" | "Absent" | "Leave";
+
+/** One row per employee per day, marked by the Attendance Manager (or Admin). */
+export interface Attendance {
+  id: string;
+  employeeId: string;
+  date: string;
+  checkIn: string;
+  checkOut: string;
+  status: AttendanceStatus | "";
+  lateMinutes: number;
+  workingMinutes: number;
+  earlyExitMinutes: number;
+  remarks: string;
+  markedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttendanceDayRow {
+  employee: Doer;
+  attendance: Attendance | null;
 }
 
 /** A row in the Master Sheet — free-form documentation of a list/system. */

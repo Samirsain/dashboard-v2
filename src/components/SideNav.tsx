@@ -13,6 +13,7 @@ type NavKey =
   | "workflow"
   | "master-sheet"
   | "forms"
+  | "attendance"
   | "team-performance"
   | "settings"
   | "help-ticket";
@@ -65,6 +66,14 @@ export default function SideNav({ active }: { active: NavKey }) {
         <Link href="/forms" className={active === "forms" ? linkActive : linkBase}>
           <GoogleFormsIcon className="w-6 h-6 shrink-0" />
           <span className={labelCls}>Google Forms</span>
+        </Link>
+
+        {/* Attendance */}
+        <Link href="/attendance" className={active === "attendance" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="badge">
+            badge
+          </span>
+          <span className={labelCls}>Attendance</span>
         </Link>
 
         {/* Admin-only */}

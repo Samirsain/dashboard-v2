@@ -11,6 +11,7 @@ import masterSheetRoutes from "./masterSheet.routes";
 import formConfigRoutes from "./formConfig.routes";
 import backupRoutes from "./backup.routes";
 import ticketRoutes from "./ticket.routes";
+import attendanceRoutes from "./attendance.routes";
 import { hasGoogleCredentials, hasSupabaseCredentials } from "../config/env";
 
 const router = Router();
@@ -40,5 +41,6 @@ router.use("/master-sheet", masterSheetRoutes);
 router.use("/forms", formConfigRoutes);
 router.use("/backup", backupRoutes);
 router.use("/tickets", ticketRoutes);
+router.use("/attendance", attendanceRoutes);
 
 export default router;

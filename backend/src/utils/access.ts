@@ -12,3 +12,16 @@ export function canViewAllData(user: JwtClaims | undefined): boolean {
   if (user.role === "Admin") return true;
   return user.canViewAll === true;
 }
+
+/**
+ * Who can mark attendance for other employees:
+ *  - Admin — always, by role.
+ *  - Whoever is flagged isAttendanceManager (a doer designated by an admin).
+ *
+ * Everyone else is read-only on attendance (their own record only).
+ */
+export function canMarkAttendance(user: JwtClaims | undefined): boolean {
+  if (!user) return false;
+  if (user.role === "Admin") return true;
+  return user.isAttendanceManager === true;
+}
