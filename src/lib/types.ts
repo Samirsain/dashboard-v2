@@ -1,4 +1,4 @@
-export type UserRole = "Admin" | "Manager" | "PC" | "Doer";
+export type UserRole = "Admin" | "Doer";
 export type UserStatus = "Active" | "Inactive";
 
 export interface Doer {
@@ -37,7 +37,7 @@ export interface FormConfig {
   sheetName: string;
   /** The shareable Google Form URL (for copying/sending) — separate from the response Sheet. */
   formLink: string;
-  /** Doer IDs granted access to this form's responses. Admin/Manager/PC always see everything. */
+  /** Doer IDs granted access to this form's responses. Admin always sees everything. */
   memberIds: string[];
   createdAt: string;
 }

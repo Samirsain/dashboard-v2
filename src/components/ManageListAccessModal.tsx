@@ -21,7 +21,7 @@ export default function ManageListAccessModal({
   useEffect(() => {
     api
       .get<Doer[]>("/users")
-      .then((all) => setDoers(all.filter((d) => d.role === "Doer" || d.role === "PC")))
+      .then((all) => setDoers(all.filter((d) => d.role === "Doer" || d.role === "Admin")))
       .catch(() => setDoers([]));
   }, []);
 

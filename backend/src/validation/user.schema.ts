@@ -6,7 +6,7 @@ export const createUserSchema = z.object({
   mobile: z.string().min(1),
   email: z.string().email(),
   department: z.string().min(1),
-  role: z.enum(["Admin", "Manager", "PC", "Doer"]),
+  role: z.enum(["Admin", "Doer"]),
   status: z.enum(["Active", "Inactive"]).default("Active"),
   // Kept short to allow the existing "EM@01" employee-code convention.
   password: z.string().min(4),
@@ -18,7 +18,7 @@ export const updateUserSchema = z.object({
   mobile: z.string().min(1).optional(),
   email: z.string().email().optional(),
   department: z.string().min(1).optional(),
-  role: z.enum(["Admin", "Manager", "PC", "Doer"]).optional(),
+  role: z.enum(["Admin", "Doer"]).optional(),
   status: z.enum(["Active", "Inactive"]).optional(),
 });
 

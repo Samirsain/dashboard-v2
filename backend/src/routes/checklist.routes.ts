@@ -24,13 +24,13 @@ router.post(
 // Any doer may create templates; changing or deleting them stays restricted.
 router.patch(
   "/templates/:id",
-  requireRole("Admin", "Manager"),
+  requireRole("Admin"),
   validate({ params: idParamSchema, body: updateChecklistTemplateSchema }),
   checklistController.updateTemplate
 );
 router.delete(
   "/templates/:id",
-  requireRole("Admin", "Manager"),
+  requireRole("Admin"),
   validate({ params: idParamSchema }),
   checklistController.removeTemplate
 );

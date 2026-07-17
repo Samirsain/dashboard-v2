@@ -18,13 +18,13 @@ router.get("/", usersController.list);
 router.get("/:id", validate({ params: idParamSchema }), usersController.getById);
 router.post(
   "/",
-  requireRole("Admin", "Manager"),
+  requireRole("Admin"),
   validate({ body: createUserSchema }),
   usersController.create
 );
 router.patch(
   "/:id",
-  requireRole("Admin", "Manager"),
+  requireRole("Admin"),
   validate({ params: idParamSchema, body: updateUserSchema }),
   usersController.update
 );

@@ -24,7 +24,7 @@ function toList(record: SheetRecord): List {
 
 export const listsService = {
   /**
-   * Lists the given user is allowed to see. Admin/Manager/PC see everything;
+   * Lists the given user is allowed to see. Admin sees everything;
    * a plain doer only sees lists they're a member of. `type` narrows to Task
    * Lists or Checklists.
    */

@@ -29,7 +29,7 @@ function TaskListInner() {
   const [doerFilter, setDoerFilter] = useState("");
   const { user } = useAuth();
   const canCreateTasks =
-    user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
+    user?.role === "Admin";
 
   async function loadData() {
     setLoading(true);
@@ -41,7 +41,7 @@ function TaskListInner() {
         api.get<List[]>("/lists?type=task").catch(() => [] as List[]),
       ]);
       setTasks(taskData);
-      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "PC"));
+      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "Admin"));
       setLists(listData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load tasks.");

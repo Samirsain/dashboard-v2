@@ -28,7 +28,7 @@ type CreateFormConfigInput = Omit<FormConfig, "id" | "createdAt" | "memberIds"> 
 
 export const formConfigService = {
   /**
-   * Lists the forms the given user is allowed to see. Admin/Manager/PC see
+   * Lists the forms the given user is allowed to see. Admin sees
    * everything; a plain doer only sees forms they've been granted access to.
    */
   async list(opts: { user?: JwtClaims } = {}): Promise<FormConfig[]> {

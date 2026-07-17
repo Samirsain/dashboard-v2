@@ -1,4 +1,4 @@
-export type UserRole = "Admin" | "Manager" | "PC" | "Doer";
+export type UserRole = "Admin" | "Doer";
 export type UserStatus = "Active" | "Inactive";
 
 /** A row from DOERLIST — the master employee table. `id` is the Doer ID. */
@@ -38,7 +38,7 @@ export interface List {
   id: string;
   name: string;
   type: ListType;
-  /** Doer IDs allowed to access this list (admins/PC/Manager always can). */
+  /** Doer IDs allowed to access this list (Admin always can). */
   memberIds: string[];
   createdAt: string;
 }
@@ -67,7 +67,7 @@ export interface FormConfig {
   sheetName: string;
   /** The shareable Google Form URL (for copying/sending) — separate from the response Sheet. */
   formLink: string;
-  /** Doer IDs granted access to this form's responses. Admin/Manager/PC always see everything. */
+  /** Doer IDs granted access to this form's responses. Admin always sees everything. */
   memberIds: string[];
   createdAt: string;
 }

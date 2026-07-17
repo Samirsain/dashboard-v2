@@ -12,7 +12,7 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
   department: z.string().min(1),
-  role: z.enum(["Admin", "Manager", "PC", "Doer"]).default("Doer"),
+  role: z.enum(["Admin", "Doer"]).default("Doer"),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

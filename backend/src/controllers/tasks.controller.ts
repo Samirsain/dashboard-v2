@@ -8,7 +8,7 @@ import type { CreateTaskInput, RevisionInput, TaskFilterQuery, UpdateTaskInput }
 export const tasksController = {
   list: asyncHandler(async (req: Request, res: Response) => {
     const filters = { ...(req.query as unknown as TaskFilterQuery) };
-    // Normal doers only ever see their own tasks; admins/managers/PC and
+    // Normal doers only ever see their own tasks; admins and
     // canViewAll doers see everything (optionally still narrowed by query).
     if (!canViewAllData(req.user)) {
       filters.assignedDoerId = req.user!.sub;

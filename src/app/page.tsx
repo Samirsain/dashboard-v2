@@ -141,17 +141,13 @@ function DashboardInner() {
     }
   }
 
-  const isPrivileged = user?.role === "Admin" || user?.role === "Manager";
-  const canCreateTasks =
-    user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
-  const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "PC");
+  const isPrivileged = user?.role === "Admin";
+  const canCreateTasks = user?.role === "Admin";
+  const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "Admin");
   const taskLists = lists.filter((l) => l.type === "task");
   const checklistLists = lists.filter((l) => l.type === "checklist");
   const showDoerColumn =
-    user?.role === "Admin" ||
-    user?.role === "PC" ||
-    user?.role === "Manager" ||
-    user?.employeeCode?.toUpperCase() === "TM03";
+    user?.role === "Admin" || user?.employeeCode?.toUpperCase() === "TM03";
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
 
   /** "Office" for no list, else the list's group name (e.g. "SAHIL"). */
