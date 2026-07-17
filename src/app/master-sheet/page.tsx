@@ -5,6 +5,7 @@ import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import type { MasterSheetRow } from "@/lib/types";
 
@@ -279,7 +280,7 @@ function MasterSheetInner() {
                       <td className={`${cell} font-medium`}>{row.name || "—"}</td>
                       <td className={cell}>{row.type || "—"}</td>
                       <td className={`${cell} whitespace-pre-line`}>{row.description || "—"}</td>
-                      <td className={`${cell} font-data-mono`}>{row.date || "—"}</td>
+                      <td className={`${cell} font-data-mono`}>{formatDMY(row.date)}</td>
                       <td className={cell}><LinkList raw={row.videos} /></td>
                       <td className={cell}>{row.pc || "—"}</td>
                       <td className={cell}>{row.ps || "—"}</td>

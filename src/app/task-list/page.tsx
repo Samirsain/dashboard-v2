@@ -9,6 +9,7 @@ import AuthGuard from "@/components/AuthGuard";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
+import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import type { Doer, List, Task } from "@/lib/types";
 
@@ -217,7 +218,7 @@ function TaskListInner() {
                       </div>
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
-                      {task.dueDate}
+                      {formatDMY(task.dueDate)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       {task.status !== "Cancelled" && (

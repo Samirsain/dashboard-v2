@@ -8,6 +8,7 @@ import InitialsAvatar from "@/components/InitialsAvatar";
 import AuthGuard from "@/components/AuthGuard";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
 import { api, ApiError } from "@/lib/api";
+import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import type { Doer, ChecklistInstance, ChecklistTemplate, List } from "@/lib/types";
 
@@ -230,7 +231,7 @@ function ChecklistInner() {
                       </div>
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
-                      {item.date}
+                      {formatDMY(item.date)}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
                       <ChecklistStatusPill status={item.status} />

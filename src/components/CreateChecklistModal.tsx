@@ -135,25 +135,23 @@ export default function CreateChecklistModal({
             />
           </div>
 
-          {lists.length > 0 && (
-            <div>
-              <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                List
-              </label>
-              <select
-                value={listId}
-                onChange={(e) => setListId(e.target.value)}
-                className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
-              >
-                <option value="">Office (Default)</option>
-                {lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div>
+            <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+              List
+            </label>
+            <select
+              value={listId}
+              onChange={(e) => setListId(e.target.value)}
+              className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+            >
+              <option value="">Office (Default)</option>
+              {lists.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="grid grid-cols-2 gap-stack-md">
             <div>

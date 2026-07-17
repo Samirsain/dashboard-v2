@@ -6,6 +6,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import InitialsAvatar from "@/components/InitialsAvatar";
 import { api, ApiError } from "@/lib/api";
+import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import type { Task, Doer, ChecklistInstance, ChecklistTemplate, List } from "@/lib/types";
 
@@ -486,7 +487,7 @@ function TeamPerformanceInner() {
                       {selectedProfile.tasks.slice(0, 5).map((t) => (
                         <tr key={t.id} className="border-b border-surface-variant hover:bg-surface-container-low transition-colors">
                           <td className="p-2 truncate max-w-[180px]">{t.title}</td>
-                          <td className="p-2 font-data-mono">{t.dueDate}</td>
+                          <td className="p-2 font-data-mono">{formatDMY(t.dueDate)}</td>
                           <td className={`p-2 text-right ${t.status === "Completed" ? "text-primary" : (t.status !== "Cancelled" && t.dueDate < todayIso) ? "text-error font-bold" : ""}`}>
                             {t.status}
                           </td>
@@ -518,7 +519,7 @@ function TeamPerformanceInner() {
                       {selectedProfile.checklist.slice(0, 5).map((c) => (
                         <tr key={c.id} className="border-b border-surface-variant hover:bg-surface-container-low transition-colors">
                           <td className="p-2 truncate max-w-[180px]">{c.taskName}</td>
-                          <td className="p-2 font-data-mono">{c.date}</td>
+                          <td className="p-2 font-data-mono">{formatDMY(c.date)}</td>
                           <td className={`p-2 text-right ${c.status === "Completed" ? "text-primary" : c.date < todayIso ? "text-error font-bold" : ""}`}>
                             {c.status}
                           </td>

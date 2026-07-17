@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
+import { formatDMY } from "@/lib/format";
 import type { Task } from "@/lib/types";
 
 export default function ReviseTaskModal({
@@ -52,7 +53,7 @@ export default function ReviseTaskModal({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md p-stack-lg">
           <div className="text-on-surface-variant font-data-mono text-data-mono uppercase">
-            Current Due Date: <span className="text-on-surface">{task.dueDate}</span>
+            Current Due Date: <span className="text-on-surface">{formatDMY(task.dueDate)}</span>
           </div>
 
           <div>
