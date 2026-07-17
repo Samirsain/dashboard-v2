@@ -144,7 +144,7 @@ export default function MobileHeader() {
                 Master Sheet
               </Link>
               <Link href="/forms" className={rowFor("/forms")}>
-                Form
+                Google Forms
               </Link>
 
               {isAdmin && (
