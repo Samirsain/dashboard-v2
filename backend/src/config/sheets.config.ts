@@ -102,6 +102,24 @@ export const sheetsConfig = {
     },
     "FORM_CONFIGS"
   ),
+  /**
+   * Per-response workflow status ("Working"/"Complete") an admin/PC sets
+   * from the Form Responses table. Dashboard-only — the linked Google Sheet
+   * is never written to. Keyed by "{Form ID}::{row number in the sheet}".
+   */
+  formResponseStatuses: entity(
+    "FORM_RESPONSE_STATUSES",
+    "form_response_statuses",
+    "Status ID",
+    {
+      "Status ID": "id",
+      "Form ID": "form_id",
+      "Row Number": "row_number",
+      Status: "status",
+      UpdatedAt: "updated_at",
+    },
+    "FORM_RESPONSE_STATUSES"
+  ),
   /** Named lists (categories) an admin creates — each is a "Task List" or a "Checklist". */
   lists: entity(
     "LISTS",
