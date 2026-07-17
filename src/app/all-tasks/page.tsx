@@ -117,51 +117,55 @@ function AllTasksInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, doerFilter, fromDate, toDate, search, scope]);
 
-  const checklistRows = useMemo(() => {
+  // "Pending" = the checklist tasks themselves (templates) — what was
+  // created, who's doing it, since when, how often. Not tied to whether
+  // today's instance happens to have been generated, so a Weekly/Monthly
+  // task shows up here every day, not just on its scheduled day.
+  const pendingChecklistTasks = useMemo(() => {
+    return templates
+      .filter((t) => inScope(t.listId))
+      .filter((t) => (doerFilter ? t.assignedDoerId === doerFilter : true))
+      .filter((t) => inRange(t.createdAt.slice(0, 10), fromDate, toDate))
+      .filter((t) =>
+        `${t.taskName} ${nameById.get(t.assignedDoerId) ?? ""}`.toLowerCase().includes(search.toLowerCase())
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, doerFilter, fromDate, toDate, search, nameById, scope]);
+
+  const completedChecklistInstances = useMemo(() => {
     return checklist
-      .filter((c) => c.status === checklistStatus)
+      .filter((c) => c.status === "Completed")
       .filter((c) => inScope(templateListMap[c.templateId] ?? ""))
       .filter((c) => (doerFilter ? c.assignedDoerId === doerFilter : true))
-      .filter((c) =>
-        inRange(checklistStatus === "Completed" ? checklistCompletedOn(c) : c.date, fromDate, toDate)
-      )
+      .filter((c) => inRange(checklistCompletedOn(c), fromDate, toDate))
       .filter((c) =>
         `${c.taskName} ${nameById.get(c.assignedDoerId) ?? ""}`
           .toLowerCase()
           .includes(search.toLowerCase())
       )
-      .sort((a, b) =>
-        checklistStatus === "Completed"
-          ? (b.completedAt || b.date || "").localeCompare(a.completedAt || a.date || "")
-          : a.date.localeCompare(b.date)
-      );
+      .sort((a, b) => (b.completedAt || b.date || "").localeCompare(a.completedAt || a.date || ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checklist, checklistStatus, doerFilter, fromDate, toDate, search, nameById, templateListMap, scope]);
+  }, [checklist, doerFilter, fromDate, toDate, search, nameById, templateListMap, scope]);
 
-  const rows = tab === "tasks" ? completedTasks.length : checklistRows.length;
-
-  async function handleChecklistDone(instance: ChecklistInstance) {
-    try {
-      const updated = await api.post<ChecklistInstance>(`/checklist/instances/${instance.id}/complete`);
-      setChecklist((prev) => prev.map((c) => (c.id === instance.id ? updated : c)));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to complete checklist item.");
-    }
-  }
+  const checklistRowCount =
+    checklistStatus === "Pending" ? pendingChecklistTasks.length : completedChecklistInstances.length;
+  const rows = tab === "tasks" ? completedTasks.length : checklistRowCount;
 
   // Deletes the recurring checklist task entirely (the template + every
   // instance it ever generated) — used when a daily/monthly checklist item
   // is no longer needed at all, not just "stop it going forward."
-  async function handleDeleteChecklistTask(instance: ChecklistInstance) {
+  async function handleDeleteChecklistTask(task: { id: string; taskName: string }) {
     if (
       !confirm(
-        `Permanently delete "${instance.taskName}"? This removes the recurring checklist task and its full history — it will stop generating and can't be undone.`
+        `Permanently delete "${task.taskName}"? This removes the recurring checklist task and its full history — it will stop generating and can't be undone.`
       )
     )
       return;
     try {
-      await api.delete(`/checklist/templates/${instance.templateId}`);
-      setChecklist((prev) => prev.filter((c) => c.templateId !== instance.templateId));
+      await api.delete(`/checklist/templates/${task.id}`);
+      setTemplates((prev) => prev.filter((t) => t.id !== task.id));
+      setChecklist((prev) => prev.filter((c) => c.templateId !== task.id));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to delete checklist task.");
     }
@@ -190,16 +194,16 @@ function AllTasksInner() {
         t.priority,
       ]);
     } else if (checklistStatus === "Pending") {
-      headers = ["Checklist Task", "Doer", "Scheduled Date", "Frequency"];
-      dataRows = checklistRows.map((c) => [
-        c.taskName,
-        nameById.get(c.assignedDoerId) ?? c.assignedDoerId,
-        c.date,
-        templates.find((t) => t.id === c.templateId)?.frequency ?? "",
+      headers = ["Checklist Task", "Doer", "Created", "Frequency"];
+      dataRows = pendingChecklistTasks.map((t) => [
+        t.taskName,
+        nameById.get(t.assignedDoerId) ?? t.assignedDoerId,
+        t.createdAt.slice(0, 10),
+        t.frequency,
       ]);
     } else {
       headers = ["Checklist Task", "Doer", "Scheduled Date", "Completed On", "Completed By"];
-      dataRows = checklistRows.map((c) => [
+      dataRows = completedChecklistInstances.map((c) => [
         c.taskName,
         nameById.get(c.assignedDoerId) ?? c.assignedDoerId,
         c.date,
@@ -221,7 +225,7 @@ function AllTasksInner() {
 
   const inputCls =
     "border-2 border-on-surface bg-surface px-3 py-1.5 text-on-surface focus:outline-none font-data-mono text-data-mono";
-  const dateFilterLabel = tab === "checklist" && checklistStatus === "Pending" ? "scheduled" : "completed";
+  const dateFilterLabel = tab === "checklist" && checklistStatus === "Pending" ? "created" : "completed";
 
   return (
     <>
@@ -436,9 +440,9 @@ function AllTasksInner() {
                     <tr>
                       <th className="py-3 px-4 border-r border-surface-variant">Checklist Task</th>
                       <th className="py-3 px-4 border-r border-surface-variant w-40">Doer</th>
-                      <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Scheduled Date</th>
+                      <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Created</th>
                       <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Frequency</th>
-                      <th className="py-3 px-4 w-44 text-center">Action</th>
+                      <th className="py-3 px-4 w-32 text-center">Action</th>
                     </tr>
                   ) : (
                     <tr>
@@ -459,7 +463,7 @@ function AllTasksInner() {
                       </td>
                     </tr>
                   )}
-                  {!loading && checklistRows.length === 0 && (
+                  {!loading && checklistRowCount === 0 && (
                     <tr>
                       <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         No {checklistStatus.toLowerCase()} checklist items match the filters.
@@ -467,35 +471,27 @@ function AllTasksInner() {
                     </tr>
                   )}
                   {checklistStatus === "Pending"
-                    ? checklistRows.map((c) => (
-                        <tr key={c.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
-                          <td className="py-3 px-4 border-r border-surface-variant font-medium">{c.taskName}</td>
+                    ? pendingChecklistTasks.map((t) => (
+                        <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                          <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.taskName}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
-                            {nameById.get(c.assignedDoerId) ?? "—"}
+                            {nameById.get(t.assignedDoerId) ?? "—"}
                           </td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(c.date)}</td>
+                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.createdAt.slice(0, 10))}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase">
-                            {templates.find((t) => t.id === c.templateId)?.frequency ?? "—"}
+                            {t.frequency}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() => handleChecklistDone(c)}
-                                className="border-2 border-on-surface bg-on-surface text-surface-container-lowest px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
-                              >
-                                Done
-                              </button>
-                              <button
-                                onClick={() => handleDeleteChecklistTask(c)}
-                                className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => handleDeleteChecklistTask(t)}
+                              className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))
-                    : checklistRows.map((c) => (
+                    : completedChecklistInstances.map((c) => (
                         <tr key={c.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                           <td className="py-3 px-4 border-r border-surface-variant font-medium">{c.taskName}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
@@ -506,7 +502,7 @@ function AllTasksInner() {
                           <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
                           <td className="py-3 px-4 text-center">
                             <button
-                              onClick={() => handleDeleteChecklistTask(c)}
+                              onClick={() => handleDeleteChecklistTask({ id: c.templateId, taskName: c.taskName })}
                               className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
                             >
                               Delete
