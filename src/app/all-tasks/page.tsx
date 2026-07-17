@@ -6,6 +6,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
+import { nextChecklistDueDate } from "@/lib/checklistSchedule";
 import { useAuth } from "@/lib/auth-context";
 import type { ChecklistInstance, ChecklistTemplate, Doer, List, Task } from "@/lib/types";
 
@@ -117,21 +118,33 @@ function AllTasksInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, doerFilter, fromDate, toDate, search, scope]);
 
+  // A template's next due date: prefer an already-generated Pending
+  // instance's date (authoritative once it exists); otherwise compute the
+  // next date its frequency is due from today. Recomputed live, so once a
+  // Weekly/Monthly task's day passes, this naturally rolls to the next one.
+  function dueDateFor(template: ChecklistTemplate): string {
+    const pendingInstance = checklist
+      .filter((c) => c.templateId === template.id && c.status === "Pending")
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return pendingInstance?.date || nextChecklistDueDate(template.frequency, template.frequencyValue);
+  }
+
   // "Pending" = the checklist tasks themselves (templates) — what was
-  // created, who's doing it, since when, how often. Not tied to whether
-  // today's instance happens to have been generated, so a Weekly/Monthly
-  // task shows up here every day, not just on its scheduled day.
+  // created, who's doing it, when it's next due, how often. Not tied to
+  // whether today's instance happens to have been generated, so a
+  // Weekly/Monthly task shows up here every day, not just on its scheduled
+  // day — its Due Date column just reflects the upcoming date.
   const pendingChecklistTasks = useMemo(() => {
     return templates
       .filter((t) => inScope(t.listId))
       .filter((t) => (doerFilter ? t.assignedDoerId === doerFilter : true))
-      .filter((t) => inRange(t.createdAt.slice(0, 10), fromDate, toDate))
+      .filter((t) => inRange(dueDateFor(t), fromDate, toDate))
       .filter((t) =>
         `${t.taskName} ${nameById.get(t.assignedDoerId) ?? ""}`.toLowerCase().includes(search.toLowerCase())
       )
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      .sort((a, b) => dueDateFor(a).localeCompare(dueDateFor(b)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templates, doerFilter, fromDate, toDate, search, nameById, scope]);
+  }, [templates, checklist, doerFilter, fromDate, toDate, search, nameById, scope]);
 
   const completedChecklistInstances = useMemo(() => {
     return checklist
@@ -194,11 +207,11 @@ function AllTasksInner() {
         t.priority,
       ]);
     } else if (checklistStatus === "Pending") {
-      headers = ["Checklist Task", "Doer", "Created", "Frequency"];
+      headers = ["Checklist Task", "Doer", "Due Date", "Frequency"];
       dataRows = pendingChecklistTasks.map((t) => [
         t.taskName,
         nameById.get(t.assignedDoerId) ?? t.assignedDoerId,
-        t.createdAt.slice(0, 10),
+        dueDateFor(t),
         t.frequency,
       ]);
     } else {
@@ -225,7 +238,7 @@ function AllTasksInner() {
 
   const inputCls =
     "border-2 border-on-surface bg-surface px-3 py-1.5 text-on-surface focus:outline-none font-data-mono text-data-mono";
-  const dateFilterLabel = tab === "checklist" && checklistStatus === "Pending" ? "created" : "completed";
+  const dateFilterLabel = tab === "checklist" && checklistStatus === "Pending" ? "due" : "completed";
 
   return (
     <>
@@ -440,7 +453,7 @@ function AllTasksInner() {
                     <tr>
                       <th className="py-3 px-4 border-r border-surface-variant">Checklist Task</th>
                       <th className="py-3 px-4 border-r border-surface-variant w-40">Doer</th>
-                      <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Created</th>
+                      <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Due Date</th>
                       <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Frequency</th>
                       <th className="py-3 px-4 w-32 text-center">Action</th>
                     </tr>
@@ -477,7 +490,7 @@ function AllTasksInner() {
                           <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
                             {nameById.get(t.assignedDoerId) ?? "—"}
                           </td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.createdAt.slice(0, 10))}</td>
+                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(dueDateFor(t))}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase">
                             {t.frequency}
                           </td>

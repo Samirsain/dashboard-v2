@@ -61,6 +61,7 @@ export interface ChecklistTemplate {
   taskName: string;
   assignedDoerId: string;
   frequency: string;
+  frequencyValue: string;
   status: string;
   createdAt: string;
 }
