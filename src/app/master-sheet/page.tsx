@@ -54,7 +54,7 @@ function LinkList({ raw }: { raw: string }) {
 
 function MasterSheetInner() {
   const { user } = useAuth();
-  const canEdit = user?.role === "Admin" || user?.role === "Manager";
+  const canEdit = user?.role === "Admin";
 
   const [rows, setRows] = useState<MasterSheetRow[]>([]);
   const [loading, setLoading] = useState(true);

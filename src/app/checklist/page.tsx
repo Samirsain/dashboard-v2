@@ -73,7 +73,7 @@ function ChecklistInner() {
       });
 
       setInstances(enrichedInstances);
-      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "PC"));
+      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "Admin"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load checklist.");
     } finally {

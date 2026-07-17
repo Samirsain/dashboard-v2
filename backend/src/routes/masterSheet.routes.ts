@@ -13,23 +13,23 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Any signed-in user can read the Master Sheet; only Admin/Manager edit it.
+// Any signed-in user can read the Master Sheet; only Admin edits it.
 router.get("/", masterSheetController.list);
 router.post(
   "/",
-  requireRole("Admin", "Manager"),
+  requireRole("Admin"),
   validate({ body: createMasterSheetSchema }),
   masterSheetController.create
 );
 router.patch(
   "/:id",
-  requireRole("Admin", "Manager"),
+  requireRole("Admin"),
   validate({ params: idParamSchema, body: updateMasterSheetSchema }),
   masterSheetController.update
 );
 router.delete(
   "/:id",
-  requireRole("Admin", "Manager"),
+  requireRole("Admin"),
   validate({ params: idParamSchema }),
   masterSheetController.remove
 );

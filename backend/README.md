@@ -76,7 +76,7 @@ All routes are under `/api` and (aside from `/auth/login`, `/auth/register`,
 | POST | `/api/auth/login` | `{ identifier, password }` — identifier is either an Email or an Employee Code (e.g. `"EM01"`) |
 | POST | `/api/auth/register` | |
 | GET | `/api/auth/me` | |
-| GET/POST | `/api/users` | POST requires Admin/Manager. Reads/writes DOERLIST |
+| GET/POST | `/api/users` | POST requires Admin. Reads/writes DOERLIST |
 | GET/PATCH/DELETE | `/api/users/:id` | `:id` is a Doer ID |
 | GET/POST | `/api/tasks` | filters: `assignedDoerId`, `status`, `priority`, `department`. List/get responses are TASKLIST rows joined with DOERLIST (`doer: { name, mobile, email, department, role }`) |
 | GET/PATCH/DELETE | `/api/tasks/:id` | create/update reject an `assignedDoerId` that doesn't exist in DOERLIST (`400 INVALID_DOER_ID`) |

@@ -77,7 +77,7 @@ function WorkflowInner() {
         api.get<WorkflowInstance[]>(`/workflow/instances?status=${statusFilter}`),
       ]);
       setTemplates(templateData);
-      setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "PC"));
+      setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "Admin"));
       setInstances(instanceData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load workflow data.");

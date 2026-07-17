@@ -50,7 +50,7 @@ function TeamPerformanceInner() {
           api.get<ChecklistInstance[]>("/checklist/instances").catch(() => [] as ChecklistInstance[]),
         ]);
         setTasks(taskData);
-        setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "PC"));
+        setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "Admin"));
         setLists(listData);
         setTemplates(templateData);
         setChecklistInstances(instanceData);

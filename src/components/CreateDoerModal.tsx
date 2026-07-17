@@ -94,8 +94,6 @@ export default function CreateDoerModal({
               <label className={label}>Role</label>
               <select value={role} onChange={(e) => setRole(e.target.value)} className={field}>
                 <option value="Doer">Doer</option>
-                <option value="PC">PC</option>
-                <option value="Manager">Manager</option>
                 <option value="Admin">Admin</option>
               </select>
             </div>

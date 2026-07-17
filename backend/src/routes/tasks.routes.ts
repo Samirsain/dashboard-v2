@@ -17,11 +17,11 @@ router.use(requireAuth);
 
 router.get("/", validate({ query: taskFilterQuerySchema }), tasksController.list);
 router.get("/:id", validate({ params: idParamSchema }), tasksController.getById);
-// Creating tasks is restricted to PC/Admin (and Manager); marking done,
-// updating status, and revising stay open to every logged-in doer.
+// Creating tasks is restricted to Admin; marking done, updating status,
+// and revising stay open to every logged-in doer.
 router.post(
   "/",
-  requireRole("Admin", "Manager", "PC"),
+  requireRole("Admin"),
   validate({ body: createTaskSchema }),
   tasksController.create
 );

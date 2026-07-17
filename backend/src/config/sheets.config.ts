@@ -105,7 +105,7 @@ export const sheetsConfig = {
     "FORM_CONFIGS"
   ),
   /**
-   * Per-response workflow status ("Working"/"Complete") an admin/PC sets
+   * Per-response workflow status ("Working"/"Complete") an admin sets
    * from the Form Responses table. Dashboard-only — the linked Google Sheet
    * is never written to. Keyed by "{Form ID}::{row number in the sheet}".
    */

@@ -482,11 +482,10 @@ function FormResponsesSection({
 
 function FormsInner() {
   const { user } = useAuth();
-  const canManage =
-    user?.role === "Admin" || user?.role === "Manager" || user?.role === "PC";
-  const canDelete = user?.role === "Admin" || user?.role === "Manager";
+  const canManage = user?.role === "Admin";
+  const canDelete = user?.role === "Admin";
 
-  const canManageAccess = user?.role === "Admin" || user?.role === "Manager";
+  const canManageAccess = user?.role === "Admin";
 
   const [forms, setForms] = useState<FormConfig[]>([]);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
@@ -522,7 +521,7 @@ function FormsInner() {
     if (canManageAccess) {
       api
         .get<Doer[]>("/users")
-        .then((all) => setDoers(all.filter((d) => d.role === "Doer" || d.role === "PC")))
+        .then((all) => setDoers(all.filter((d) => d.role === "Doer" || d.role === "Admin")))
         .catch(() => setDoers([]));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -612,7 +611,7 @@ function FormsInner() {
             <div className="flex flex-col gap-stack-sm">
               <h3 className="font-headline-md text-headline-md text-on-surface">Form Access</h3>
               <p className="font-data-mono text-xs text-on-surface-variant uppercase">
-                Which doers can see each form&apos;s responses. Admin/Manager/PC always see everything.
+                Which doers can see each form&apos;s responses. Admin always sees everything.
               </p>
             </div>
           )}
@@ -638,7 +637,7 @@ function FormsInner() {
                           >
                             <span className="truncate">
                               {f.memberIds.length === 0
-                                ? "Admin/Manager/PC only"
+                                ? "Admin only"
                                 : `${f.memberIds.length} doer${f.memberIds.length === 1 ? "" : "s"}`}
                             </span>
                             <span className="material-symbols-outlined text-base">

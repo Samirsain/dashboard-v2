@@ -101,7 +101,7 @@ function AllTasksInner() {
 
   // People who can be assigned work — shown in the doer filter dropdown.
   const doerOptions = useMemo(
-    () => users.filter((u) => u.role === "Doer" || u.role === "PC"),
+    () => users.filter((u) => u.role === "Doer" || u.role === "Admin"),
     [users]
   );
 
