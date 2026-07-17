@@ -88,6 +88,10 @@ function DashboardInner() {
     setLoading(true);
     setError(null);
     try {
+      // Same as the Checklist page: hit /checklist/today first so any
+      // active template still missing today's instance gets one generated —
+      // keeps every page's pending-checklist view consistent.
+      await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
       const [dash, tasks, listsData, checklist, templateData, doerData] = await Promise.all([
         api.get<FullDashboard>("/dashboard"),
         api.get<Task[]>("/tasks"),

@@ -49,6 +49,11 @@ function AllTasksInner() {
   useEffect(() => {
     async function load() {
       try {
+        // Same as the Checklist page: hit /checklist/today first so any
+        // active template still missing today's instance gets one generated
+        // — otherwise a template created/visited only via a different page
+        // could show up there but not here (or vice versa).
+        await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
         const [taskData, userData, listData, templateData, checklistData] = await Promise.all([
           api.get<Task[]>("/tasks"),
           api.get<Doer[]>("/users"),
