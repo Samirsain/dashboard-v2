@@ -11,6 +11,7 @@ function toFormConfig(record: SheetRecord): FormConfig {
     name: record["Name"] ?? "",
     spreadsheetId: record["Spreadsheet ID"] ?? "",
     sheetName: record["Sheet Name"] ?? "",
+    formLink: record["Form Link"] ?? "",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -34,6 +35,7 @@ export const formConfigService = {
       Name: input.name,
       "Spreadsheet ID": input.spreadsheetId,
       "Sheet Name": input.sheetName,
+      "Form Link": input.formLink,
       CreatedAt: new Date().toISOString(),
     };
     const saved = await dataService.append(entity, record);

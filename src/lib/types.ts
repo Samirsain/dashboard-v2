@@ -35,6 +35,8 @@ export interface FormConfig {
   name: string;
   spreadsheetId: string;
   sheetName: string;
+  /** The shareable Google Form URL (for copying/sending) — separate from the response Sheet. */
+  formLink: string;
   createdAt: string;
 }
 

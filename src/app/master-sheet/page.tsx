@@ -168,16 +168,13 @@ function MasterSheetInner() {
           <input value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} type="date" className={`${inputCls} font-data-mono`} />
         </td>
         <td className={cell}>
-          <textarea value={draft.videos} onChange={(e) => setDraft({ ...draft, videos: e.target.value })} placeholder="One video link per line" rows={2} className={`${inputCls} min-w-[160px]`} />
+          <textarea value={draft.videos} onChange={(e) => setDraft({ ...draft, videos: e.target.value })} placeholder="One training video link per line" rows={2} className={`${inputCls} min-w-[160px]`} />
         </td>
         <td className={cell}>
           <input value={draft.pc} onChange={(e) => setDraft({ ...draft, pc: e.target.value })} placeholder="Process Coordinator" className={inputCls} />
         </td>
         <td className={cell}>
           <input value={draft.ps} onChange={(e) => setDraft({ ...draft, ps: e.target.value })} placeholder="Problem Solver" className={inputCls} />
-        </td>
-        <td className={cell}>
-          <textarea value={draft.access} onChange={(e) => setDraft({ ...draft, access: e.target.value })} placeholder="Doers with access" rows={2} className={`${inputCls} min-w-[160px]`} />
         </td>
         <td className={cell}>
           <input value={draft.link} onChange={(e) => setDraft({ ...draft, link: e.target.value })} placeholder="https://..." className={inputCls} />
@@ -247,10 +244,9 @@ function MasterSheetInner() {
                   <th className="py-3 px-3 border-r border-surface-variant w-28">Type</th>
                   <th className="py-3 px-3 border-r border-surface-variant">Description</th>
                   <th className="py-3 px-3 border-r border-surface-variant w-32">Date</th>
-                  <th className="py-3 px-3 border-r border-surface-variant w-40">Videos</th>
+                  <th className="py-3 px-3 border-r border-surface-variant w-40">Training Video</th>
                   <th className="py-3 px-3 border-r border-surface-variant w-32">PC</th>
                   <th className="py-3 px-3 border-r border-surface-variant w-32">PS</th>
-                  <th className="py-3 px-3 border-r border-surface-variant w-40">Access</th>
                   <th className="py-3 px-3 border-r border-surface-variant w-32">Link</th>
                   <th className="py-3 px-3 w-28 text-center">Action</th>
                 </tr>
@@ -258,14 +254,14 @@ function MasterSheetInner() {
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={11} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={10} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && rows.length === 0 && !adding && (
                   <tr>
-                    <td colSpan={11} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={10} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No entries yet.{canEdit ? ' Use "+ Add Row" to create one.' : ""}
                     </td>
                   </tr>
@@ -284,7 +280,6 @@ function MasterSheetInner() {
                       <td className={cell}><LinkList raw={row.videos} /></td>
                       <td className={cell}>{row.pc || "—"}</td>
                       <td className={cell}>{row.ps || "—"}</td>
-                      <td className={`${cell} whitespace-pre-line`}>{row.access || "—"}</td>
                       <td className={cell}><LinkList raw={row.link} /></td>
                       <td className="py-3 px-3 text-center align-top">
                         {canEdit ? (
@@ -312,7 +307,7 @@ function MasterSheetInner() {
           {canEdit && (
             <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
               Codes: Office Task List = TL, Office Checklist = CL, Sahil Task List = TL2, Sahil
-              Checklist = CL2. Put one video link per line.
+              Checklist = CL2. Put one training video link per line.
             </p>
           )}
         </main>
