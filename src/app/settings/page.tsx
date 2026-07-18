@@ -156,6 +156,31 @@ function SettingsInner() {
     }
   }
 
+  async function handleRoleChange(doer: Doer, nextRole: Doer["role"]) {
+    if (nextRole === doer.role) return;
+    const prevRole = doer.role;
+    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, role: nextRole } : d)));
+    try {
+      await api.patch<Doer>(`/users/${doer.id}`, { role: nextRole });
+    } catch (err) {
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, role: prevRole } : d)));
+      alert(err instanceof ApiError ? err.message : "Failed to update role.");
+    }
+  }
+
+  async function handleRename(doer: Doer) {
+    const nextName = prompt(`Rename ${doer.name} to:`, doer.name)?.trim();
+    if (!nextName || nextName === doer.name) return;
+    const prevName = doer.name;
+    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, name: nextName } : d)));
+    try {
+      await api.patch<Doer>(`/users/${doer.id}`, { name: nextName });
+    } catch (err) {
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, name: prevName } : d)));
+      alert(err instanceof ApiError ? err.message : "Failed to rename.");
+    }
+  }
+
   async function handleDelete(doer: Doer) {
     if (doer.id === currentUser?.id) {
       alert("You can't delete your own account.");
@@ -268,7 +293,15 @@ function SettingsInner() {
                       {d.employeeCode || "—"}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <span className="font-label-sm text-label-sm uppercase">{d.role}</span>
+                      <select
+                        value={d.role}
+                        onChange={(e) => handleRoleChange(d, e.target.value as Doer["role"])}
+                        title="Admin gets full access (Settings, Team Performance, All Tasks)"
+                        className="border-2 border-on-surface bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                      >
+                        <option value="Doer">Doer</option>
+                        <option value="Admin">Admin</option>
+                      </select>
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant align-top">
                       {(() => {
@@ -334,6 +367,12 @@ function SettingsInner() {
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleRename(d)}
+                          className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                        >
+                          Rename
+                        </button>
                         <button
                           onClick={() => setDoerToReset(d)}
                           className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
