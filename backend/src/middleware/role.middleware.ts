@@ -16,3 +16,21 @@ export function requireRole(...roles: UserRole[]) {
     next();
   };
 }
+
+/**
+ * Blocks assistant admins from a destructive action even though they otherwise
+ * have admin access. Used on the delete-doer / delete-task routes so an
+ * assistant can do everything an admin can except permanently remove records.
+ * Must run after requireAuth.
+ */
+export function forbidAssistant(req: Request, _res: Response, next: NextFunction): void {
+  if (!req.user) {
+    next(AppError.unauthorized());
+    return;
+  }
+  if (req.user.isAssistant) {
+    next(AppError.forbidden("Assistant admins can't delete this.", "ASSISTANT_FORBIDDEN"));
+    return;
+  }
+  next();
+}

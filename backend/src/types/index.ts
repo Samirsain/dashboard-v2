@@ -16,6 +16,13 @@ export interface User {
   canViewAll: boolean;
   /** When true, this doer can mark attendance for every employee (Attendance Manager). Admin always can too. */
   isAttendanceManager: boolean;
+  /**
+   * When true, this user is an "assistant admin": they get the full admin
+   * experience (they'll normally also have role "Admin") EXCEPT the ability to
+   * delete doers or delete tasks — those destructive actions stay with the
+   * primary admin only.
+   */
+  isAssistant: boolean;
   createdAt: string;
 }
 
@@ -215,6 +222,8 @@ export interface JwtClaims {
   canViewAll?: boolean;
   /** Mirrors User.isAttendanceManager so attendance endpoints can check without a DB lookup. */
   isAttendanceManager?: boolean;
+  /** Mirrors User.isAssistant so delete guards can check without a DB lookup. */
+  isAssistant?: boolean;
 }
 
 export interface DashboardSummary {

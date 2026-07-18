@@ -2,7 +2,7 @@ import { Router } from "express";
 import { tasksController } from "../controllers/tasks.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/role.middleware";
+import { requireRole, forbidAssistant } from "../middleware/role.middleware";
 import { idParamSchema } from "../validation/user.schema";
 import {
   createTaskSchema,
@@ -30,7 +30,13 @@ router.patch(
   validate({ params: idParamSchema, body: updateTaskSchema }),
   tasksController.update
 );
-router.delete("/:id", validate({ params: idParamSchema }), tasksController.remove);
+router.delete(
+  "/:id",
+  requireRole("Admin"),
+  forbidAssistant,
+  validate({ params: idParamSchema }),
+  tasksController.remove
+);
 router.post(
   "/:id/revision",
   validate({ params: idParamSchema, body: revisionSchema }),

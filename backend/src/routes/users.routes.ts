@@ -2,7 +2,7 @@ import { Router } from "express";
 import { usersController } from "../controllers/users.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/role.middleware";
+import { requireRole, forbidAssistant } from "../middleware/role.middleware";
 import {
   createUserSchema,
   idParamSchema,
@@ -31,6 +31,7 @@ router.patch(
 router.delete(
   "/:id",
   requireRole("Admin"),
+  forbidAssistant,
   validate({ params: idParamSchema }),
   usersController.remove
 );

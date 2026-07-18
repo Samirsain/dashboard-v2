@@ -152,6 +152,7 @@ export const sheetsConfig = {
       Status: "status",
       "Can View All": "can_view_all",
       "Is Attendance Manager": "is_attendance_manager",
+      "Is Assistant": "is_assistant",
       PasswordHash: "password_hash",
       CreatedAt: "created_at",
     },

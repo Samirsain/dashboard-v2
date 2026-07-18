@@ -23,6 +23,7 @@ export const authService = {
       role: user.role,
       canViewAll: user.canViewAll,
       isAttendanceManager: user.isAttendanceManager,
+      isAssistant: user.isAssistant,
     });
     return { token, user: publicUser };
   },
@@ -45,6 +46,7 @@ export const authService = {
       role: user.role,
       canViewAll: user.canViewAll,
       isAttendanceManager: user.isAttendanceManager,
+      isAssistant: user.isAssistant,
     });
     return { token, user };
   },

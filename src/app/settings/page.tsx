@@ -156,6 +156,17 @@ function SettingsInner() {
     }
   }
 
+  async function toggleAssistant(doer: Doer) {
+    const next = !doer.isAssistant;
+    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, isAssistant: next } : d)));
+    try {
+      await api.patch<Doer>(`/users/${doer.id}`, { isAssistant: next });
+    } catch (err) {
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, isAssistant: !next } : d)));
+      alert(err instanceof ApiError ? err.message : "Failed to update Assistant.");
+    }
+  }
+
   async function handleRoleChange(doer: Doer, nextRole: Doer["role"]) {
     if (nextRole === doer.role) return;
     const prevRole = doer.role;
@@ -263,20 +274,21 @@ function SettingsInner() {
                   <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Attendance Mgr</th>
-                  <th className="py-3 px-4 w-56 text-center">Action</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Assistant</th>
+                  <th className="py-3 px-4 w-64 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && doers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No doers found.
                     </td>
                   </tr>
@@ -365,6 +377,14 @@ function SettingsInner() {
                         title="Can mark attendance for every employee"
                       />
                     </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center">
+                      <input
+                        type="checkbox"
+                        checked={d.isAssistant}
+                        onChange={() => toggleAssistant(d)}
+                        title="Assistant admin: full admin access except deleting doers or tasks"
+                      />
+                    </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -379,12 +399,15 @@ function SettingsInner() {
                         >
                           Reset Password
                         </button>
-                        <button
-                          onClick={() => handleDelete(d)}
-                          className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                        >
-                          Delete
-                        </button>
+                        {/* Assistant admins can't delete doers. */}
+                        {!currentUser?.isAssistant && (
+                          <button
+                            onClick={() => handleDelete(d)}
+                            className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

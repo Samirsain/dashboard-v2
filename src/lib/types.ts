@@ -11,6 +11,8 @@ export interface Doer {
   role: UserRole;
   status: UserStatus;
   isAttendanceManager: boolean;
+  /** Assistant admin: full admin access except deleting doers or tasks. */
+  isAssistant: boolean;
   createdAt: string;
 }
 
