@@ -8,7 +8,7 @@ import InitialsAvatar from "@/components/InitialsAvatar";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import type { Attendance, AttendanceDayRow, AttendanceRangeRow, AttendanceStatus } from "@/lib/types";
+import type { Attendance, AttendanceDayRow, AttendanceRangeRow } from "@/lib/types";
 
 function todayIso(): string {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -216,21 +216,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     return rows.filter((r) => r.employee.name.toLowerCase().includes(q) || r.employee.department.toLowerCase().includes(q));
   }, [rows, search]);
 
-  const summary = useMemo(() => {
-    const counts: Record<AttendanceStatus, number> = {
-      Present: 0,
-      Late: 0,
-      "Half Day": 0,
-      Absent: 0,
-      Leave: 0,
-    };
-    for (const r of rows) {
-      const s = r.attendance?.status;
-      if (s) counts[s]++;
-    }
-    return { ...counts, total: rows.length };
-  }, [rows]);
-
   useEffect(() => {
     queueMicrotask(async () => {
       if (!rangeFrom || !rangeTo) {
@@ -279,23 +264,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
       )}
 
-      {/* Overview cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {[
-          ["Total", summary.total],
-          ["Present", summary.Present],
-          ["Late", summary.Late],
-          ["Half Day", summary["Half Day"]],
-          ["Leave", summary.Leave],
-          ["Absent", summary.Absent],
-        ].map(([label, value]) => (
-          <div key={label as string} className="bg-surface-container-lowest border-2 border-on-surface p-3">
-            <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">{label}</p>
-            <p className="font-headline-md text-headline-md text-on-surface">{value}</p>
-          </div>
-        ))}
-      </div>
-
       {/* Filters */}
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -309,6 +277,36 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           />
           {!editable && (
             <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">(view only — past date)</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
+          <input
+            type="date"
+            value={rangeFrom}
+            max={rangeTo || todayIso()}
+            onChange={(e) => setRangeFrom(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
+          <input
+            type="date"
+            value={rangeTo}
+            min={rangeFrom || undefined}
+            max={todayIso()}
+            onChange={(e) => setRangeTo(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          {(rangeFrom || rangeTo) && (
+            <button
+              onClick={() => {
+                setRangeFrom("");
+                setRangeTo("");
+              }}
+              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            >
+              Clear
+            </button>
           )}
         </div>
         <input
@@ -382,39 +380,10 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         </table>
       </div>
 
-      {/* Range report */}
+      {/* Range report — driven by the From/To pickers in the filter bar above */}
+      {(rangeFrom || rangeTo) && (
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
         <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Date Range Report</h3>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
-          <input
-            type="date"
-            value={rangeFrom}
-            max={rangeTo || todayIso()}
-            onChange={(e) => setRangeFrom(e.target.value)}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
-          />
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
-          <input
-            type="date"
-            value={rangeTo}
-            min={rangeFrom || undefined}
-            max={todayIso()}
-            onChange={(e) => setRangeTo(e.target.value)}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
-          />
-          {(rangeFrom || rangeTo) && (
-            <button
-              onClick={() => {
-                setRangeFrom("");
-                setRangeTo("");
-              }}
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
 
         {rangeError && (
           <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{rangeError}</p>
@@ -474,6 +443,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
