@@ -8,7 +8,7 @@ import InitialsAvatar from "@/components/InitialsAvatar";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import type { Attendance, AttendanceDayRow, AttendanceStatus } from "@/lib/types";
+import type { Attendance, AttendanceDayRow, AttendanceRangeRow, AttendanceStatus } from "@/lib/types";
 
 function todayIso(): string {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -51,6 +51,8 @@ function EmployeeView() {
   const [history, setHistory] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -64,6 +66,10 @@ function EmployeeView() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load attendance."))
       .finally(() => setLoading(false));
   }, []);
+
+  const filteredHistory = useMemo(() => {
+    return history.filter((r) => (!rangeFrom || r.date >= rangeFrom) && (!rangeTo || r.date <= rangeTo));
+  }, [history, rangeFrom, rangeTo]);
 
   return (
     <div className="flex flex-col gap-stack-lg">
@@ -103,6 +109,36 @@ function EmployeeView() {
         </p>
       </div>
 
+      <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center gap-3">
+        <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
+        <input
+          type="date"
+          value={rangeFrom}
+          max={rangeTo || undefined}
+          onChange={(e) => setRangeFrom(e.target.value)}
+          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+        />
+        <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
+        <input
+          type="date"
+          value={rangeTo}
+          min={rangeFrom || undefined}
+          onChange={(e) => setRangeTo(e.target.value)}
+          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+        />
+        {(rangeFrom || rangeTo) && (
+          <button
+            onClick={() => {
+              setRangeFrom("");
+              setRangeTo("");
+            }}
+            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[640px]">
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
@@ -115,14 +151,14 @@ function EmployeeView() {
             </tr>
           </thead>
           <tbody className="font-body-md text-body-md text-on-surface">
-            {!loading && history.length === 0 && (
+            {!loading && filteredHistory.length === 0 && (
               <tr>
                 <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   No attendance history yet.
                 </td>
               </tr>
             )}
-            {history.map((r) => (
+            {filteredHistory.map((r) => (
               <tr key={r.id} className="border-b border-surface-variant last:border-b-0">
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatDMY(r.date)}</td>
                 <td className="py-2 px-4 border-r border-surface-variant"><StatusPill status={r.status} /></td>
@@ -146,6 +182,11 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+  const [rangeRows, setRangeRows] = useState<AttendanceRangeRow[]>([]);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState<string | null>(null);
 
   const editable = isAdmin || date === todayIso();
 
@@ -189,6 +230,24 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     }
     return { ...counts, total: rows.length };
   }, [rows]);
+
+  useEffect(() => {
+    queueMicrotask(async () => {
+      if (!rangeFrom || !rangeTo) {
+        setRangeRows([]);
+        return;
+      }
+      setRangeLoading(true);
+      setRangeError(null);
+      try {
+        setRangeRows(await api.get<AttendanceRangeRow[]>(`/attendance/range?from=${rangeFrom}&to=${rangeTo}`));
+      } catch (err) {
+        setRangeError(err instanceof ApiError ? err.message : "Failed to load range report.");
+      } finally {
+        setRangeLoading(false);
+      }
+    });
+  }, [rangeFrom, rangeTo]);
 
   async function handleCheckIn(employeeId: string) {
     setBusy(true);
@@ -321,6 +380,99 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Range report */}
+      <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
+        <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Date Range Report</h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
+          <input
+            type="date"
+            value={rangeFrom}
+            max={rangeTo || todayIso()}
+            onChange={(e) => setRangeFrom(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
+          <input
+            type="date"
+            value={rangeTo}
+            min={rangeFrom || undefined}
+            max={todayIso()}
+            onChange={(e) => setRangeTo(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          {(rangeFrom || rangeTo) && (
+            <button
+              onClick={() => {
+                setRangeFrom("");
+                setRangeTo("");
+              }}
+              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {rangeError && (
+          <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{rangeError}</p>
+        )}
+
+        {!rangeFrom || !rangeTo ? (
+          <p className="font-data-mono text-data-mono text-on-surface-variant">
+            Pick a From and To date to see per-employee totals for that range.
+          </p>
+        ) : (
+          <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[720px]">
+              <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+                <tr>
+                  <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Present</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Late</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Half Day</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Absent</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Leave</th>
+                  <th className="py-3 px-4">Total Marked</th>
+                </tr>
+              </thead>
+              <tbody className="font-body-md text-body-md text-on-surface">
+                {rangeLoading && (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      Loading...
+                    </td>
+                  </tr>
+                )}
+                {!rangeLoading && rangeRows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      No data for this range.
+                    </td>
+                  </tr>
+                )}
+                {rangeRows.map(({ employee, counts, totalMarked }) => (
+                  <tr key={employee.id} className="border-b border-surface-variant last:border-b-0">
+                    <td className="py-2 px-4 border-r border-surface-variant">
+                      <div className="flex items-center gap-2">
+                        <InitialsAvatar name={employee.name} className="w-6 h-6 border border-on-surface" />
+                        <span className="font-medium">{employee.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Present}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Late}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts["Half Day"]}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Absent}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Leave}</td>
+                    <td className="py-2 px-4 font-data-mono text-data-mono">{totalMarked}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

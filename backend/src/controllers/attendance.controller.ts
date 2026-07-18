@@ -5,7 +5,13 @@ import { attendanceService } from "../services/attendance.service";
 import { canMarkAttendance } from "../utils/access";
 import { todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
-import type { AttendanceDateQuery, MarkStatusInput, CheckInOutInput, RemarksInput } from "../validation/attendance.schema";
+import type {
+  AttendanceDateQuery,
+  AttendanceRangeQuery,
+  MarkStatusInput,
+  CheckInOutInput,
+  RemarksInput,
+} from "../validation/attendance.schema";
 
 /** Attendance Managers (non-Admin) may only mark/edit today's attendance. */
 function assertEditableDate(req: Request, date: string): void {
@@ -37,6 +43,12 @@ export const attendanceController = {
     requireMarker(req);
     const { date } = req.query as AttendanceDateQuery;
     ok(res, await attendanceService.day(date ?? todayIso()));
+  }),
+
+  range: asyncHandler(async (req: Request, res: Response) => {
+    requireMarker(req);
+    const { from, to } = req.query as unknown as AttendanceRangeQuery;
+    ok(res, await attendanceService.range(from, to));
   }),
 
   markStatus: asyncHandler(async (req: Request, res: Response) => {

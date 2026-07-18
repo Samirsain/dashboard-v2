@@ -38,6 +38,12 @@ export interface AttendanceDayRow {
   attendance: Attendance | null;
 }
 
+export interface AttendanceRangeRow {
+  employee: Doer;
+  counts: Record<AttendanceStatus, number>;
+  totalMarked: number;
+}
+
 /** A row in the Master Sheet — free-form documentation of a list/system. */
 export interface MasterSheetRow {
   id: string;

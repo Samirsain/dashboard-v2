@@ -150,6 +150,46 @@ export const attendanceService = {
       .sort((a, b) => b.date.localeCompare(a.date));
   },
 
+  /** Per-employee attendance counts for every day in [from, to] (inclusive). */
+  async range(
+    from: string,
+    to: string
+  ): Promise<Array<{ employee: User; counts: Record<AttendanceStatus, number>; totalMarked: number }>> {
+    const [users, records] = await Promise.all([usersService.list(), dataService.findAll(entity)]);
+    const inRange = records.filter((r) => {
+      const date = r["Date"] as string;
+      return date >= from && date <= to;
+    });
+    const byEmployee = new Map<string, SheetRecord[]>();
+    for (const r of inRange) {
+      const employeeId = r["Employee ID"] as string;
+      const list = byEmployee.get(employeeId) ?? [];
+      list.push(r);
+      byEmployee.set(employeeId, list);
+    }
+    return users
+      .filter((u) => u.status === "Active")
+      .map((employee) => {
+        const counts: Record<AttendanceStatus, number> = {
+          Present: 0,
+          Late: 0,
+          "Half Day": 0,
+          Absent: 0,
+          Leave: 0,
+        };
+        let totalMarked = 0;
+        for (const r of byEmployee.get(employee.id) ?? []) {
+          const status = r["Status"] as AttendanceStatus | "";
+          if (status) {
+            counts[status]++;
+            totalMarked++;
+          }
+        }
+        return { employee, counts, totalMarked };
+      })
+      .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
+  },
+
   /** All active employees for `date`, each joined with their attendance row (or null if unmarked). */
   async day(date: string): Promise<Array<{ employee: User; attendance: Attendance | null }>> {
     const [users, records] = await Promise.all([usersService.list(), dataService.findAll(entity)]);
