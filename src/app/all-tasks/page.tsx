@@ -79,7 +79,7 @@ function AllTasksInner() {
   }, []);
 
   useEffect(() => {
-    setScope("ALL");
+    queueMicrotask(() => setScope("ALL"));
   }, [tab]);
 
   const nameById = useMemo(() => {
@@ -289,7 +289,24 @@ function AllTasksInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-md">
-          <div className="flex justify-between items-end border-b-2 border-on-surface pb-stack-md">
+          {/* Mobile search + export (desktop header is hidden below md) */}
+          <div className="md:hidden flex flex-col gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="SEARCH TASK / DOER..."
+              className="w-full border-2 border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant focus:outline-none"
+            />
+            <button
+              onClick={exportCSV}
+              disabled={rows === 0}
+              className="w-full px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase disabled:opacity-50"
+            >
+              Export CSV
+            </button>
+          </div>
+
+          <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md">
             <div>
               <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
                 {tab === "checklist" ? `All ${checklistStatus}` : "All Completed"}

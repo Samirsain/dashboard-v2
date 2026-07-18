@@ -329,6 +329,27 @@ function TeamPerformanceInner() {
 
         {/* Content Container */}
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg max-w-full overflow-hidden">
+          {/* Mobile title + exports (desktop header is hidden below md) */}
+          <div className="md:hidden flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
+              Team Performance
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={exportCSV}
+                className="px-3 py-1.5 border-2 border-on-surface bg-surface font-label-sm text-label-sm uppercase"
+              >
+                CSV
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-3 py-1.5 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
+              >
+                PDF
+              </button>
+            </div>
+          </div>
+
           {error && (
             <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
           )}

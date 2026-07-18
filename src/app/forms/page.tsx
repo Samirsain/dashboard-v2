@@ -498,6 +498,8 @@ function FormsInner() {
   const [doers, setDoers] = useState<Doer[]>([]);
   const [openAccessId, setOpenAccessId] = useState<string | null>(null);
   const [savingAccessKey, setSavingAccessKey] = useState<string | null>(null);
+  // Form Access section is collapsed by default — the table only shows once expanded.
+  const [showFormAccess, setShowFormAccess] = useState(false);
 
   async function loadForms() {
     setLoadingForms(true);
@@ -609,14 +611,24 @@ function FormsInner() {
 
           {canManageAccess && forms.length > 0 && (
             <div className="flex flex-col gap-stack-sm">
-              <h3 className="font-headline-md text-headline-md text-on-surface">Form Access</h3>
-              <p className="font-data-mono text-xs text-on-surface-variant uppercase">
-                Which doers can see each form&apos;s responses. Admin always sees everything.
-              </p>
+              <button
+                onClick={() => setShowFormAccess((prev) => !prev)}
+                className="flex items-center gap-2 w-fit"
+              >
+                <h3 className="font-headline-md text-headline-md text-on-surface">Form Access</h3>
+                <span className="material-symbols-outlined text-on-surface">
+                  {showFormAccess ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+              {showFormAccess && (
+                <p className="font-data-mono text-xs text-on-surface-variant uppercase">
+                  Which doers can see each form&apos;s responses. Admin always sees everything.
+                </p>
+              )}
             </div>
           )}
 
-          {canManageAccess && forms.length > 0 && (
+          {canManageAccess && showFormAccess && forms.length > 0 && (
             <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">

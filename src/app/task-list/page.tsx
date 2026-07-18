@@ -141,7 +141,29 @@ function TaskListInner() {
 
         {/* Page Content */}
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
-          <div className="flex justify-between items-end border-b-2 border-on-surface pb-stack-md">
+          {/* Mobile search + doer filter (desktop header is hidden below md) */}
+          <div className="md:hidden flex flex-col gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="SEARCH TASKS..."
+              className="w-full border-2 border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant focus:outline-none"
+            />
+            <select
+              value={doerFilter}
+              onChange={(e) => setDoerFilter(e.target.value)}
+              className="w-full border-2 border-on-surface bg-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+            >
+              <option value="">All Doers</option>
+              {doers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md">
             <div>
               <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
                 {currentList ? currentList.name : "Active Task Directory"}

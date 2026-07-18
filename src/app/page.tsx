@@ -282,6 +282,25 @@ function DashboardInner() {
         {/* Dashboard Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-container-padding">
           <div className="max-w-[1440px] mx-auto grid grid-cols-12 gap-4 md:gap-gutter">
+            {/* Mobile quick actions (desktop header is hidden below md) */}
+            <div className="col-span-12 md:hidden flex flex-wrap gap-2">
+              <Link
+                href="/help-ticket"
+                className="flex-1 text-center border-2 border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+              >
+                Help Ticket
+              </Link>
+              {isAdmin && (
+                <button
+                  onClick={() => exportTasksToCsv(allTasks)}
+                  disabled={allTasks.length === 0}
+                  className="flex-1 border-2 border-on-surface bg-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
+                >
+                  Export CSV
+                </button>
+              )}
+            </div>
+
             {error && (
               <div className="col-span-12">
                 <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
@@ -325,7 +344,7 @@ function DashboardInner() {
             <div className="col-span-12 bg-surface border-2 border-on-surface flex flex-col">
               <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-wrap justify-between items-center gap-3">
                 <h3 className="font-headline-md text-headline-md text-on-surface">Pending Tasks</h3>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {canCreateTasks && (
                     <button
                       onClick={() => setShowCreatePicker(true)}
