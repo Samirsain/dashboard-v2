@@ -79,6 +79,8 @@ function DashboardInner() {
   // Pending Tasks filter: "all" = every open item (past/today/future);
   // "today" = only items due on today's date.
   const [pendingFilter, setPendingFilter] = useState<"all" | "today">("all");
+  // Pending Tasks doer filter: "" = every doer.
+  const [pendingDoerFilter, setPendingDoerFilter] = useState("");
   // Create-task flow: pick a type (Task List / Checklist) first, then show
   // the matching modal with that type's named lists (+ implicit Office) to
   // choose from.
@@ -203,10 +205,9 @@ function DashboardInner() {
   // "today" view = today's items PLUS every overdue (past, still-pending) item.
   // allPending is sorted by dueDate ascending, so overdue rows (earlier dates)
   // naturally list before today's rows.
-  const pendingRows =
-    pendingFilter === "today"
-      ? allPending.filter((r) => r.dueDate === today || isOverdue(r.dueDate))
-      : allPending;
+  const pendingRows = allPending
+    .filter((r) => (pendingFilter === "today" ? r.dueDate === today || isOverdue(r.dueDate) : true))
+    .filter((r) => (pendingDoerFilter ? r.assignedDoerId === pendingDoerFilter : true));
 
   const summary = dashboard?.summary;
   const overallPct =
@@ -332,6 +333,20 @@ function DashboardInner() {
                     >
                       + Create
                     </button>
+                  )}
+                  {showDoerColumn && (
+                    <select
+                      value={pendingDoerFilter}
+                      onChange={(e) => setPendingDoerFilter(e.target.value)}
+                      className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                    >
+                      <option value="">All Doers</option>
+                      {assignableDoers.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
                   )}
                   {(["all", "today"] as const).map((f) => (
                     <button
