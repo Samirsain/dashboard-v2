@@ -214,15 +214,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  async function handleRemarks(employeeId: string, remarks: string) {
-    try {
-      await api.patch("/attendance/remarks", { employeeId, date, remarks });
-      await load();
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to save remarks.");
-    }
-  }
-
   return (
     <div className="flex flex-col gap-stack-lg">
       {error && (
@@ -274,25 +265,23 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
             <tr>
               <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
-              <th className="py-3 px-4 border-r border-surface-variant">Department</th>
               <th className="py-3 px-4 border-r border-surface-variant">Status</th>
               <th className="py-3 px-4 border-r border-surface-variant">Check-In</th>
               <th className="py-3 px-4 border-r border-surface-variant">Check-Out</th>
-              <th className="py-3 px-4 border-r border-surface-variant">Remarks</th>
               {editable && <th className="py-3 px-4">Actions</th>}
             </tr>
           </thead>
           <tbody className="font-body-md text-body-md text-on-surface">
             {loading && (
               <tr>
-                <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   Loading...
                 </td>
               </tr>
             )}
             {!loading && filteredRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   No employees found.
                 </td>
               </tr>
@@ -305,24 +294,9 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
                     <span className="font-medium">{employee.name}</span>
                   </div>
                 </td>
-                <td className="py-2 px-4 border-r border-surface-variant">{employee.department}</td>
                 <td className="py-2 px-4 border-r border-surface-variant"><StatusPill status={attendance?.status ?? ""} /></td>
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(attendance?.checkIn ?? "")}</td>
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(attendance?.checkOut ?? "")}</td>
-                <td className="py-2 px-4 border-r border-surface-variant">
-                  {editable ? (
-                    <input
-                      defaultValue={attendance?.remarks ?? ""}
-                      onBlur={(e) => {
-                        if (e.target.value !== (attendance?.remarks ?? "")) handleRemarks(employee.id, e.target.value);
-                      }}
-                      placeholder="—"
-                      className="w-full border border-surface-variant bg-surface px-2 py-1 font-data-mono text-xs text-on-surface focus:outline-none focus:border-on-surface"
-                    />
-                  ) : (
-                    <span className="font-data-mono text-xs text-on-surface-variant">{attendance?.remarks || "—"}</span>
-                  )}
-                </td>
                 {editable && (
                   <td className="py-2 px-4">
                     <div className="flex items-center gap-2">
