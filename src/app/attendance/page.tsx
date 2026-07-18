@@ -188,7 +188,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   const [rangeRows, setRangeRows] = useState<AttendanceRangeRow[]>([]);
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeError, setRangeError] = useState<string | null>(null);
-  const [clearingAll, setClearingAll] = useState(false);
 
   const editable = isAdmin || date === todayIso();
 
@@ -260,31 +259,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  async function handleClearAll() {
-    const confirmed = confirm(
-      "⚠️ This will PERMANENTLY DELETE every attendance record for every employee — every date, every status, every check-in/check-out. This cannot be undone.\n\nAre you absolutely sure you want to clear ALL attendance data?"
-    );
-    if (!confirmed) return;
-    const typed = prompt('This is irreversible. Type "DELETE ALL" (without quotes) to confirm.');
-    if (typed !== "DELETE ALL") {
-      alert("Cancelled — text didn't match. No data was deleted.");
-      return;
-    }
-    setClearingAll(true);
-    try {
-      await api.delete("/attendance/all");
-      setRangeFrom("");
-      setRangeTo("");
-      setRangeRows([]);
-      await load();
-      alert("All attendance records have been cleared.");
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to clear attendance.");
-    } finally {
-      setClearingAll(false);
-    }
-  }
-
   return (
     <div className="flex flex-col gap-stack-lg">
       {error && (
@@ -344,21 +318,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         />
       </div>
 
-      {/* Danger zone — Admin only, permanently wipes every attendance record. */}
-      {isAdmin && (
-        <div className="bg-error/10 border-2 border-error p-4 flex flex-wrap items-center justify-between gap-4">
-          <p className="font-label-sm text-label-sm uppercase text-error">
-            ⚠️ Danger Zone — this permanently deletes ALL attendance records for every employee and date.
-          </p>
-          <button
-            disabled={clearingAll}
-            onClick={handleClearAll}
-            className="px-3 py-1.5 border-2 border-error bg-error text-on-error font-label-sm text-label-sm uppercase hover:bg-error/80 transition-colors disabled:opacity-40"
-          >
-            {clearingAll ? "Clearing..." : "Clear All Attendance"}
-          </button>
-        </div>
-      )}
 
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[1000px]">

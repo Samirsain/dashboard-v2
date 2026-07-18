@@ -44,6 +44,8 @@ router.post(
   validate({ params: idParamSchema }),
   checklistController.completeInstance
 );
+// Irreversible — wipes every Completed checklist instance. Admin only (Team Performance reset).
+router.delete("/instances/completed", requireRole("Admin"), checklistController.removeCompletedInstances);
 router.post("/generate", checklistController.generateToday);
 
 export default router;

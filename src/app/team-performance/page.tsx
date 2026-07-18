@@ -39,30 +39,60 @@ function TeamPerformanceInner() {
   // together the same way the sidebar does (OFFICE TL + OFFICE CL, etc).
   const [scope, setScope] = useState<string>(ALL);
   const [selectedDoerId, setSelectedDoerId] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [taskData, doerData, listData, templateData, instanceData] = await Promise.all([
+        api.get<Task[]>("/tasks"),
+        api.get<Doer[]>("/users"),
+        api.get<List[]>("/lists").catch(() => [] as List[]),
+        api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
+        api.get<ChecklistInstance[]>("/checklist/instances").catch(() => [] as ChecklistInstance[]),
+      ]);
+      setTasks(taskData);
+      setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "Admin"));
+      setLists(listData);
+      setTemplates(templateData);
+      setChecklistInstances(instanceData);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load data.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [taskData, doerData, listData, templateData, instanceData] = await Promise.all([
-          api.get<Task[]>("/tasks"),
-          api.get<Doer[]>("/users"),
-          api.get<List[]>("/lists").catch(() => [] as List[]),
-          api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
-          api.get<ChecklistInstance[]>("/checklist/instances").catch(() => [] as ChecklistInstance[]),
-        ]);
-        setTasks(taskData);
-        setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "Admin"));
-        setLists(listData);
-        setTemplates(templateData);
-        setChecklistInstances(instanceData);
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to load data.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
+    queueMicrotask(() => {
+      loadData();
+    });
   }, []);
+
+  async function handleResetScoring() {
+    const confirmed = confirm(
+      "⚠️ This will PERMANENTLY DELETE every COMPLETED task and every COMPLETED checklist item — for every employee, all history. Pending/open items are kept, and scoring will restart fresh from them. This cannot be undone.\n\nAre you absolutely sure you want to reset Team Performance?"
+    );
+    if (!confirmed) return;
+    const typed = prompt('This is irreversible. Type "RESET SCORING" (without quotes) to confirm.');
+    if (typed !== "RESET SCORING") {
+      alert("Cancelled — text didn't match. Nothing was deleted.");
+      return;
+    }
+    setResetting(true);
+    try {
+      await Promise.all([
+        api.delete("/tasks/completed"),
+        api.delete("/checklist/instances/completed"),
+      ]);
+      await loadData();
+      alert("Team Performance has been reset — completed history cleared, pending items kept.");
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to reset Team Performance.");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   const todayIso = getTodayIso();
 
@@ -349,6 +379,20 @@ function TeamPerformanceInner() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Danger zone — permanently wipes completed history to reset scoring. */}
+          <div className="bg-error/10 border-2 border-error p-4 flex flex-wrap items-center justify-between gap-4">
+            <p className="font-label-sm text-label-sm uppercase text-error">
+              ⚠️ Danger Zone — permanently deletes every COMPLETED task and checklist item (pending items are kept).
+            </p>
+            <button
+              disabled={resetting}
+              onClick={handleResetScoring}
+              className="px-3 py-1.5 border-2 border-error bg-error text-on-error font-label-sm text-label-sm uppercase hover:bg-error/80 transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              {resetting ? "Resetting..." : "Reset Team Performance"}
+            </button>
           </div>
 
           {/* Simple Cards Row */}

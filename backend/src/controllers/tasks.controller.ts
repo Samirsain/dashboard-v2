@@ -49,4 +49,11 @@ export const tasksController = {
     const history = await tasksService.getRevisionHistory(req.params.id as string);
     ok(res, history);
   }),
+
+  // Admin-only (enforced by requireRole("Admin") on the route) — permanently
+  // deletes every Completed task, used to reset Team Performance scoring.
+  removeCompleted: asyncHandler(async (_req: Request, res: Response) => {
+    const deleted = await tasksService.removeCompleted();
+    ok(res, { deleted });
+  }),
 };
