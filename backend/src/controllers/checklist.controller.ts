@@ -32,6 +32,13 @@ export const checklistController = {
     ok(res, { deleted: true });
   }),
 
+  // Admin-only (enforced by requireRole("Admin") on the route) — permanently
+  // deletes every Completed checklist instance, used to reset Team Performance scoring.
+  removeCompletedInstances: asyncHandler(async (_req: Request, res: Response) => {
+    const deleted = await checklistService.removeCompletedInstances();
+    ok(res, { deleted });
+  }),
+
   listInstances: asyncHandler(async (req: Request, res: Response) => {
     const { date, status, assignedDoerId } = req.query as Record<string, string | undefined>;
     // Normal doers are scoped to their own checklist items; view-all users see everyone's.

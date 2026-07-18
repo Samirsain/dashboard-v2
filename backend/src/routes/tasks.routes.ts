@@ -31,6 +31,9 @@ router.patch(
   validate({ params: idParamSchema, body: updateTaskSchema }),
   tasksController.update
 );
+// Must be registered before "/:id" so "completed" isn't swallowed as an id param.
+// Irreversible — wipes every Completed task. Admin only (Team Performance reset).
+router.delete("/completed", requireRole("Admin"), tasksController.removeCompleted);
 router.delete(
   "/:id",
   requireRole("Admin"),

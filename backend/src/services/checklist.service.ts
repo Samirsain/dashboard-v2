@@ -162,6 +162,11 @@ export const checklistService = {
     await dataService.deleteById(templatesEntity, id);
   },
 
+  /** Permanently deletes every checklist instance whose Status is "Completed" — used for a Team Performance reset. Irreversible. */
+  async removeCompletedInstances(): Promise<number> {
+    return dataService.deleteWhere(instancesEntity, "Status", "Completed");
+  },
+
   // ---- Instances ---------------------------------------------------------
 
   async listInstances(filters?: {

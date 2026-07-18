@@ -220,6 +220,11 @@ export const tasksService = {
     });
   },
 
+  /** Permanently deletes every task whose Status is "Completed" — used for a Team Performance reset. Irreversible. */
+  async removeCompleted(): Promise<number> {
+    return dataService.deleteWhere(entity, "Status", "Completed");
+  },
+
   /**
    * Revision workflow: a due date can't be met, so the doer requests a new
    * date with a reason. The full old→new record is appended to the
