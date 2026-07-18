@@ -32,7 +32,8 @@ function TeamPerformanceInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [filterDate, setFilterDate] = useState<"All" | "Today" | "ThisWeek" | "ThisMonth">("ThisMonth");
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
   // Which list "group" to score: ALL, OFFICE (no named list), or a named
   // group like SAHIL — grouping Office/Sahil's Task List and Checklist
   // together the same way the sidebar does (OFFICE TL + OFFICE CL, etc).
@@ -90,29 +91,16 @@ function TeamPerformanceInner() {
   }
 
   function inDateWindow(dateStr: string): boolean {
-    if (filterDate === "All") return true;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return true;
-    const today = new Date();
-    if (filterDate === "Today") return dateStr === todayIso;
-    if (filterDate === "ThisWeek") {
-      const day = today.getDay();
-      const first = new Date(today);
-      first.setDate(today.getDate() - day);
-      const last = new Date(today);
-      last.setDate(today.getDate() - day + 6);
-      return d >= first && d <= last;
-    }
-    if (filterDate === "ThisMonth") {
-      return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-    }
+    if (!rangeFrom && !rangeTo) return true;
+    if (rangeFrom && dateStr < rangeFrom) return false;
+    if (rangeTo && dateStr > rangeTo) return false;
     return true;
   }
 
   const filteredTasks = useMemo(
     () => tasks.filter((t) => inScope(t.listId) && inDateWindow(t.dueDate)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, scope, filterDate, scopeGroups]
+    [tasks, scope, rangeFrom, rangeTo, scopeGroups]
   );
 
   const filteredChecklist = useMemo(
@@ -121,7 +109,7 @@ function TeamPerformanceInner() {
         (c) => inScope(templateListMap[c.templateId] ?? "") && inDateWindow(c.date)
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [checklistInstances, templateListMap, scope, filterDate, scopeGroups]
+    [checklistInstances, templateListMap, scope, rangeFrom, rangeTo, scopeGroups]
   );
 
   interface DoerStat {
@@ -317,23 +305,34 @@ function TeamPerformanceInner() {
 
           {/* Filters & Timeframe */}
           <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">Timeframe:</span>
-              <div className="flex gap-2">
-                {(["All", "Today", "ThisWeek", "ThisMonth"] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setFilterDate(t)}
-                    className={`px-3 py-1 border text-xs font-label-sm uppercase transition-colors cursor-pointer ${
-                      filterDate === t
-                        ? "bg-on-surface text-surface border-on-surface"
-                        : "border-on-surface hover:bg-surface-container"
-                    }`}
-                  >
-                    {t === "ThisWeek" ? "This Week" : t === "ThisMonth" ? "This Month" : t === "All" ? "All Time" : t}
-                  </button>
-                ))}
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">From:</span>
+              <input
+                type="date"
+                value={rangeFrom}
+                max={rangeTo || undefined}
+                onChange={(e) => setRangeFrom(e.target.value)}
+                className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+              />
+              <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">To:</span>
+              <input
+                type="date"
+                value={rangeTo}
+                min={rangeFrom || undefined}
+                onChange={(e) => setRangeTo(e.target.value)}
+                className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+              />
+              {(rangeFrom || rangeTo) && (
+                <button
+                  onClick={() => {
+                    setRangeFrom("");
+                    setRangeTo("");
+                  }}
+                  className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
