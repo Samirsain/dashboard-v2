@@ -217,6 +217,7 @@ export interface ActivityLog {
 export interface JwtClaims {
   sub: string; // user id
   email: string;
+  employeeCode?: string;
   role: UserRole;
   /** Mirrors User.canViewAll so list endpoints can filter without a DB lookup. */
   canViewAll?: boolean;

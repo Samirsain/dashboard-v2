@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/AppError";
+import { canCreateTask } from "../utils/access";
 import type { UserRole } from "../types";
 
 /** Restricts a route to one or more roles. Must run after requireAuth. */
@@ -15,6 +16,19 @@ export function requireRole(...roles: UserRole[]) {
     }
     next();
   };
+}
+
+/** Restricts a route to whoever canCreateTask allows (Admin, or hardcoded full-task-access codes). */
+export function requireTaskCreateAccess(req: Request, _res: Response, next: NextFunction): void {
+  if (!req.user) {
+    next(AppError.unauthorized());
+    return;
+  }
+  if (!canCreateTask(req.user)) {
+    next(AppError.forbidden("Only Admin can create tasks."));
+    return;
+  }
+  next();
 }
 
 /**

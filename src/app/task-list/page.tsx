@@ -11,6 +11,7 @@ import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessAllTasks } from "@/lib/access";
 import type { Doer, List, Task } from "@/lib/types";
 
 function isUrgentPriority(priority: Task["priority"]): boolean {
@@ -28,8 +29,7 @@ function TaskListInner() {
   const [search, setSearch] = useState("");
   const [doerFilter, setDoerFilter] = useState("");
   const { user } = useAuth();
-  const canCreateTasks =
-    user?.role === "Admin";
+  const canCreateTasks = canAccessAllTasks(user);
 
   async function loadData() {
     setLoading(true);

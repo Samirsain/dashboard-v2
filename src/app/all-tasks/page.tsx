@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { nextChecklistDueDate } from "@/lib/checklistSchedule";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessAllTasks } from "@/lib/access";
 import type { ChecklistInstance, ChecklistTemplate, Doer, List, Task } from "@/lib/types";
 
 type Tab = "tasks" | "checklist";
@@ -571,7 +572,7 @@ function AllTasksInner() {
 export default function AllTasksPage() {
   const { user } = useAuth();
 
-  if (user && user.role !== "Admin") {
+  if (user && !canAccessAllTasks(user)) {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
