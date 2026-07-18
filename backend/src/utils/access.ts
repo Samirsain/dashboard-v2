@@ -44,11 +44,13 @@ export function canCreateTask(user: JwtClaims | undefined): boolean {
  * Who can mark attendance for other employees:
  *  - Admin — always, by role.
  *  - Whoever is flagged isAttendanceManager (a doer designated by an admin).
+ *  - Anyone on the hardcoded full-task-access list.
  *
  * Everyone else is read-only on attendance (their own record only).
  */
 export function canMarkAttendance(user: JwtClaims | undefined): boolean {
   if (!user) return false;
   if (user.role === "Admin") return true;
+  if (hasHardcodedFullTaskAccess(user)) return true;
   return user.isAttendanceManager === true;
 }

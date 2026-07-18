@@ -18,3 +18,11 @@ export function canAccessAllTasks(user: Doer | null | undefined): boolean {
   if (user.role === "Admin") return true;
   return hasHardcodedFullTaskAccess(user);
 }
+
+/** Who is allowed to mark attendance for every employee. */
+export function canMarkAttendance(user: Doer | null | undefined): boolean {
+  if (!user) return false;
+  if (user.role === "Admin") return true;
+  if (hasHardcodedFullTaskAccess(user)) return true;
+  return user.isAttendanceManager === true;
+}

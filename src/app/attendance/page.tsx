@@ -8,6 +8,7 @@ import InitialsAvatar from "@/components/InitialsAvatar";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { canMarkAttendance } from "@/lib/access";
 import type { Attendance, AttendanceDayRow, AttendanceRangeRow } from "@/lib/types";
 
 function todayIso(): string {
@@ -450,7 +451,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
 
 function AttendanceInner() {
   const { user } = useAuth();
-  const isMarker = user?.role === "Admin" || user?.isAttendanceManager === true;
+  const isMarker = canMarkAttendance(user);
 
   return (
     <>
