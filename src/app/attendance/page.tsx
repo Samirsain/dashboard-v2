@@ -26,8 +26,6 @@ function formatClockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
-const STATUS_OPTIONS: AttendanceStatus[] = ["Present", "Late", "Half Day", "Absent", "Leave"];
-
 const STATUS_STYLES: Record<string, string> = {
   Present: "bg-primary/20 text-on-surface",
   Late: "bg-yellow-100 text-on-surface",
@@ -144,7 +142,6 @@ function EmployeeView() {
 function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   const [date, setDate] = useState(todayIso());
   const [rows, setRows] = useState<AttendanceDayRow[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -158,7 +155,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     try {
       const data = await api.get<AttendanceDayRow[]>(`/attendance/day?date=${date}`);
       setRows(data);
-      setSelected(new Set());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load attendance.");
     } finally {
@@ -187,40 +183,12 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
       Absent: 0,
       Leave: 0,
     };
-    let currentlyWorking = 0;
     for (const r of rows) {
       const s = r.attendance?.status;
       if (s) counts[s]++;
-      if (r.attendance?.checkIn && !r.attendance?.checkOut) currentlyWorking++;
     }
-    return { ...counts, currentlyWorking, total: rows.length };
+    return { ...counts, total: rows.length };
   }, [rows]);
-
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    setSelected((prev) => (prev.size === filteredRows.length ? new Set() : new Set(filteredRows.map((r) => r.employee.id))));
-  }
-
-  async function bulkMark(status: AttendanceStatus) {
-    if (selected.size === 0) return;
-    setBusy(true);
-    try {
-      await api.post("/attendance/mark", { employeeIds: Array.from(selected), date, status });
-      await load();
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to mark attendance.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleCheckIn(employeeId: string) {
     setBusy(true);
@@ -262,7 +230,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {/* Overview cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {[
           ["Total", summary.total],
           ["Present", summary.Present],
@@ -270,7 +238,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           ["Half Day", summary["Half Day"]],
           ["Leave", summary.Leave],
           ["Absent", summary.Absent],
-          ["Working Now", summary.currentlyWorking],
         ].map(([label, value]) => (
           <div key={label as string} className="bg-surface-container-lowest border-2 border-on-surface p-3">
             <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">{label}</p>
@@ -302,38 +269,10 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         />
       </div>
 
-      {/* Bulk actions */}
-      {editable && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-            {selected.size} selected
-          </span>
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s}
-              disabled={selected.size === 0 || busy}
-              onClick={() => bulkMark(s)}
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40"
-            >
-              Mark {s}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[1000px]">
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
             <tr>
-              {editable && (
-                <th className="py-3 px-4 border-r border-surface-variant w-10">
-                  <input
-                    type="checkbox"
-                    checked={selected.size > 0 && selected.size === filteredRows.length}
-                    onChange={toggleAll}
-                  />
-                </th>
-              )}
               <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
               <th className="py-3 px-4 border-r border-surface-variant">Department</th>
               <th className="py-3 px-4 border-r border-surface-variant">Status</th>
@@ -346,25 +285,20 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           <tbody className="font-body-md text-body-md text-on-surface">
             {loading && (
               <tr>
-                <td colSpan={8} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   Loading...
                 </td>
               </tr>
             )}
             {!loading && filteredRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   No employees found.
                 </td>
               </tr>
             )}
             {filteredRows.map(({ employee, attendance }) => (
               <tr key={employee.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
-                {editable && (
-                  <td className="py-2 px-4 border-r border-surface-variant">
-                    <input type="checkbox" checked={selected.has(employee.id)} onChange={() => toggle(employee.id)} />
-                  </td>
-                )}
                 <td className="py-2 px-4 border-r border-surface-variant">
                   <div className="flex items-center gap-2">
                     <InitialsAvatar name={employee.name} className="w-6 h-6 border border-on-surface" />
