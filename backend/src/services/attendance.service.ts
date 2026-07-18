@@ -202,4 +202,9 @@ export const attendanceService = {
       })
       .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
   },
+
+  /** Permanently deletes every attendance record for every employee/date. Irreversible. */
+  async clearAll(): Promise<number> {
+    return dataService.deleteAll(entity);
+  },
 };

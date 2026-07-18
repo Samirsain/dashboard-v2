@@ -116,4 +116,15 @@ export const dataService = {
       throw AppError.notFound(`No record with ${entity.idColumn} "${id}" in "${entity.table}".`);
     }
   },
+
+  /** Deletes every row in the entity's table. Irreversible — used only for explicit admin "clear all" actions. */
+  async deleteAll(entity: SheetEntityConfig): Promise<number> {
+    const { data, error } = await getSupabase()
+      .from(entity.table)
+      .delete()
+      .not(idColumnName(entity), "is", null)
+      .select(idColumnName(entity));
+    if (error) fail(`deleteAll(${entity.table})`, error);
+    return data?.length ?? 0;
+  },
 };

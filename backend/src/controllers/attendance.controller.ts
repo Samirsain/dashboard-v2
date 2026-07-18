@@ -82,4 +82,11 @@ export const attendanceController = {
     assertEditableDate(req, targetDate);
     ok(res, await attendanceService.setRemarks(employeeId, targetDate, remarks, req.user!.sub));
   }),
+
+  // Admin-only (enforced by requireRole("Admin") on the route) — permanently
+  // wipes every attendance record for every employee/date.
+  clearAll: asyncHandler(async (_req: Request, res: Response) => {
+    const deleted = await attendanceService.clearAll();
+    ok(res, { deleted });
+  }),
 };

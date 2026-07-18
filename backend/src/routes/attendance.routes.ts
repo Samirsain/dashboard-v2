@@ -2,6 +2,7 @@ import { Router } from "express";
 import { attendanceController } from "../controllers/attendance.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/role.middleware";
 import {
   attendanceDateQuerySchema,
   attendanceRangeQuerySchema,
@@ -25,5 +26,7 @@ router.post("/mark", validate({ body: markStatusSchema }), attendanceController.
 router.post("/check-in", validate({ body: checkInOutSchema }), attendanceController.checkIn);
 router.post("/check-out", validate({ body: checkInOutSchema }), attendanceController.checkOut);
 router.patch("/remarks", validate({ body: remarksSchema }), attendanceController.setRemarks);
+// Irreversible — wipes every attendance record for every employee/date. Admin only.
+router.delete("/all", requireRole("Admin"), attendanceController.clearAll);
 
 export default router;
