@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessAllTasks } from "@/lib/access";
 import BrandLogo from "@/components/BrandLogo";
 import GoogleFormsIcon from "@/components/GoogleFormsIcon";
 
@@ -76,15 +77,19 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Attendance</span>
         </Link>
 
+        {/* All Tasks: Admin, plus hardcoded full-task-access codes. */}
+        {canAccessAllTasks(user) && (
+          <Link href="/all-tasks" className={active === "all-tasks" ? linkActive : linkBase}>
+            <span className="material-symbols-outlined" data-icon="fact_check">
+              fact_check
+            </span>
+            <span className={labelCls}>All Tasks</span>
+          </Link>
+        )}
+
         {/* Admin-only */}
         {user?.role === "Admin" && (
           <>
-            <Link href="/all-tasks" className={active === "all-tasks" ? linkActive : linkBase}>
-              <span className="material-symbols-outlined" data-icon="fact_check">
-                fact_check
-              </span>
-              <span className={labelCls}>All Tasks</span>
-            </Link>
             <Link
               href="/team-performance"
               className={active === "team-performance" ? linkActive : linkBase}

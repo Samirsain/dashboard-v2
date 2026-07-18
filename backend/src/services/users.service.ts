@@ -21,6 +21,7 @@ function toUser(record: SheetRecord): User {
     status: (record["Status"] as UserStatus) || "Active",
     canViewAll: (record["Can View All"] ?? "").toLowerCase() === "true",
     isAttendanceManager: (record["Is Attendance Manager"] ?? "").toLowerCase() === "true",
+    isAssistant: (record["Is Assistant"] ?? "").toLowerCase() === "true",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -92,6 +93,7 @@ export const usersService = {
       Status: input.status,
       "Can View All": "false",
       "Is Attendance Manager": "false",
+      "Is Assistant": "false",
       PasswordHash: passwordHash,
       CreatedAt: todayIso(),
     };
@@ -113,6 +115,7 @@ export const usersService = {
         | "status"
         | "employeeCode"
         | "isAttendanceManager"
+        | "isAssistant"
       >
     >
   ): Promise<User> {
@@ -126,6 +129,8 @@ export const usersService = {
     if (updates.employeeCode !== undefined) patch["Employee Code"] = updates.employeeCode;
     if (updates.isAttendanceManager !== undefined)
       patch["Is Attendance Manager"] = String(updates.isAttendanceManager);
+    if (updates.isAssistant !== undefined)
+      patch["Is Assistant"] = String(updates.isAssistant);
 
     const saved = await dataService.updateById(entity, id, patch);
     return toUser(saved);

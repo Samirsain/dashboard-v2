@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessAllTasks } from "@/lib/access";
 import { api } from "@/lib/api";
 import type { List } from "@/lib/types";
 
@@ -150,11 +151,13 @@ export default function MobileHeader() {
                 Attendance
               </Link>
 
+              {canAccessAllTasks(user) && (
+                <Link href="/all-tasks" className={rowFor("/all-tasks")}>
+                  All Tasks
+                </Link>
+              )}
               {isAdmin && (
                 <>
-                  <Link href="/all-tasks" className={rowFor("/all-tasks")}>
-                    All Tasks
-                  </Link>
                   <Link href="/team-performance" className={rowFor("/team-performance")}>
                     Team Performance
                   </Link>

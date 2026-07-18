@@ -145,14 +145,28 @@ function SettingsInner() {
     }
   }
 
-  async function toggleAttendanceManager(doer: Doer) {
-    const next = !doer.isAttendanceManager;
-    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, isAttendanceManager: next } : d)));
+  async function handleRoleChange(doer: Doer, nextRole: Doer["role"]) {
+    if (nextRole === doer.role) return;
+    const prevRole = doer.role;
+    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, role: nextRole } : d)));
     try {
-      await api.patch<Doer>(`/users/${doer.id}`, { isAttendanceManager: next });
+      await api.patch<Doer>(`/users/${doer.id}`, { role: nextRole });
     } catch (err) {
-      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, isAttendanceManager: !next } : d)));
-      alert(err instanceof ApiError ? err.message : "Failed to update Attendance Manager.");
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, role: prevRole } : d)));
+      alert(err instanceof ApiError ? err.message : "Failed to update role.");
+    }
+  }
+
+  async function handleRename(doer: Doer) {
+    const nextName = prompt(`Rename ${doer.name} to:`, doer.name)?.trim();
+    if (!nextName || nextName === doer.name) return;
+    const prevName = doer.name;
+    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, name: nextName } : d)));
+    try {
+      await api.patch<Doer>(`/users/${doer.id}`, { name: nextName });
+    } catch (err) {
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, name: prevName } : d)));
+      alert(err instanceof ApiError ? err.message : "Failed to rename.");
     }
   }
 
@@ -237,21 +251,20 @@ function SettingsInner() {
                   <th className="py-3 px-4 border-r border-surface-variant w-32">User ID</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
-                  <th className="py-3 px-4 border-r border-surface-variant w-36 text-center">Attendance Mgr</th>
-                  <th className="py-3 px-4 w-56 text-center">Action</th>
+                  <th className="py-3 px-4 w-64 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && doers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No doers found.
                     </td>
                   </tr>
@@ -268,7 +281,15 @@ function SettingsInner() {
                       {d.employeeCode || "—"}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <span className="font-label-sm text-label-sm uppercase">{d.role}</span>
+                      <select
+                        value={d.role}
+                        onChange={(e) => handleRoleChange(d, e.target.value as Doer["role"])}
+                        title="Admin gets full access (Settings, Team Performance, All Tasks)"
+                        className="border-2 border-on-surface bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                      >
+                        <option value="Doer">Doer</option>
+                        <option value="Admin">Admin</option>
+                      </select>
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant align-top">
                       {(() => {
@@ -324,28 +345,29 @@ function SettingsInner() {
                         );
                       })()}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <input
-                        type="checkbox"
-                        checked={d.isAttendanceManager}
-                        onChange={() => toggleAttendanceManager(d)}
-                        title="Can mark attendance for every employee"
-                      />
-                    </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleRename(d)}
+                          className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                        >
+                          Rename
+                        </button>
                         <button
                           onClick={() => setDoerToReset(d)}
                           className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
                         >
                           Reset Password
                         </button>
-                        <button
-                          onClick={() => handleDelete(d)}
-                          className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                        >
-                          Delete
-                        </button>
+                        {/* Assistant admins can't delete doers. */}
+                        {!currentUser?.isAssistant && (
+                          <button
+                            onClick={() => handleDelete(d)}
+                            className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

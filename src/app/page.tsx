@@ -8,6 +8,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessAllTasks } from "@/lib/access";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
@@ -142,12 +143,11 @@ function DashboardInner() {
   }
 
   const isPrivileged = user?.role === "Admin";
-  const canCreateTasks = user?.role === "Admin";
+  const canCreateTasks = canAccessAllTasks(user);
   const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "Admin");
   const taskLists = lists.filter((l) => l.type === "task");
   const checklistLists = lists.filter((l) => l.type === "checklist");
-  const showDoerColumn =
-    user?.role === "Admin" || user?.employeeCode?.toUpperCase() === "TM03";
+  const showDoerColumn = canAccessAllTasks(user);
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
 
   /** "Office" for no list, else the list's group name (e.g. "SAHIL"). */

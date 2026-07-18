@@ -20,9 +20,11 @@ export const authService = {
     const token = signToken({
       sub: user.id,
       email: user.email,
+      employeeCode: user.employeeCode,
       role: user.role,
       canViewAll: user.canViewAll,
       isAttendanceManager: user.isAttendanceManager,
+      isAssistant: user.isAssistant,
     });
     return { token, user: publicUser };
   },
@@ -42,9 +44,11 @@ export const authService = {
     const token = signToken({
       sub: user.id,
       email: user.email,
+      employeeCode: user.employeeCode,
       role: user.role,
       canViewAll: user.canViewAll,
       isAttendanceManager: user.isAttendanceManager,
+      isAssistant: user.isAssistant,
     });
     return { token, user };
   },

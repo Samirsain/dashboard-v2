@@ -8,7 +8,8 @@ import InitialsAvatar from "@/components/InitialsAvatar";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import type { Attendance, AttendanceDayRow, AttendanceStatus } from "@/lib/types";
+import { canMarkAttendance } from "@/lib/access";
+import type { Attendance, AttendanceDayRow, AttendanceRangeRow } from "@/lib/types";
 
 function todayIso(): string {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -25,8 +26,6 @@ function formatClockTime(iso: string): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
-
-const STATUS_OPTIONS: AttendanceStatus[] = ["Present", "Late", "Half Day", "Absent", "Leave"];
 
 const STATUS_STYLES: Record<string, string> = {
   Present: "bg-primary/20 text-on-surface",
@@ -53,6 +52,8 @@ function EmployeeView() {
   const [history, setHistory] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -66,6 +67,10 @@ function EmployeeView() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load attendance."))
       .finally(() => setLoading(false));
   }, []);
+
+  const filteredHistory = useMemo(() => {
+    return history.filter((r) => (!rangeFrom || r.date >= rangeFrom) && (!rangeTo || r.date <= rangeTo));
+  }, [history, rangeFrom, rangeTo]);
 
   return (
     <div className="flex flex-col gap-stack-lg">
@@ -105,6 +110,36 @@ function EmployeeView() {
         </p>
       </div>
 
+      <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center gap-3">
+        <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
+        <input
+          type="date"
+          value={rangeFrom}
+          max={rangeTo || undefined}
+          onChange={(e) => setRangeFrom(e.target.value)}
+          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+        />
+        <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
+        <input
+          type="date"
+          value={rangeTo}
+          min={rangeFrom || undefined}
+          onChange={(e) => setRangeTo(e.target.value)}
+          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+        />
+        {(rangeFrom || rangeTo) && (
+          <button
+            onClick={() => {
+              setRangeFrom("");
+              setRangeTo("");
+            }}
+            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[640px]">
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
@@ -117,14 +152,14 @@ function EmployeeView() {
             </tr>
           </thead>
           <tbody className="font-body-md text-body-md text-on-surface">
-            {!loading && history.length === 0 && (
+            {!loading && filteredHistory.length === 0 && (
               <tr>
                 <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   No attendance history yet.
                 </td>
               </tr>
             )}
-            {history.map((r) => (
+            {filteredHistory.map((r) => (
               <tr key={r.id} className="border-b border-surface-variant last:border-b-0">
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatDMY(r.date)}</td>
                 <td className="py-2 px-4 border-r border-surface-variant"><StatusPill status={r.status} /></td>
@@ -144,11 +179,16 @@ function EmployeeView() {
 function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   const [date, setDate] = useState(todayIso());
   const [rows, setRows] = useState<AttendanceDayRow[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+  const [rangeRows, setRangeRows] = useState<AttendanceRangeRow[]>([]);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
 
   const editable = isAdmin || date === todayIso();
 
@@ -158,7 +198,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     try {
       const data = await api.get<AttendanceDayRow[]>(`/attendance/day?date=${date}`);
       setRows(data);
-      setSelected(new Set());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load attendance.");
     } finally {
@@ -179,48 +218,23 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     return rows.filter((r) => r.employee.name.toLowerCase().includes(q) || r.employee.department.toLowerCase().includes(q));
   }, [rows, search]);
 
-  const summary = useMemo(() => {
-    const counts: Record<AttendanceStatus, number> = {
-      Present: 0,
-      Late: 0,
-      "Half Day": 0,
-      Absent: 0,
-      Leave: 0,
-    };
-    let currentlyWorking = 0;
-    for (const r of rows) {
-      const s = r.attendance?.status;
-      if (s) counts[s]++;
-      if (r.attendance?.checkIn && !r.attendance?.checkOut) currentlyWorking++;
-    }
-    return { ...counts, currentlyWorking, total: rows.length };
-  }, [rows]);
-
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  useEffect(() => {
+    queueMicrotask(async () => {
+      if (!rangeFrom || !rangeTo) {
+        setRangeRows([]);
+        return;
+      }
+      setRangeLoading(true);
+      setRangeError(null);
+      try {
+        setRangeRows(await api.get<AttendanceRangeRow[]>(`/attendance/range?from=${rangeFrom}&to=${rangeTo}`));
+      } catch (err) {
+        setRangeError(err instanceof ApiError ? err.message : "Failed to load range report.");
+      } finally {
+        setRangeLoading(false);
+      }
     });
-  }
-
-  function toggleAll() {
-    setSelected((prev) => (prev.size === filteredRows.length ? new Set() : new Set(filteredRows.map((r) => r.employee.id))));
-  }
-
-  async function bulkMark(status: AttendanceStatus) {
-    if (selected.size === 0) return;
-    setBusy(true);
-    try {
-      await api.post("/attendance/mark", { employeeIds: Array.from(selected), date, status });
-      await load();
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to mark attendance.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  }, [rangeFrom, rangeTo]);
 
   async function handleCheckIn(employeeId: string) {
     setBusy(true);
@@ -246,12 +260,28 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  async function handleRemarks(employeeId: string, remarks: string) {
+  async function handleClearAll() {
+    const confirmed = confirm(
+      "⚠️ This will PERMANENTLY DELETE every attendance record for every employee — every date, every status, every check-in/check-out. This cannot be undone.\n\nAre you absolutely sure you want to clear ALL attendance data?"
+    );
+    if (!confirmed) return;
+    const typed = prompt('This is irreversible. Type "DELETE ALL" (without quotes) to confirm.');
+    if (typed !== "DELETE ALL") {
+      alert("Cancelled — text didn't match. No data was deleted.");
+      return;
+    }
+    setClearingAll(true);
     try {
-      await api.patch("/attendance/remarks", { employeeId, date, remarks });
+      await api.delete("/attendance/all");
+      setRangeFrom("");
+      setRangeTo("");
+      setRangeRows([]);
       await load();
+      alert("All attendance records have been cleared.");
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to save remarks.");
+      alert(err instanceof ApiError ? err.message : "Failed to clear attendance.");
+    } finally {
+      setClearingAll(false);
     }
   }
 
@@ -260,24 +290,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
       {error && (
         <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
       )}
-
-      {/* Overview cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        {[
-          ["Total", summary.total],
-          ["Present", summary.Present],
-          ["Late", summary.Late],
-          ["Half Day", summary["Half Day"]],
-          ["Leave", summary.Leave],
-          ["Absent", summary.Absent],
-          ["Working Now", summary.currentlyWorking],
-        ].map(([label, value]) => (
-          <div key={label as string} className="bg-surface-container-lowest border-2 border-on-surface p-3">
-            <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">{label}</p>
-            <p className="font-headline-md text-headline-md text-on-surface">{value}</p>
-          </div>
-        ))}
-      </div>
 
       {/* Filters */}
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center justify-between gap-4">
@@ -294,6 +306,36 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">(view only — past date)</span>
           )}
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
+          <input
+            type="date"
+            value={rangeFrom}
+            max={rangeTo || todayIso()}
+            onChange={(e) => setRangeFrom(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
+          <input
+            type="date"
+            value={rangeTo}
+            min={rangeFrom || undefined}
+            max={todayIso()}
+            onChange={(e) => setRangeTo(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          {(rangeFrom || rangeTo) && (
+            <button
+              onClick={() => {
+                setRangeFrom("");
+                setRangeTo("");
+              }}
+              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -302,22 +344,19 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         />
       </div>
 
-      {/* Bulk actions */}
-      {editable && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-            {selected.size} selected
-          </span>
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s}
-              disabled={selected.size === 0 || busy}
-              onClick={() => bulkMark(s)}
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40"
-            >
-              Mark {s}
-            </button>
-          ))}
+      {/* Danger zone — Admin only, permanently wipes every attendance record. */}
+      {isAdmin && (
+        <div className="bg-error/10 border-2 border-error p-4 flex flex-wrap items-center justify-between gap-4">
+          <p className="font-label-sm text-label-sm uppercase text-error">
+            ⚠️ Danger Zone — this permanently deletes ALL attendance records for every employee and date.
+          </p>
+          <button
+            disabled={clearingAll}
+            onClick={handleClearAll}
+            className="px-3 py-1.5 border-2 border-error bg-error text-on-error font-label-sm text-label-sm uppercase hover:bg-error/80 transition-colors disabled:opacity-40"
+          >
+            {clearingAll ? "Clearing..." : "Clear All Attendance"}
+          </button>
         </div>
       )}
 
@@ -325,70 +364,39 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         <table className="w-full text-left border-collapse min-w-[1000px]">
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
             <tr>
-              {editable && (
-                <th className="py-3 px-4 border-r border-surface-variant w-10">
-                  <input
-                    type="checkbox"
-                    checked={selected.size > 0 && selected.size === filteredRows.length}
-                    onChange={toggleAll}
-                  />
-                </th>
-              )}
               <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
-              <th className="py-3 px-4 border-r border-surface-variant">Department</th>
               <th className="py-3 px-4 border-r border-surface-variant">Status</th>
               <th className="py-3 px-4 border-r border-surface-variant">Check-In</th>
               <th className="py-3 px-4 border-r border-surface-variant">Check-Out</th>
-              <th className="py-3 px-4 border-r border-surface-variant">Remarks</th>
               {editable && <th className="py-3 px-4">Actions</th>}
             </tr>
           </thead>
           <tbody className="font-body-md text-body-md text-on-surface">
             {loading && (
               <tr>
-                <td colSpan={8} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   Loading...
                 </td>
               </tr>
             )}
             {!loading && filteredRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                   No employees found.
                 </td>
               </tr>
             )}
             {filteredRows.map(({ employee, attendance }) => (
               <tr key={employee.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
-                {editable && (
-                  <td className="py-2 px-4 border-r border-surface-variant">
-                    <input type="checkbox" checked={selected.has(employee.id)} onChange={() => toggle(employee.id)} />
-                  </td>
-                )}
                 <td className="py-2 px-4 border-r border-surface-variant">
                   <div className="flex items-center gap-2">
                     <InitialsAvatar name={employee.name} className="w-6 h-6 border border-on-surface" />
                     <span className="font-medium">{employee.name}</span>
                   </div>
                 </td>
-                <td className="py-2 px-4 border-r border-surface-variant">{employee.department}</td>
                 <td className="py-2 px-4 border-r border-surface-variant"><StatusPill status={attendance?.status ?? ""} /></td>
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(attendance?.checkIn ?? "")}</td>
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(attendance?.checkOut ?? "")}</td>
-                <td className="py-2 px-4 border-r border-surface-variant">
-                  {editable ? (
-                    <input
-                      defaultValue={attendance?.remarks ?? ""}
-                      onBlur={(e) => {
-                        if (e.target.value !== (attendance?.remarks ?? "")) handleRemarks(employee.id, e.target.value);
-                      }}
-                      placeholder="—"
-                      className="w-full border border-surface-variant bg-surface px-2 py-1 font-data-mono text-xs text-on-surface focus:outline-none focus:border-on-surface"
-                    />
-                  ) : (
-                    <span className="font-data-mono text-xs text-on-surface-variant">{attendance?.remarks || "—"}</span>
-                  )}
-                </td>
                 {editable && (
                   <td className="py-2 px-4">
                     <div className="flex items-center gap-2">
@@ -414,13 +422,78 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           </tbody>
         </table>
       </div>
+
+      {/* Range report — driven by the From/To pickers in the filter bar above */}
+      {(rangeFrom || rangeTo) && (
+      <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
+        <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Date Range Report</h3>
+
+        {rangeError && (
+          <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{rangeError}</p>
+        )}
+
+        {!rangeFrom || !rangeTo ? (
+          <p className="font-data-mono text-data-mono text-on-surface-variant">
+            Pick a From and To date to see per-employee totals for that range.
+          </p>
+        ) : (
+          <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[720px]">
+              <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+                <tr>
+                  <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Present</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Late</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Half Day</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Absent</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Leave</th>
+                  <th className="py-3 px-4">Total Marked</th>
+                </tr>
+              </thead>
+              <tbody className="font-body-md text-body-md text-on-surface">
+                {rangeLoading && (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      Loading...
+                    </td>
+                  </tr>
+                )}
+                {!rangeLoading && rangeRows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      No data for this range.
+                    </td>
+                  </tr>
+                )}
+                {rangeRows.map(({ employee, counts, totalMarked }) => (
+                  <tr key={employee.id} className="border-b border-surface-variant last:border-b-0">
+                    <td className="py-2 px-4 border-r border-surface-variant">
+                      <div className="flex items-center gap-2">
+                        <InitialsAvatar name={employee.name} className="w-6 h-6 border border-on-surface" />
+                        <span className="font-medium">{employee.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Present}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Late}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts["Half Day"]}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Absent}</td>
+                    <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{counts.Leave}</td>
+                    <td className="py-2 px-4 font-data-mono text-data-mono">{totalMarked}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      )}
     </div>
   );
 }
 
 function AttendanceInner() {
   const { user } = useAuth();
-  const isMarker = user?.role === "Admin" || user?.isAttendanceManager === true;
+  const isMarker = canMarkAttendance(user);
 
   return (
     <>

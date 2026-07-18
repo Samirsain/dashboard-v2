@@ -5,7 +5,13 @@ import { attendanceService } from "../services/attendance.service";
 import { canMarkAttendance } from "../utils/access";
 import { todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
-import type { AttendanceDateQuery, MarkStatusInput, CheckInOutInput, RemarksInput } from "../validation/attendance.schema";
+import type {
+  AttendanceDateQuery,
+  AttendanceRangeQuery,
+  MarkStatusInput,
+  CheckInOutInput,
+  RemarksInput,
+} from "../validation/attendance.schema";
 
 /** Attendance Managers (non-Admin) may only mark/edit today's attendance. */
 function assertEditableDate(req: Request, date: string): void {
@@ -39,6 +45,12 @@ export const attendanceController = {
     ok(res, await attendanceService.day(date ?? todayIso()));
   }),
 
+  range: asyncHandler(async (req: Request, res: Response) => {
+    requireMarker(req);
+    const { from, to } = req.query as unknown as AttendanceRangeQuery;
+    ok(res, await attendanceService.range(from, to));
+  }),
+
   markStatus: asyncHandler(async (req: Request, res: Response) => {
     requireMarker(req);
     const { employeeIds, date, status } = req.body as MarkStatusInput;
@@ -69,5 +81,12 @@ export const attendanceController = {
     const targetDate = date ?? todayIso();
     assertEditableDate(req, targetDate);
     ok(res, await attendanceService.setRemarks(employeeId, targetDate, remarks, req.user!.sub));
+  }),
+
+  // Admin-only (enforced by requireRole("Admin") on the route) — permanently
+  // wipes every attendance record for every employee/date.
+  clearAll: asyncHandler(async (_req: Request, res: Response) => {
+    const deleted = await attendanceService.clearAll();
+    ok(res, { deleted });
   }),
 };

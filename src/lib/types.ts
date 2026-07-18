@@ -11,6 +11,8 @@ export interface Doer {
   role: UserRole;
   status: UserStatus;
   isAttendanceManager: boolean;
+  /** Assistant admin: full admin access except deleting doers or tasks. */
+  isAssistant: boolean;
   createdAt: string;
 }
 
@@ -36,6 +38,12 @@ export interface Attendance {
 export interface AttendanceDayRow {
   employee: Doer;
   attendance: Attendance | null;
+}
+
+export interface AttendanceRangeRow {
+  employee: Doer;
+  counts: Record<AttendanceStatus, number>;
+  totalMarked: number;
 }
 
 /** A row in the Master Sheet — free-form documentation of a list/system. */
