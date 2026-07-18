@@ -172,6 +172,25 @@ function WorkflowInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-container-padding flex flex-col gap-stack-lg">
+          {/* Mobile actions (desktop header is hidden below md) */}
+          <div className="md:hidden flex flex-wrap gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setShowCreateTemplate(true)}
+                className="flex-1 border-2 border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+              >
+                + New Template
+              </button>
+            )}
+            <button
+              onClick={() => setShowStartInstance(true)}
+              disabled={templates.length === 0}
+              className="flex-1 border-2 border-on-surface bg-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
+            >
+              + Start Workflow
+            </button>
+          </div>
+
           {error && (
             <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
               {error}

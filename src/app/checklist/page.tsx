@@ -152,7 +152,14 @@ function ChecklistInner() {
 
         {/* Page Content */}
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
-          <div className="flex justify-between items-end border-b-2 border-on-surface pb-stack-md">
+          {/* Mobile search (desktop header is hidden below md) */}
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="SEARCH CHECKLIST..."
+            className="md:hidden w-full border-2 border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant focus:outline-none"
+          />
+          <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md">
             <div>
               <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
                 {currentList ? currentList.name : "Daily Checklist"}
