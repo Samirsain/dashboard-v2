@@ -304,6 +304,18 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  async function handleMarkStatus(employeeId: string, status: string) {
+    setBusy(true);
+    try {
+      await api.post("/attendance/mark", { employeeIds: [employeeId], date, status });
+      await load();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : `Failed to mark ${status}.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleRecompute() {
     if (
       !confirm(
@@ -419,21 +431,36 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(attendance?.checkOut ?? "")}</td>
                 {editable && (
                   <td className="py-2 px-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <button
                         disabled={busy || !!attendance?.checkIn}
                         onClick={() => handleCheckIn(employee.id)}
                         className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
                       >
-                        Check In
+                        In
                       </button>
                       <button
                         disabled={busy || !attendance?.checkIn || !!attendance?.checkOut}
                         onClick={() => handleCheckOut(employee.id)}
                         className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
                       >
-                        Check Out
+                        Out
                       </button>
+                      <span className="w-px h-5 bg-surface-variant mx-0.5" />
+                      {(["Absent", "Leave"] as const).map((s) => (
+                        <button
+                          key={s}
+                          disabled={busy}
+                          onClick={() => handleMarkStatus(employee.id, s)}
+                          className={`px-2 py-1 border-2 font-label-sm text-label-sm uppercase transition-colors disabled:opacity-40 ${
+                            attendance?.status === s
+                              ? "border-on-surface bg-on-surface text-surface"
+                              : "border-on-surface text-on-surface hover:bg-surface-container"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
                     </div>
                   </td>
                 )}
