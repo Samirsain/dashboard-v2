@@ -142,6 +142,52 @@ export const attendanceService = {
     return upsert(employeeId, date, { Remarks: remarks }, markedBy);
   },
 
+  /**
+   * Re-applies the current office-hours policy to every attendance row that
+   * has a CheckIn timestamp, recomputing Status / Late Minutes / Early Exit /
+   * Working Minutes from the recorded times. Rows without a CheckIn (manually
+   * marked Absent/Leave) are left untouched. Returns how many rows changed.
+   */
+  async recomputeAll(markedBy: string): Promise<number> {
+    const records = await dataService.findAll(entity);
+    let updated = 0;
+    for (const r of records) {
+      const checkIn = r["CheckIn"] as string;
+      if (!checkIn) continue;
+
+      const { status: inStatus, lateMinutes } = computeCheckInStatus(new Date(checkIn));
+      let status: AttendanceStatus = inStatus;
+      let earlyExitMinutes = 0;
+      let workingMinutes = Number(r["Working Minutes"] ?? "0") || 0;
+
+      const checkOut = r["CheckOut"] as string;
+      if (checkOut) {
+        const out = computeCheckOutStatus(new Date(checkOut));
+        earlyExitMinutes = Math.max(0, out.earlyExitMinutes);
+        workingMinutes = minutesBetween(checkIn, checkOut);
+        if (out.forcedHalfDay && (status === "Present" || status === "Late")) status = "Half Day";
+        else if (out.forcedLate && status === "Present") status = "Late";
+      }
+
+      const patch: Partial<SheetRecord> = {};
+      if ((r["Status"] ?? "") !== status) patch["Status"] = status;
+      if ((Number(r["Late Minutes"] ?? "0") || 0) !== lateMinutes) patch["Late Minutes"] = String(lateMinutes);
+      if ((Number(r["Early Exit Minutes"] ?? "0") || 0) !== earlyExitMinutes)
+        patch["Early Exit Minutes"] = String(earlyExitMinutes);
+      if ((Number(r["Working Minutes"] ?? "0") || 0) !== workingMinutes)
+        patch["Working Minutes"] = String(workingMinutes);
+
+      if (Object.keys(patch).length === 0) continue;
+      await dataService.updateById(entity, r["Attendance ID"] as string, {
+        ...patch,
+        MarkedBy: markedBy,
+        UpdatedAt: new Date().toISOString(),
+      });
+      updated++;
+    }
+    return updated;
+  },
+
   async today(employeeId: string): Promise<Attendance | null> {
     const row = await findRow(employeeId, todayIso());
     return row ? toAttendance(row) : null;

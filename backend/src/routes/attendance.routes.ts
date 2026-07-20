@@ -28,5 +28,7 @@ router.post("/check-out", validate({ body: checkInOutSchema }), attendanceContro
 router.patch("/remarks", validate({ body: remarksSchema }), attendanceController.setRemarks);
 // Irreversible — wipes every attendance record for every employee/date. Admin only.
 router.delete("/all", requireRole("Admin"), attendanceController.clearAll);
+// Re-applies the current policy to already-marked rows (fixes old statuses). Admin only.
+router.post("/recompute", requireRole("Admin"), attendanceController.recompute);
 
 export default router;
