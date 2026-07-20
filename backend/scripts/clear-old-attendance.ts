@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * One-off script: Deletes ALL attendance records EXCEPT today (2026-07-20).
  *

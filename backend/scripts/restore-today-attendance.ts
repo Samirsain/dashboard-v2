@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * One-off script: Restores the 6 attendance records deleted for 2026-07-20.
  *
@@ -60,7 +61,9 @@ async function main() {
 
     const lateMinutes = rec.status === "Late"
       ? (() => {
-          const [h, m] = rec.checkIn.split(":").map(Number);
+          const parts = rec.checkIn.split(":").map(Number);
+          const h = parts[0] ?? 0;
+          const m = parts[1] ?? 0;
           const checkedInMin = h * 60 + m;
           const threshold = 9 * 60 + 45; // 09:45 threshold
           return Math.max(0, checkedInMin - threshold);

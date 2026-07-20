@@ -447,20 +447,17 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
                         Out
                       </button>
                       <span className="w-px h-5 bg-surface-variant mx-0.5" />
-                      {(["Absent", "Leave"] as const).map((s) => (
-                        <button
-                          key={s}
-                          disabled={busy}
-                          onClick={() => handleMarkStatus(employee.id, s)}
-                          className={`px-2 py-1 border-2 font-label-sm text-label-sm uppercase transition-colors disabled:opacity-40 ${
-                            attendance?.status === s
-                              ? "border-on-surface bg-on-surface text-surface"
-                              : "border-on-surface text-on-surface hover:bg-surface-container"
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
+                      <button
+                        disabled={busy}
+                        onClick={() => handleMarkStatus(employee.id, "Leave")}
+                        className={`px-2 py-1 border-2 font-label-sm text-label-sm uppercase transition-colors disabled:opacity-40 ${
+                          attendance?.status === "Leave"
+                            ? "border-on-surface bg-on-surface text-surface"
+                            : "border-on-surface text-on-surface hover:bg-surface-container"
+                        }`}
+                      >
+                        Leave
+                      </button>
                     </div>
                   </td>
                 )}
