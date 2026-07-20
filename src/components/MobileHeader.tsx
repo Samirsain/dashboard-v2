@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
-import { useHelpTicketAlert } from "@/lib/useTicketAlert";
 import { api } from "@/lib/api";
 import type { List } from "@/lib/types";
 
@@ -22,7 +21,6 @@ function shortListLabel(name: string, type: "task" | "checklist"): string {
  */
 export default function MobileHeader() {
   const { user, logout } = useAuth();
-  const hasTicketAlert = useHelpTicketAlert();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [lists, setLists] = useState<List[]>([]);
@@ -151,12 +149,6 @@ export default function MobileHeader() {
               </Link>
               <Link href="/attendance" className={rowFor("/attendance")}>
                 Attendance
-              </Link>
-              <Link href="/help-ticket" className={`flex items-center justify-between ${rowFor("/help-ticket")}`}>
-                <span>Help Ticket</span>
-                {hasTicketAlert && (
-                  <span className="w-2.5 h-2.5 rounded-full bg-error animate-pulse shrink-0" />
-                )}
               </Link>
 
               {canAccessAllTasks(user) && (
