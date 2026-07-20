@@ -117,9 +117,14 @@ export const attendanceService = {
       throw AppError.conflict("Already checked out for this date.", "ALREADY_CHECKED_OUT");
     }
     const nowIso = new Date().toISOString();
-    const { earlyExitMinutes, forcedHalfDay } = computeCheckOutStatus(new Date());
+    const { earlyExitMinutes, forcedHalfDay, forcedLate } = computeCheckOutStatus(new Date());
     const workingMinutes = minutesBetween(existing["CheckIn"] as string, nowIso);
-    const status: AttendanceStatus = forcedHalfDay ? "Half Day" : (existing["Status"] as AttendanceStatus) || "Present";
+    // Early departure can only make the day worse, never better: before 5 PM
+    // forces Half Day; before 6:15 PM downgrades a Present day to Late.
+    const current = ((existing["Status"] as AttendanceStatus) || "Present") as AttendanceStatus;
+    let status: AttendanceStatus = current;
+    if (forcedHalfDay && (current === "Present" || current === "Late")) status = "Half Day";
+    else if (forcedLate && current === "Present") status = "Late";
     return upsert(
       employeeId,
       date,

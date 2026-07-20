@@ -14,38 +14,48 @@ function minutesSinceMidnight(date: Date, timeZone = env.scheduler.timezone): nu
   return hour * 60 + minute;
 }
 
-// Office hours, in minutes-since-midnight.
-const CHECK_IN_WINDOW_END = 9 * 60 + 45; // 09:45
-const LATE_WINDOW_END = 10 * 60; // 10:00
-const HALF_DAY_WINDOW_END = 14 * 60; // 02:00 PM
-const CHECK_OUT_HALF_DAY_BEFORE = 17 * 60; // 05:00 PM
-const CHECK_OUT_EARLY_EXIT_END = 18 * 60 + 14; // 06:14 PM
-const CHECK_OUT_NORMAL = 18 * 60 + 30; // 06:30 PM
+// Office-hours policy (per the posted notice):
+//   LATE ("L")     — arrival after 9:45 AM, or departure before 6:15 PM.
+//   HALF DAY ("H") — arrival after 11:00 AM, or departure before 5:00 PM.
+//   Absent         — arrival after 2:00 PM (never showed up for real).
+const CHECK_IN_ON_TIME_END = 9 * 60 + 45; // 09:45 AM — arrive by this to be Present
+const CHECK_IN_LATE_END = 11 * 60; // 11:00 AM — after this, arrival is Half Day
+const CHECK_IN_HALF_DAY_END = 14 * 60; // 02:00 PM — after this, arrival counts as Absent
+const CHECK_OUT_HALF_DAY_BEFORE = 17 * 60; // 05:00 PM — leaving earlier forces Half Day
+const CHECK_OUT_LATE_BEFORE = 18 * 60 + 15; // 06:15 PM — leaving earlier downgrades Present to Late
 
 export type CheckInStatus = "Present" | "Late" | "Half Day" | "Absent";
 
 /** Check-in status + how many minutes late (0 unless Late/Half Day/Absent), from the office-hours policy. */
 export function computeCheckInStatus(date: Date): { status: CheckInStatus; lateMinutes: number } {
   const mins = minutesSinceMidnight(date);
-  if (mins <= CHECK_IN_WINDOW_END) return { status: "Present", lateMinutes: 0 };
-  if (mins <= LATE_WINDOW_END) return { status: "Late", lateMinutes: mins - CHECK_IN_WINDOW_END };
-  if (mins <= HALF_DAY_WINDOW_END) return { status: "Half Day", lateMinutes: mins - CHECK_IN_WINDOW_END };
-  return { status: "Absent", lateMinutes: mins - CHECK_IN_WINDOW_END };
+  if (mins <= CHECK_IN_ON_TIME_END) return { status: "Present", lateMinutes: 0 };
+  if (mins <= CHECK_IN_LATE_END) return { status: "Late", lateMinutes: mins - CHECK_IN_ON_TIME_END };
+  if (mins <= CHECK_IN_HALF_DAY_END)
+    return { status: "Half Day", lateMinutes: mins - CHECK_IN_ON_TIME_END };
+  return { status: "Absent", lateMinutes: mins - CHECK_IN_ON_TIME_END };
 }
 
-/** Minutes left early (0 if on/after 06:30 PM) + whether it forces the day to Half Day (checkout before 5 PM). */
+/**
+ * Check-out effect on the day, per the notice:
+ *  - before 5:00 PM  -> forces the day to Half Day
+ *  - before 6:15 PM  -> forces at least Late (a Present day becomes Late)
+ *  - 6:15 PM onwards -> no penalty
+ * earlyExitMinutes is how many minutes before 6:15 PM the person left (0 if on time).
+ */
 export function computeCheckOutStatus(date: Date): {
   earlyExitMinutes: number;
   forcedHalfDay: boolean;
+  forcedLate: boolean;
 } {
   const mins = minutesSinceMidnight(date);
   if (mins < CHECK_OUT_HALF_DAY_BEFORE) {
-    return { earlyExitMinutes: CHECK_OUT_NORMAL - mins, forcedHalfDay: true };
+    return { earlyExitMinutes: CHECK_OUT_LATE_BEFORE - mins, forcedHalfDay: true, forcedLate: false };
   }
-  if (mins <= CHECK_OUT_EARLY_EXIT_END) {
-    return { earlyExitMinutes: CHECK_OUT_NORMAL - mins, forcedHalfDay: false };
+  if (mins < CHECK_OUT_LATE_BEFORE) {
+    return { earlyExitMinutes: CHECK_OUT_LATE_BEFORE - mins, forcedHalfDay: false, forcedLate: true };
   }
-  return { earlyExitMinutes: 0, forcedHalfDay: false };
+  return { earlyExitMinutes: 0, forcedHalfDay: false, forcedLate: false };
 }
 
 /** Whole minutes between two ISO timestamps. */
