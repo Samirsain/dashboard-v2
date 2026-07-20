@@ -160,3 +160,23 @@ body {
 .material-symbols-outlined[data-weight="fill"] {
   font-variation-settings: "FILL" 1;
 }
+
+@keyframes blink-red {
+  0%, 100% {
+    background-color: #dc2626;
+    border-color: #991b1b;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.9);
+  }
+  50% {
+    background-color: #ffffff;
+    border-color: #dc2626;
+    color: #dc2626;
+    box-shadow: 0 0 4px rgba(220, 38, 38, 0.3);
+  }
+}
+
+.animate-blink-red {
+  animation: blink-red 1s infinite ease-in-out;
+}
+

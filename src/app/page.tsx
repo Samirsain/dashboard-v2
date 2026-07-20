@@ -19,6 +19,7 @@ import type {
   FullDashboard,
   List,
   Task,
+  Ticket,
 } from "@/lib/types";
 
 /** Builds and downloads a CSV of the given tasks (client-side, no server round-trip). */
@@ -74,6 +75,7 @@ function DashboardInner() {
   const [lists, setLists] = useState<List[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
+  const [hasPendingTickets, setHasPendingTickets] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Pending Tasks filter: "all" = every open item (past/today/future);
@@ -95,7 +97,7 @@ function DashboardInner() {
       // active template still missing today's instance gets one generated —
       // keeps every page's pending-checklist view consistent.
       await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
-      const [dash, tasks, listsData, checklist, templateData, doerData] = await Promise.all([
+      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData] = await Promise.all([
         api.get<FullDashboard>("/dashboard"),
         api.get<Task[]>("/tasks"),
         api.get<List[]>("/lists").catch(() => [] as List[]),
@@ -104,6 +106,7 @@ function DashboardInner() {
           .catch(() => [] as ChecklistInstance[]),
         api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
         api.get<Doer[]>("/users").catch(() => [] as Doer[]),
+        api.get<Ticket[]>("/tickets").catch(() => [] as Ticket[]),
       ]);
       setDashboard(dash);
       setLists(listsData);
@@ -111,6 +114,7 @@ function DashboardInner() {
       setPendingChecklist(checklist);
       setTemplates(templateData);
       setDoers(doerData);
+      setHasPendingTickets((ticketData ?? []).some((t) => t.status !== "Completed"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load dashboard.");
     } finally {
@@ -258,7 +262,11 @@ function DashboardInner() {
             )}
             <Link
               href="/help-ticket"
-              className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+              className={
+                hasPendingTickets
+                  ? "border-2 border-red-600 px-3 py-1.5 font-label-sm text-label-sm uppercase font-bold animate-blink-red transition-colors"
+                  : "border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+              }
             >
               Help Ticket
             </Link>
@@ -286,7 +294,11 @@ function DashboardInner() {
             <div className="col-span-12 md:hidden flex flex-wrap gap-2">
               <Link
                 href="/help-ticket"
-                className="flex-1 text-center border-2 border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+                className={
+                  hasPendingTickets
+                    ? "flex-1 text-center border-2 border-red-600 px-3 py-2 font-label-sm text-label-sm uppercase font-bold animate-blink-red"
+                    : "flex-1 text-center border-2 border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+                }
               >
                 Help Ticket
               </Link>
