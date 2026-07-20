@@ -30,5 +30,12 @@ router.patch("/remarks", validate({ body: remarksSchema }), attendanceController
 router.delete("/all", requireRole("Admin"), attendanceController.clearAll);
 // Re-applies the current policy to already-marked rows (fixes old statuses). Admin only.
 router.post("/recompute", requireRole("Admin"), attendanceController.recompute);
+// Irreversible — wipes every attendance record except one date (default today). Admin only.
+router.delete(
+  "/history",
+  requireRole("Admin"),
+  validate({ query: attendanceDateQuerySchema }),
+  attendanceController.clearHistory
+);
 
 export default router;

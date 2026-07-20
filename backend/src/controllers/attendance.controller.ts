@@ -96,4 +96,12 @@ export const attendanceController = {
     const updated = await attendanceService.recomputeAll(req.user!.sub);
     ok(res, { updated });
   }),
+
+  // Admin-only — permanently wipes every attendance record EXCEPT the given date (defaults to today).
+  clearHistory: asyncHandler(async (req: Request, res: Response) => {
+    const { date } = req.query as AttendanceDateQuery;
+    const keepDate = date ?? todayIso();
+    const deleted = await attendanceService.clearHistoryExcept(keepDate);
+    ok(res, { deleted, kept: keepDate });
+  }),
 };

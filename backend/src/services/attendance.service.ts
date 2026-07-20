@@ -258,4 +258,9 @@ export const attendanceService = {
   async clearAll(): Promise<number> {
     return dataService.deleteAll(entity);
   },
+
+  /** Permanently deletes every attendance record for every date EXCEPT `keepDate`. Irreversible. */
+  async clearHistoryExcept(keepDate: string): Promise<number> {
+    return dataService.deleteWhereNot(entity, "Date", keepDate);
+  },
 };

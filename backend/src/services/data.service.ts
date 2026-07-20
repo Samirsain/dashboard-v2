@@ -128,6 +128,25 @@ export const dataService = {
     return data?.length ?? 0;
   },
 
+  /** Deletes every row where `header` does NOT equal `value` (e.g. wipe all history except today). Irreversible. */
+  async deleteWhereNot(entity: SheetEntityConfig, header: string, value: string): Promise<number> {
+    const column = entity.columns[header];
+    if (!column) {
+      throw new AppError(
+        `Misconfigured entity "${entity.table}": header "${header}" has no column mapping.`,
+        500,
+        "CONFIG_ERROR"
+      );
+    }
+    const { data, error } = await getSupabase()
+      .from(entity.table)
+      .delete()
+      .neq(column, value)
+      .select(idColumnName(entity));
+    if (error) fail(`deleteWhereNot(${entity.table}, ${header}!=${value})`, error);
+    return data?.length ?? 0;
+  },
+
   /** Deletes every row where `header` (a record header, e.g. "Status") equals `value`. Irreversible. */
   async deleteWhere(entity: SheetEntityConfig, header: string, value: string): Promise<number> {
     const column = entity.columns[header];

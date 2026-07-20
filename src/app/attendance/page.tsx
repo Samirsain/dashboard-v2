@@ -278,6 +278,28 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  async function handleClearHistory() {
+    const confirmed = confirm(
+      `⚠️ This will PERMANENTLY DELETE attendance for every date EXCEPT ${formatDMY(date)} — every employee, all other history. This cannot be undone.\n\nAre you sure?`
+    );
+    if (!confirmed) return;
+    const typed = prompt('This is irreversible. Type "DELETE HISTORY" (without quotes) to confirm.');
+    if (typed !== "DELETE HISTORY") {
+      alert("Cancelled — text didn't match. Nothing was deleted.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api.delete<{ deleted: number; kept: string }>(`/attendance/history?date=${date}`);
+      await load();
+      alert(`Done — ${result.deleted} record(s) deleted. Kept ${formatDMY(result.kept)}.`);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to clear history.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-stack-lg">
       {error && (
@@ -338,6 +360,16 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
               className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40"
             >
               Fix Statuses
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              disabled={busy}
+              onClick={handleClearHistory}
+              title={`Permanently deletes attendance for every date except ${formatDMY(date)}`}
+              className="px-3 py-1.5 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors disabled:opacity-40"
+            >
+              Remove History
             </button>
           )}
           <input
