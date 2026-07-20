@@ -329,7 +329,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
       )}
 
-      {/* Row 1: Daily controls */}
+      {/* Daily controls */}
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">Date</label>
@@ -344,71 +344,12 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">(view only — past date)</span>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {isAdmin && (
-            <button
-              disabled={busy}
-              onClick={handleRecompute}
-              title="Re-applies the current Late/Half Day rules to all previously marked attendance"
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40"
-            >
-              Fix Statuses
-            </button>
-          )}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employee..."
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
-          />
-        </div>
-      </div>
-
-      {/* Row 2: Monthly report controls */}
-      <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center gap-3">
-        <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">Report</label>
-        {[0, -1, -2].map((offset) => (
-          <button
-            key={offset}
-            onClick={() => pickMonth(offset)}
-            className={`px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase transition-colors ${
-              rangeFrom === monthRange(offset).from && rangeTo === monthRange(offset).to
-                ? "bg-on-surface text-surface"
-                : "text-on-surface hover:bg-surface-container"
-            }`}
-          >
-            {monthLabel(offset)}
-          </button>
-        ))}
-        <span className="font-label-sm text-label-sm uppercase text-on-surface-variant ml-2">or</span>
         <input
-          type="date"
-          value={rangeFrom}
-          max={rangeTo || todayIso()}
-          onChange={(e) => setRangeFrom(e.target.value)}
-          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search employee..."
+          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
         />
-        <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">to</span>
-        <input
-          type="date"
-          value={rangeTo}
-          min={rangeFrom || undefined}
-          max={todayIso()}
-          onChange={(e) => setRangeTo(e.target.value)}
-          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
-        />
-        {(rangeFrom || rangeTo) && (
-          <button
-            onClick={() => {
-              setRangeFrom("");
-              setRangeTo("");
-              setReportDoer("");
-            }}
-            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-          >
-            Clear
-          </button>
-        )}
       </div>
 
 
@@ -475,16 +416,58 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         </table>
       </div>
 
-      {/* Range report — driven by the From/To pickers in the filter bar above */}
-      {(rangeFrom || rangeTo) && (
+      {/* Monthly Report */}
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Monthly Report</h3>
-          {/* Doer filter dropdown */}
+        <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Monthly Report</h3>
+
+        {/* Report controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {[0, -1, -2].map((offset) => (
+            <button
+              key={offset}
+              onClick={() => pickMonth(offset)}
+              className={`px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase transition-colors ${
+                rangeFrom === monthRange(offset).from && rangeTo === monthRange(offset).to
+                  ? "bg-on-surface text-surface"
+                  : "text-on-surface hover:bg-surface-container"
+              }`}
+            >
+              {monthLabel(offset)}
+            </button>
+          ))}
+          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant ml-2">or</span>
+          <input
+            type="date"
+            value={rangeFrom}
+            max={rangeTo || todayIso()}
+            onChange={(e) => setRangeFrom(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">to</span>
+          <input
+            type="date"
+            value={rangeTo}
+            min={rangeFrom || undefined}
+            max={todayIso()}
+            onChange={(e) => setRangeTo(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          />
+          {(rangeFrom || rangeTo) && (
+            <button
+              onClick={() => {
+                setRangeFrom("");
+                setRangeTo("");
+                setReportDoer("");
+              }}
+              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            >
+              Clear
+            </button>
+          )}
           <select
             value={reportDoer}
             onChange={(e) => setReportDoer(e.target.value)}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px] ml-auto"
           >
             <option value="">All Employees</option>
             {rangeRows.map(({ employee }) => (
@@ -570,7 +553,6 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
       </div>
-      )}
     </div>
   );
 }
