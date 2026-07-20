@@ -13,10 +13,10 @@ const PREDEFINED_SOLUTIONS: string[] = []; // Not used anymore
 
 function StatusBadge({ status }: { status: Ticket["status"] }) {
   const colors = {
-    Pending: "bg-warning text-on-warning",
+    Pending: "bg-yellow-400 text-black",
     "Waiting for Employee": "bg-primary text-on-primary",
     Reopened: "bg-error text-on-error",
-    Completed: "bg-success text-on-success",
+    Completed: "bg-green-600 text-white",
   };
   return (
     <span className={`inline-block font-label-sm text-label-sm uppercase px-2 py-0.5 border-2 border-on-surface ${colors[status] || "bg-surface-variant text-on-surface-variant"}`}>
@@ -181,14 +181,14 @@ function TicketDetailsInner() {
                       <button
                         onClick={() => handleEmployeeStatus("Completed")}
                         disabled={submitting}
-                        className="px-6 py-2 bg-success text-surface-container-lowest font-label-md text-label-md uppercase hover:bg-success/90 transition-colors disabled:opacity-50"
+                        className="px-6 py-2 bg-green-600 text-white font-label-md text-label-md uppercase hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer"
                       >
                         ✅ Mark as Done
                       </button>
                       <button
                         onClick={() => handleEmployeeStatus("Reopened")}
                         disabled={submitting}
-                        className="px-6 py-2 bg-error text-surface-container-lowest font-label-md text-label-md uppercase hover:bg-error/90 transition-colors disabled:opacity-50"
+                        className="px-6 py-2 bg-error text-on-error font-label-md text-label-md uppercase hover:bg-error/90 transition-colors disabled:opacity-50 cursor-pointer"
                       >
                         ❌ Still Facing Issue
                       </button>

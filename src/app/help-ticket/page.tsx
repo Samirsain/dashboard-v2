@@ -11,10 +11,10 @@ import Link from "next/link";
 
 function StatusBadge({ status }: { status: Ticket["status"] }) {
   const colors = {
-    Pending: "bg-warning text-on-warning",
+    Pending: "bg-yellow-400 text-black",
     "Waiting for Employee": "bg-primary text-on-primary",
     Reopened: "bg-error text-on-error",
-    Completed: "bg-success text-on-success",
+    Completed: "bg-green-600 text-white",
   };
   return (
     <span className={`inline-block font-label-sm text-label-sm uppercase px-2 py-0.5 border-2 border-on-surface ${colors[status] || "bg-surface-variant text-on-surface-variant"}`}>
@@ -103,7 +103,7 @@ function HelpTicketInner() {
                 <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Total</p>
                 <p className="font-headline-lg text-headline-lg mt-1">{stats.total}</p>
               </div>
-              <div className="bg-warning/20 border-2 border-warning p-4">
+              <div className="bg-yellow-400/20 border-2 border-yellow-400 p-4">
                 <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Pending</p>
                 <p className="font-headline-lg text-headline-lg mt-1">{stats.pending}</p>
               </div>
@@ -115,7 +115,7 @@ function HelpTicketInner() {
                 <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Reopened</p>
                 <p className="font-headline-lg text-headline-lg mt-1">{stats.reopened}</p>
               </div>
-              <div className="bg-success/20 border-2 border-success p-4">
+              <div className="bg-green-600/20 border-2 border-green-600 p-4">
                 <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Completed Today</p>
                 <p className="font-headline-lg text-headline-lg mt-1">{stats.completedToday}</p>
               </div>

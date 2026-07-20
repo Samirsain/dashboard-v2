@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
+import { useHelpTicketAlert } from "@/lib/useTicketAlert";
 import BrandLogo from "@/components/BrandLogo";
 import GoogleFormsIcon from "@/components/GoogleFormsIcon";
 
@@ -27,6 +28,7 @@ const labelCls = "font-headline-md text-headline-md text-base uppercase tracking
 
 export default function SideNav({ active }: { active: NavKey }) {
   const { user } = useAuth();
+  const hasTicketAlert = useHelpTicketAlert();
 
   return (
     <nav className="hidden md:flex fixed left-0 top-0 h-full flex-col z-40 w-64 border-r-2 border-on-surface bg-surface">
@@ -75,6 +77,17 @@ export default function SideNav({ active }: { active: NavKey }) {
             badge
           </span>
           <span className={labelCls}>Attendance</span>
+        </Link>
+
+        {/* Help Ticket */}
+        <Link href="/help-ticket" className={active === "help-ticket" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="confirmation_number">
+            confirmation_number
+          </span>
+          <span className={labelCls}>Help Ticket</span>
+          {hasTicketAlert && (
+            <span className="ml-auto w-2.5 h-2.5 rounded-full bg-error animate-pulse shrink-0" />
+          )}
         </Link>
 
         {/* All Tasks: Admin, plus hardcoded full-task-access codes. */}
