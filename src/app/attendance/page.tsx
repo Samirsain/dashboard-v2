@@ -216,8 +216,9 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
 
   /** Filtered range rows based on doer selection */
   const filteredRangeRows = useMemo(() => {
-    if (!reportDoer) return rangeRows;
-    return rangeRows.filter((r) => r.employee.id === reportDoer);
+    const nonAdmins = rangeRows.filter((r) => r.employee.role !== "Admin");
+    if (!reportDoer) return nonAdmins;
+    return nonAdmins.filter((r) => r.employee.id === reportDoer);
   }, [rangeRows, reportDoer]);
 
   /** Summary totals for the filtered range */
@@ -257,9 +258,10 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   }, [date]);
 
   const filteredRows = useMemo(() => {
-    if (!search) return rows;
+    const nonAdmins = rows.filter((r) => r.employee.role !== "Admin");
+    if (!search) return nonAdmins;
     const q = search.toLowerCase();
-    return rows.filter((r) => r.employee.name.toLowerCase().includes(q) || r.employee.department.toLowerCase().includes(q));
+    return nonAdmins.filter((r) => r.employee.name.toLowerCase().includes(q) || r.employee.department.toLowerCase().includes(q));
   }, [rows, search]);
 
   useEffect(() => {
@@ -478,7 +480,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
           >
             <option value="">All Employees</option>
-            {rangeRows.map(({ employee }) => (
+            {rangeRows.filter((r) => r.employee.role !== "Admin").map(({ employee }) => (
               <option key={employee.id} value={employee.id}>{employee.name}</option>
             ))}
           </select>

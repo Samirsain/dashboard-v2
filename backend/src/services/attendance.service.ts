@@ -219,7 +219,7 @@ export const attendanceService = {
       byEmployee.set(employeeId, list);
     }
     return users
-      .filter((u) => u.status === "Active")
+      .filter((u) => u.status === "Active" && u.role !== "Admin")
       .map((employee) => {
         const counts: Record<AttendanceStatus, number> = {
           Present: 0,
@@ -246,7 +246,7 @@ export const attendanceService = {
     const [users, records] = await Promise.all([usersService.list(), dataService.findAll(entity)]);
     const byEmployee = new Map(records.filter((r) => r["Date"] === date).map((r) => [r["Employee ID"], r]));
     return users
-      .filter((u) => u.status === "Active")
+      .filter((u) => u.status === "Active" && u.role !== "Admin")
       .map((employee) => {
         const row = byEmployee.get(employee.id);
         return { employee, attendance: row ? toAttendance(row) : null };
