@@ -89,4 +89,11 @@ export const attendanceController = {
     const deleted = await attendanceService.clearAll();
     ok(res, { deleted });
   }),
+
+  // Admin-only — re-applies the current office-hours policy to every existing
+  // attendance row that has a check-in, fixing statuses recorded under old rules.
+  recompute: asyncHandler(async (req: Request, res: Response) => {
+    const updated = await attendanceService.recomputeAll(req.user!.sub);
+    ok(res, { updated });
+  }),
 };

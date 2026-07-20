@@ -259,6 +259,25 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  async function handleRecompute() {
+    if (
+      !confirm(
+        "Re-apply the current Late/Half Day rules to ALL previously marked attendance (every employee, every date with a check-in)? Statuses will be corrected per the new policy."
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const result = await api.post<{ updated: number }>("/attendance/recompute", {});
+      await load();
+      alert(`Done — ${result.updated} record(s) updated to match the current policy.`);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to recompute statuses.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-stack-lg">
       {error && (
@@ -310,12 +329,24 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             </button>
           )}
         </div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search employee..."
-          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && (
+            <button
+              disabled={busy}
+              onClick={handleRecompute}
+              title="Re-applies the current Late/Half Day rules to all previously marked attendance"
+              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40"
+            >
+              Fix Statuses
+            </button>
+          )}
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search employee..."
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
+          />
+        </div>
       </div>
 
 
