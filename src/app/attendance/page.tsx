@@ -15,6 +15,23 @@ function todayIso(): string {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
+/** Returns { from, to } ISO dates for a given month offset (0 = current, -1 = last month, etc.) */
+function monthRange(offset: number): { from: string; to: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + offset;
+  const start = new Date(y, m, 1);
+  const end = new Date(y, m + 1, 0); // last day of that month
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  return { from: fmt(start), to: fmt(end) };
+}
+
+function monthLabel(offset: number): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  return d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+}
+
 function formatMinutes(mins: number): string {
   if (!mins) return "—";
   const h = Math.floor(mins / 60);
@@ -188,6 +205,34 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   const [rangeRows, setRangeRows] = useState<AttendanceRangeRow[]>([]);
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeError, setRangeError] = useState<string | null>(null);
+  const [reportDoer, setReportDoer] = useState(""); // doer filter for range report
+
+  /** Quick month picker helper */
+  function pickMonth(offset: number) {
+    const { from, to } = monthRange(offset);
+    setRangeFrom(from);
+    setRangeTo(to);
+  }
+
+  /** Filtered range rows based on doer selection */
+  const filteredRangeRows = useMemo(() => {
+    if (!reportDoer) return rangeRows;
+    return rangeRows.filter((r) => r.employee.id === reportDoer);
+  }, [rangeRows, reportDoer]);
+
+  /** Summary totals for the filtered range */
+  const rangeSummary = useMemo(() => {
+    const s = { Present: 0, Late: 0, "Half Day": 0, Absent: 0, Leave: 0, total: 0 };
+    for (const r of filteredRangeRows) {
+      s.Present += r.counts.Present;
+      s.Late += r.counts.Late;
+      s["Half Day"] += r.counts["Half Day"];
+      s.Absent += r.counts.Absent;
+      s.Leave += r.counts.Leave;
+      s.total += r.totalMarked;
+    }
+    return s;
+  }, [filteredRangeRows]);
 
   const editable = isAdmin || date === todayIso();
 
@@ -317,11 +362,22 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             onChange={(e) => setRangeTo(e.target.value)}
             className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
           />
+          {/* Quick month buttons */}
+          {[0, -1, -2].map((offset) => (
+            <button
+              key={offset}
+              onClick={() => pickMonth(offset)}
+              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            >
+              {monthLabel(offset)}
+            </button>
+          ))}
           {(rangeFrom || rangeTo) && (
             <button
               onClick={() => {
                 setRangeFrom("");
                 setRangeTo("");
+                setReportDoer("");
               }}
               className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
             >
@@ -416,10 +472,42 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
       {/* Range report — driven by the From/To pickers in the filter bar above */}
       {(rangeFrom || rangeTo) && (
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
-        <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Date Range Report</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Monthly Report</h3>
+          {/* Doer filter dropdown */}
+          <select
+            value={reportDoer}
+            onChange={(e) => setReportDoer(e.target.value)}
+            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
+          >
+            <option value="">All Employees</option>
+            {rangeRows.map(({ employee }) => (
+              <option key={employee.id} value={employee.id}>{employee.name}</option>
+            ))}
+          </select>
+        </div>
 
         {rangeError && (
           <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{rangeError}</p>
+        )}
+
+        {/* Summary stat cards */}
+        {rangeFrom && rangeTo && !rangeLoading && filteredRangeRows.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {[
+              { label: "Present", value: rangeSummary.Present, color: "bg-primary/20 text-on-surface" },
+              { label: "Late", value: rangeSummary.Late, color: "bg-yellow-100 text-yellow-800" },
+              { label: "Half Day", value: rangeSummary["Half Day"], color: "bg-yellow-100 text-yellow-800" },
+              { label: "Absent", value: rangeSummary.Absent, color: "bg-error/20 text-error" },
+              { label: "Leave", value: rangeSummary.Leave, color: "bg-surface-container text-on-surface-variant" },
+              { label: "Total", value: rangeSummary.total, color: "bg-surface-container text-on-surface" },
+            ].map((card) => (
+              <div key={card.label} className={`border-2 border-on-surface p-3 text-center ${card.color}`}>
+                <p className="font-label-sm text-label-sm uppercase">{card.label}</p>
+                <p className="font-headline-md text-headline-md mt-1">{card.value}</p>
+              </div>
+            ))}
+          </div>
         )}
 
         {!rangeFrom || !rangeTo ? (
@@ -448,14 +536,14 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
                     </td>
                   </tr>
                 )}
-                {!rangeLoading && rangeRows.length === 0 && (
+                {!rangeLoading && filteredRangeRows.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No data for this range.
                     </td>
                   </tr>
                 )}
-                {rangeRows.map(({ employee, counts, totalMarked }) => (
+                {filteredRangeRows.map(({ employee, counts, totalMarked }) => (
                   <tr key={employee.id} className="border-b border-surface-variant last:border-b-0">
                     <td className="py-2 px-4 border-r border-surface-variant">
                       <div className="flex items-center gap-2">
