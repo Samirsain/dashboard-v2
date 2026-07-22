@@ -12,6 +12,7 @@ import formConfigRoutes from "./formConfig.routes";
 import backupRoutes from "./backup.routes";
 import ticketRoutes from "./ticket.routes";
 import attendanceRoutes from "./attendance.routes";
+import imsRoutes from "./ims.routes";
 import { hasGoogleCredentials, hasSupabaseCredentials } from "../config/env";
 
 const router = Router();
@@ -42,5 +43,6 @@ router.use("/forms", formConfigRoutes);
 router.use("/backup", backupRoutes);
 router.use("/tickets", ticketRoutes);
 router.use("/attendance", attendanceRoutes);
+router.use("/ims", imsRoutes);
 
 export default router;

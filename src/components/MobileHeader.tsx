@@ -164,6 +164,9 @@ export default function MobileHeader() {
                   <Link href="/settings" className={rowFor("/settings")}>
                     Settings
                   </Link>
+                  <Link href="/ims" className={rowFor("/ims")}>
+                    IMS
+                  </Link>
                 </>
               )}
             </div>
