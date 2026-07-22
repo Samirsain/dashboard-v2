@@ -9,6 +9,7 @@ import {
   markStatusSchema,
   checkInOutSchema,
   remarksSchema,
+  editAttendanceSchema,
 } from "../validation/attendance.schema";
 
 const router = Router();
@@ -30,5 +31,7 @@ router.patch("/remarks", validate({ body: remarksSchema }), attendanceController
 router.delete("/all", requireRole("Admin"), attendanceController.clearAll);
 // Re-applies the current policy to already-marked rows (fixes old statuses). Admin only.
 router.post("/recompute", requireRole("Admin"), attendanceController.recompute);
+// Directly edit check-in/check-out time and/or status for any date. Admin only.
+router.patch("/edit", requireRole("Admin"), validate({ body: editAttendanceSchema }), attendanceController.editRecord);
 
 export default router;

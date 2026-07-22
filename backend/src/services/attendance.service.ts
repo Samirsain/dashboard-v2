@@ -3,7 +3,7 @@ import { dataService, type SheetRecord } from "./data.service";
 import { usersService } from "./users.service";
 import { generateId } from "../utils/id";
 import { todayIso } from "../utils/date";
-import { computeCheckInStatus, computeCheckOutStatus, minutesBetween } from "../utils/attendanceTime";
+import { computeCheckInStatus, computeCheckOutStatus, minutesBetween, zonedTimeToUtcIso } from "../utils/attendanceTime";
 import { AppError } from "../utils/AppError";
 import type { Attendance, AttendanceStatus, User } from "../types";
 
@@ -140,6 +140,63 @@ export const attendanceService = {
 
   async setRemarks(employeeId: string, date: string, remarks: string, markedBy: string): Promise<Attendance> {
     return upsert(employeeId, date, { Remarks: remarks }, markedBy);
+  },
+
+  /**
+   * Admin edit: directly set check-in/check-out time (HH:MM, or "" to clear)
+   * and/or status for any date — past or today. Status auto-recalculates from
+   * the resulting times using the current policy unless an explicit status is
+   * passed, which always wins. Creates the row if it doesn't exist yet.
+   */
+  async editRecord(
+    employeeId: string,
+    date: string,
+    patch: { checkInTime?: string; checkOutTime?: string; status?: AttendanceStatus | ""; remarks?: string },
+    markedBy: string
+  ): Promise<Attendance> {
+    const existing = await findRow(employeeId, date);
+
+    let checkInIso = (existing?.["CheckIn"] as string) ?? "";
+    if (patch.checkInTime !== undefined) {
+      checkInIso = patch.checkInTime ? zonedTimeToUtcIso(date, patch.checkInTime) : "";
+    }
+    let checkOutIso = (existing?.["CheckOut"] as string) ?? "";
+    if (patch.checkOutTime !== undefined) {
+      checkOutIso = patch.checkOutTime ? zonedTimeToUtcIso(date, patch.checkOutTime) : "";
+    }
+
+    let computedStatus: AttendanceStatus | "" = (existing?.["Status"] as AttendanceStatus) || "";
+    let lateMinutes = 0;
+    let earlyExitMinutes = 0;
+    let workingMinutes = 0;
+
+    if (checkInIso) {
+      const inResult = computeCheckInStatus(new Date(checkInIso));
+      computedStatus = inResult.status;
+      lateMinutes = inResult.lateMinutes;
+    }
+    if (checkInIso && checkOutIso) {
+      const out = computeCheckOutStatus(new Date(checkOutIso));
+      earlyExitMinutes = Math.max(0, out.earlyExitMinutes);
+      workingMinutes = minutesBetween(checkInIso, checkOutIso);
+      if (out.forcedHalfDay && (computedStatus === "Present" || computedStatus === "Late")) computedStatus = "Half Day";
+      else if (out.forcedLate && computedStatus === "Present") computedStatus = "Late";
+    }
+
+    // An explicit status (including clearing it back to "") always overrides the computed one.
+    const finalStatus = patch.status !== undefined ? patch.status : computedStatus;
+
+    const dbPatch: Partial<SheetRecord> = {
+      CheckIn: checkInIso,
+      CheckOut: checkOutIso,
+      Status: finalStatus,
+      "Late Minutes": String(lateMinutes),
+      "Early Exit Minutes": String(earlyExitMinutes),
+      "Working Minutes": String(workingMinutes),
+    };
+    if (patch.remarks !== undefined) dbPatch["Remarks"] = patch.remarks;
+
+    return upsert(employeeId, date, dbPatch, markedBy);
   },
 
   /**

@@ -64,3 +64,45 @@ export function minutesBetween(startIso: string, endIso: string): number {
   const end = new Date(endIso).getTime();
   return Math.max(0, Math.round((end - start) / 60000));
 }
+
+/** How far `date` (interpreted as a UTC instant) actually is from the wall-clock time in `timeZone`, in minutes. */
+function timezoneOffsetMinutes(date: Date, timeZone: string): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second")
+  );
+  return (asUtc - date.getTime()) / 60000;
+}
+
+/**
+ * Converts a wall-clock date + "HH:MM" time, as read in `timeZone`, into the
+ * matching UTC instant (ISO string) — used to save an admin-entered
+ * check-in/check-out time back as a proper timestamp. Handles DST correctly.
+ */
+export function zonedTimeToUtcIso(
+  dateStr: string,
+  timeStr: string,
+  timeZone = env.scheduler.timezone
+): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const [hour, minute] = timeStr.split(":").map(Number);
+  const utcGuess = new Date(Date.UTC(year!, month! - 1, day!, hour!, minute!, 0));
+  const offsetMinutes = timezoneOffsetMinutes(utcGuess, timeZone);
+  return new Date(utcGuess.getTime() - offsetMinutes * 60000).toISOString();
+}
