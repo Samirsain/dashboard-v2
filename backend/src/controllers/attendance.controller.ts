@@ -11,6 +11,7 @@ import type {
   MarkStatusInput,
   CheckInOutInput,
   RemarksInput,
+  EditAttendanceInput,
 } from "../validation/attendance.schema";
 
 /** Attendance Managers (non-Admin) may only mark/edit today's attendance. */
@@ -95,5 +96,20 @@ export const attendanceController = {
   recompute: asyncHandler(async (req: Request, res: Response) => {
     const updated = await attendanceService.recomputeAll(req.user!.sub);
     ok(res, { updated });
+  }),
+
+  // Admin-only (enforced by requireRole("Admin") on the route) — directly
+  // edit check-in/check-out time and/or status for any date, past or today.
+  editRecord: asyncHandler(async (req: Request, res: Response) => {
+    const { employeeId, date, checkInTime, checkOutTime, status, remarks } = req.body as EditAttendanceInput;
+    ok(
+      res,
+      await attendanceService.editRecord(
+        employeeId,
+        date,
+        { checkInTime, checkOutTime, status, remarks },
+        req.user!.sub
+      )
+    );
   }),
 };

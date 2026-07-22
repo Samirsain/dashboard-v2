@@ -5,6 +5,7 @@ import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import InitialsAvatar from "@/components/InitialsAvatar";
+import EditAttendanceModal from "@/components/EditAttendanceModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
@@ -206,6 +207,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [reportDoer, setReportDoer] = useState(""); // doer filter for range report
+  const [editingRow, setEditingRow] = useState<AttendanceDayRow | null>(null);
 
   /** Quick month picker helper */
   function pickMonth(offset: number) {
@@ -460,6 +462,19 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
                       >
                         Leave
                       </button>
+                      {isAdmin && (
+                        <>
+                          <span className="w-px h-5 bg-surface-variant mx-0.5" />
+                          <button
+                            disabled={busy}
+                            onClick={() => setEditingRow({ employee, attendance })}
+                            title="Manually edit check-in/check-out time and status for this date"
+                            className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40"
+                          >
+                            Edit
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 )}
@@ -557,6 +572,20 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           </table>
         </div>
       </div>
+      )}
+
+      {editingRow && (
+        <EditAttendanceModal
+          employeeId={editingRow.employee.id}
+          employeeName={editingRow.employee.name}
+          date={date}
+          attendance={editingRow.attendance}
+          onClose={() => setEditingRow(null)}
+          onSaved={() => {
+            setEditingRow(null);
+            load();
+          }}
+        />
       )}
     </div>
   );
