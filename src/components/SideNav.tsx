@@ -17,7 +17,8 @@ type NavKey =
   | "attendance"
   | "team-performance"
   | "settings"
-  | "help-ticket";
+  | "help-ticket"
+  | "ims";
 
 const linkBase =
   "text-on-surface-variant px-4 py-3 flex items-center gap-3 hover:bg-surface-container hover:text-on-surface transition-colors border-l-4 border-transparent";
@@ -98,6 +99,12 @@ export default function SideNav({ active }: { active: NavKey }) {
                 insights
               </span>
               <span className={labelCls}>Team Performance</span>
+            </Link>
+            <Link href="/ims" className={active === "ims" ? linkActive : linkBase}>
+              <span className="material-symbols-outlined" data-icon="inventory_2">
+                inventory_2
+              </span>
+              <span className={labelCls}>IMS</span>
             </Link>
           </>
         )}

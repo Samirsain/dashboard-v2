@@ -290,3 +290,58 @@ export interface TicketDashboardStats {
   completedToday: number;
 }
 
+// ---- IMS (Inventory Management System) ------------------------------------
+
+export interface ImsItem {
+  id: string;
+  skuCode: string;
+  itemName: string;
+  category: string;
+  avgDailyConsumption: number;
+  leadTime: number;
+  safetyFactor: number;
+  moq: number;
+  baseMaxLevel: number;
+  effectiveMaxLevel: number;
+  materialInTransit: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ImsDirection = "In" | "Out";
+
+export interface ImsTransaction {
+  id: string;
+  skuCode: string;
+  direction: ImsDirection;
+  date: string;
+  quantity: number;
+  timestamp: string;
+  createdBy: string;
+}
+
+export interface ImsStockLedger {
+  dates: string[];
+  rows: Array<{
+    skuCode: string;
+    itemName: string;
+    maxLevel: number;
+    materialInTransit: number;
+    closingStock: number;
+    byDate: Record<string, number>;
+  }>;
+}
+
+export interface ImsReorderRow {
+  skuCode: string;
+  itemName: string;
+  category: string;
+  moq: number;
+  baseMaxLevel: number;
+  safetyFactor: number;
+  effectiveMaxLevel: number;
+  closingStock: number;
+  materialInTransit: number;
+  reorderQty: number;
+}
+
