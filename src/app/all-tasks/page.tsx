@@ -544,7 +544,7 @@ function AllTasksInner() {
                             {t.frequency}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            {!currentUser?.isAssistant && (
+                            {currentUser?.role === "Admin" && (
                               <button
                                 onClick={() => handleDeleteChecklistTask(t)}
                                 className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
@@ -565,7 +565,7 @@ function AllTasksInner() {
                           <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{checklistCompletedOn(c) || "—"}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
                           <td className="py-3 px-4 text-center">
-                            {!currentUser?.isAssistant && (
+                            {currentUser?.role === "Admin" && (
                               <button
                                 onClick={() => handleDeleteChecklistTask({ id: c.templateId, taskName: c.taskName })}
                                 className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"

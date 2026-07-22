@@ -9,6 +9,7 @@ import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
+import { useHelpTicketAlert } from "@/lib/useTicketAlert";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
@@ -67,6 +68,7 @@ function listGroupKey(name: string): string {
 function DashboardInner() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "Admin";
+  const hasTicketAlert = useHelpTicketAlert();
   const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [pendingChecklist, setPendingChecklist] = useState<ChecklistInstance[]>([]);
@@ -258,9 +260,14 @@ function DashboardInner() {
             )}
             <Link
               href="/help-ticket"
-              className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+              className={`flex items-center gap-2 border-2 px-3 py-1.5 font-label-sm text-label-sm uppercase transition-colors ${
+                hasTicketAlert
+                  ? "border-error bg-error text-on-error animate-pulse"
+                  : "border-on-surface text-on-surface hover:bg-surface-container"
+              }`}
             >
               Help Ticket
+              {hasTicketAlert && <span className="w-2 h-2 rounded-full bg-on-error shrink-0" />}
             </Link>
             {isAdmin && (
               <Link
@@ -286,9 +293,14 @@ function DashboardInner() {
             <div className="col-span-12 md:hidden flex flex-wrap gap-2">
               <Link
                 href="/help-ticket"
-                className="flex-1 text-center border-2 border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+                className={`flex-1 flex items-center justify-center gap-2 text-center border-2 px-3 py-2 font-label-sm text-label-sm uppercase transition-colors ${
+                  hasTicketAlert
+                    ? "border-error bg-error text-on-error animate-pulse"
+                    : "border-on-surface text-on-surface"
+                }`}
               >
                 Help Ticket
+                {hasTicketAlert && <span className="w-2 h-2 rounded-full bg-on-error shrink-0" />}
               </Link>
               {isAdmin && (
                 <button
