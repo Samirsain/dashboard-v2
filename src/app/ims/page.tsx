@@ -12,10 +12,21 @@ import { useAuth } from "@/lib/auth-context";
 import type { ImsItem, ImsTransaction, ImsStockLedger, ImsReorderRow } from "@/lib/types";
 
 type Tab = "items" | "transactions" | "ledger" | "reorder";
-type LedgerRange = 7 | 14 | 30 | "all";
+type QuickRange = "week" | "month" | "custom";
 
 function num(n: number): string {
   return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : "0";
+}
+
+/** Returns an ISO date string YYYY-MM-DD for today minus `days` days */
+function daysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function ImsInner() {
@@ -31,9 +42,20 @@ function ImsInner() {
   const [editingItem, setEditingItem] = useState<ImsItem | null>(null);
   const [showTxModal, setShowTxModal] = useState(false);
 
+  // Item search
   const [itemSearch, setItemSearch] = useState("");
+
+  // Transactions filter
   const [txSearch, setTxSearch] = useState("");
-  const [ledgerRange, setLedgerRange] = useState<LedgerRange>(14);
+  const [txRange, setTxRange] = useState<QuickRange>("week");
+  const [txFrom, setTxFrom] = useState(daysAgo(7));
+  const [txTo, setTxTo] = useState(todayIso());
+  const [txDirection, setTxDirection] = useState<"All" | "In" | "Out">("All");
+
+  // Ledger filter
+  const [ledgerRange, setLedgerRange] = useState<QuickRange>("week");
+  const [ledgerFrom, setLedgerFrom] = useState(daysAgo(7));
+  const [ledgerTo, setLedgerTo] = useState(todayIso());
 
   async function load() {
     setLoading(true);
@@ -50,23 +72,33 @@ function ImsInner() {
       setLedger(ledgerData);
       setReorder(reorderData);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load IMS data.");
+      setError(err instanceof ApiError ? err.message : "Failed to load inventory data.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    queueMicrotask(() => {
-      load();
-    });
+    queueMicrotask(() => { load(); });
   }, []);
 
-  const nameBySku = new Map(items.map((i) => [i.skuCode, i.itemName]));
+  // ── Quick range button handlers ──────────────────────────────────────────
+  function applyTxRange(range: QuickRange) {
+    setTxRange(range);
+    if (range === "week") { setTxFrom(daysAgo(7)); setTxTo(todayIso()); }
+    if (range === "month") { setTxFrom(daysAgo(30)); setTxTo(todayIso()); }
+    // "custom" keeps whatever the date inputs hold
+  }
 
+  function applyLedgerRange(range: QuickRange) {
+    setLedgerRange(range);
+    if (range === "week") { setLedgerFrom(daysAgo(7)); setLedgerTo(todayIso()); }
+    if (range === "month") { setLedgerFrom(daysAgo(30)); setLedgerTo(todayIso()); }
+  }
+
+  const nameBySku = new Map(items.map((i) => [i.skuCode, i.itemName]));
   const needsReorderCount = reorder.filter((r) => r.reorderQty > 0).length;
 
-  // Most urgent (biggest shortfall) first, then everything else alphabetically.
   const sortedReorder = useMemo(
     () =>
       [...reorder].sort((a, b) => {
@@ -78,25 +110,47 @@ function ImsInner() {
     [reorder]
   );
 
+  // ── Filtered items ───────────────────────────────────────────────────────
   const filteredItems = useMemo(() => {
     if (!itemSearch) return items;
     const q = itemSearch.toLowerCase();
     return items.filter((i) => i.skuCode.toLowerCase().includes(q) || i.itemName.toLowerCase().includes(q));
   }, [items, itemSearch]);
 
+  // ── Filtered transactions (date range + search + direction) ──────────────
   const filteredTransactions = useMemo(() => {
-    if (!txSearch) return transactions;
-    const q = txSearch.toLowerCase();
-    return transactions.filter(
-      (t) => t.skuCode.toLowerCase().includes(q) || (nameBySku.get(t.skuCode) ?? "").toLowerCase().includes(q)
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, txSearch, items]);
+    return transactions.filter((t) => {
+      // Date filter: compare t.date (YYYY-MM-DD) against range
+      const txDate = t.date ?? t.timestamp?.slice(0, 10) ?? "";
+      const inRange = (!txFrom || txDate >= txFrom) && (!txTo || txDate <= txTo);
+      if (!inRange) return false;
 
+      // Direction filter
+      if (txDirection !== "All" && t.direction !== txDirection) return false;
+
+      // Text search
+      if (txSearch) {
+        const q = txSearch.toLowerCase();
+        const matchSku = t.skuCode.toLowerCase().includes(q);
+        const matchName = (nameBySku.get(t.skuCode) ?? "").toLowerCase().includes(q);
+        if (!matchSku && !matchName) return false;
+      }
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, txFrom, txTo, txSearch, txDirection, items]);
+
+  // ── Visible ledger dates (filtered by date range) ────────────────────────
   const visibleLedgerDates = useMemo(() => {
-    if (ledgerRange === "all") return ledger.dates;
-    return ledger.dates.slice(-ledgerRange);
-  }, [ledger.dates, ledgerRange]);
+    return ledger.dates.filter((d) => (!ledgerFrom || d >= ledgerFrom) && (!ledgerTo || d <= ledgerTo));
+  }, [ledger.dates, ledgerFrom, ledgerTo]);
+
+  // ── Summary stats for filtered transactions ──────────────────────────────
+  const txStats = useMemo(() => {
+    const totalIn = filteredTransactions.filter((t) => t.direction === "In").reduce((s, t) => s + t.quantity, 0);
+    const totalOut = filteredTransactions.filter((t) => t.direction === "Out").reduce((s, t) => s + t.quantity, 0);
+    return { totalIn, totalOut, count: filteredTransactions.length };
+  }, [filteredTransactions]);
 
   async function handleDeleteItem(skuCode: string) {
     if (!confirm(`Delete SKU "${skuCode}"? This also removes its transaction history.`)) return;
@@ -128,6 +182,66 @@ function ImsInner() {
     { key: "reorder", label: "Reorder Sheet", badge: needsReorderCount },
   ];
 
+  // ── Range Filter Bar Component ───────────────────────────────────────────
+  function RangeFilterBar({
+    range, onRange, from, onFrom, to, onTo,
+  }: {
+    range: QuickRange; onRange: (r: QuickRange) => void;
+    from: string; onFrom: (v: string) => void;
+    to: string; onTo: (v: string) => void;
+  }) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 bg-surface-container border-2 border-on-surface px-3 py-2">
+        <span className="font-label-sm text-xs uppercase text-on-surface-variant font-bold">Period:</span>
+
+        {/* Quick buttons */}
+        {(["week", "month"] as const).map((r) => (
+          <button
+            key={r}
+            onClick={() => onRange(r)}
+            className={`px-3 py-1 border-2 font-label-sm text-xs uppercase font-bold transition-colors cursor-pointer ${
+              (range as string) === r
+                ? "bg-on-surface text-surface border-on-surface"
+                : "border-on-surface text-on-surface hover:bg-surface-container-low"
+            }`}
+          >
+            {r === "week" ? "This Week (7d)" : "This Month (30d)"}
+          </button>
+        ))}
+
+        {/* Divider */}
+        <span className="text-on-surface-variant text-xs font-data-mono">|</span>
+
+        {/* Custom date range */}
+        <div className="flex items-center gap-1.5">
+          <span className="font-label-sm text-xs text-on-surface-variant uppercase">From:</span>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => { onFrom(e.target.value); onRange("custom"); }}
+            className={`border-2 px-2 py-1 font-data-mono text-xs text-on-surface bg-surface focus:outline-none cursor-pointer ${
+              range === "custom" ? "border-on-surface" : "border-on-surface/50"
+            }`}
+          />
+          <span className="font-label-sm text-xs text-on-surface-variant uppercase">To:</span>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => { onTo(e.target.value); onRange("custom"); }}
+            className={`border-2 px-2 py-1 font-data-mono text-xs text-on-surface bg-surface focus:outline-none cursor-pointer ${
+              range === "custom" ? "border-on-surface" : "border-on-surface/50"
+            }`}
+          />
+          {range === "custom" && (
+            <span className="text-[10px] font-label-sm uppercase bg-on-surface text-surface px-2 py-1 font-bold">
+              Custom Range Active
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <MobileHeader />
@@ -135,17 +249,14 @@ function ImsInner() {
 
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
         <header className="hidden md:flex bg-surface w-full border-b-2 border-on-surface justify-between items-center h-16 px-container-padding sticky top-0 z-30">
-          <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
-            IMS — Inventory
+          <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1 font-black">
+            📦 Inventory Management System
           </div>
           <div className="flex items-center gap-3">
             {tab === "items" && (
               <button
-                onClick={() => {
-                  setEditingItem(null);
-                  setShowItemModal(true);
-                }}
-                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors"
+                onClick={() => { setEditingItem(null); setShowItemModal(true); }}
+                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors cursor-pointer"
               >
                 + Add Item
               </button>
@@ -154,7 +265,7 @@ function ImsInner() {
               <button
                 onClick={() => setShowTxModal(true)}
                 disabled={items.length === 0}
-                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors disabled:opacity-50"
+                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors disabled:opacity-50 cursor-pointer"
               >
                 + Log Transaction
               </button>
@@ -163,35 +274,24 @@ function ImsInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg max-w-full overflow-hidden">
+          {/* Mobile header */}
           <div className="md:hidden flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              IMS — Inventory
+              📦 Inventory
             </h2>
             {tab === "items" && (
-              <button
-                onClick={() => {
-                  setEditingItem(null);
-                  setShowItemModal(true);
-                }}
-                className="px-3 py-2 border-2 border-on-surface bg-on-surface text-surface font-label-sm text-label-sm uppercase"
-              >
+              <button onClick={() => { setEditingItem(null); setShowItemModal(true); }} className="px-3 py-2 border-2 border-on-surface bg-on-surface text-surface font-label-sm text-label-sm uppercase">
                 + Item
               </button>
             )}
             {tab === "transactions" && (
-              <button
-                onClick={() => setShowTxModal(true)}
-                disabled={items.length === 0}
-                className="px-3 py-2 border-2 border-on-surface bg-on-surface text-surface font-label-sm text-label-sm uppercase disabled:opacity-50"
-              >
+              <button onClick={() => setShowTxModal(true)} disabled={items.length === 0} className="px-3 py-2 border-2 border-on-surface bg-on-surface text-surface font-label-sm text-label-sm uppercase disabled:opacity-50">
                 + Log
               </button>
             )}
           </div>
 
-          {error && (
-            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
-          )}
+          {error && <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>}
 
           {!loading && items.length === 0 ? (
             <div className="bg-surface-container-lowest border-2 border-on-surface p-stack-lg flex flex-col items-center gap-4 text-center">
@@ -201,21 +301,18 @@ function ImsInner() {
                 movements and the Stock Ledger &amp; Reorder Sheet build themselves automatically.
               </p>
               <button
-                onClick={() => {
-                  setEditingItem(null);
-                  setShowItemModal(true);
-                }}
-                className="px-6 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                onClick={() => { setEditingItem(null); setShowItemModal(true); }}
+                className="px-6 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors cursor-pointer"
               >
                 + Add Your First Item
               </button>
             </div>
           ) : (
             <>
-              {/* Quick-glance summary */}
+              {/* Summary cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { label: "Total Items", value: items.length, tone: "" },
+                  { label: "Total Items (SKUs)", value: items.length, tone: "" },
                   { label: "Total Stock On Hand", value: num(reorder.reduce((s, r) => s + r.closingStock, 0)), tone: "" },
                   { label: "Transactions Logged", value: transactions.length, tone: "" },
                   {
@@ -224,22 +321,20 @@ function ImsInner() {
                     tone: needsReorderCount > 0 ? "bg-error/10 border-error text-error" : "",
                   },
                 ].map((c) => (
-                  <div
-                    key={c.label}
-                    className={`border-2 border-on-surface p-3 ${c.tone || "bg-surface-container-lowest"}`}
-                  >
+                  <div key={c.label} className={`border-2 border-on-surface p-3 ${c.tone || "bg-surface-container-lowest"}`}>
                     <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">{c.label}</p>
                     <p className="font-headline-md text-headline-md mt-1">{c.value}</p>
                   </div>
                 ))}
               </div>
 
+              {/* Tabs */}
               <div className="flex flex-wrap gap-2 border-b-2 border-on-surface pb-2">
                 {TABS.map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setTab(t.key)}
-                    className={`flex items-center gap-2 px-3 py-1.5 border-2 font-label-sm text-label-sm uppercase transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-1.5 border-2 font-label-sm text-label-sm uppercase transition-colors cursor-pointer ${
                       tab === t.key
                         ? "border-on-surface bg-on-surface text-surface"
                         : "border-on-surface text-on-surface hover:bg-surface-container"
@@ -247,11 +342,7 @@ function ImsInner() {
                   >
                     {t.label}
                     {!!t.badge && (
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-[11px] font-bold ${
-                          tab === t.key ? "bg-surface text-error" : "bg-error text-on-error"
-                        }`}
-                      >
+                      <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-[11px] font-bold ${tab === t.key ? "bg-surface text-error" : "bg-error text-on-error"}`}>
                         {t.badge}
                       </span>
                     )}
@@ -263,7 +354,7 @@ function ImsInner() {
                 <p className="font-data-mono text-data-mono text-on-surface-variant">Loading...</p>
               ) : (
                 <>
-                  {/* Section 1 — Item List */}
+                  {/* ─── Section 1: Item List ─────────────────────────────── */}
                   {tab === "items" && (
                     <div className="flex flex-col gap-stack-sm">
                       <input
@@ -279,25 +370,13 @@ function ImsInner() {
                               <th className={thCls}>SKU Code</th>
                               <th className={thCls}>Item Name</th>
                               <th className={thCls}>Category</th>
-                              <th className={thCls} title="Roughly how many units are used per day">
-                                Avg Daily Use
-                              </th>
-                              <th className={thCls} title="Days from placing an order to receiving stock">
-                                Lead Time
-                              </th>
-                              <th className={thCls} title="Multiplier applied to Base Max Level">
-                                Safety Factor
-                              </th>
-                              <th className={thCls} title="Minimum Order Quantity">
-                                MOQ
-                              </th>
+                              <th className={thCls} title="Roughly how many units are used per day">Avg Daily Use</th>
+                              <th className={thCls} title="Days from placing an order to receiving stock">Lead Time</th>
+                              <th className={thCls} title="Multiplier applied to Base Max Level">Safety Factor</th>
+                              <th className={thCls} title="Minimum Order Quantity">MOQ</th>
                               <th className={thCls}>Base Max Level</th>
-                              <th className={thCls} title="Base Max Level x Safety Factor, calculated automatically">
-                                Effective Max (Auto)
-                              </th>
-                              <th className={thCls} title="Stock already ordered but not yet received">
-                                In Transit
-                              </th>
+                              <th className={thCls} title="Base Max Level x Safety Factor, calculated automatically">Effective Max (Auto)</th>
+                              <th className={thCls} title="Stock already ordered but not yet received">In Transit</th>
                               <th className="py-3 px-4">Actions</th>
                             </tr>
                           </thead>
@@ -324,17 +403,14 @@ function ImsInner() {
                                 <td className="py-2 px-4 whitespace-nowrap">
                                   <div className="flex items-center gap-2">
                                     <button
-                                      onClick={() => {
-                                        setEditingItem(i);
-                                        setShowItemModal(true);
-                                      }}
-                                      className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                                      onClick={() => { setEditingItem(i); setShowItemModal(true); }}
+                                      className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors cursor-pointer"
                                     >
                                       Edit
                                     </button>
                                     <button
                                       onClick={() => handleDeleteItem(i.skuCode)}
-                                      className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                                      className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors cursor-pointer"
                                     >
                                       Delete
                                     </button>
@@ -348,15 +424,57 @@ function ImsInner() {
                     </div>
                   )}
 
-                  {/* Section 2 — In / Out */}
+                  {/* ─── Section 2: In / Out Transactions ────────────────── */}
                   {tab === "transactions" && (
-                    <div className="flex flex-col gap-stack-sm">
-                      <input
-                        value={txSearch}
-                        onChange={(e) => setTxSearch(e.target.value)}
-                        placeholder="Search by SKU or item name..."
-                        className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none max-w-sm"
+                    <div className="flex flex-col gap-3">
+                      {/* Range Filter Bar */}
+                      <RangeFilterBar
+                        range={txRange} onRange={applyTxRange}
+                        from={txFrom} onFrom={setTxFrom}
+                        to={txTo} onTo={setTxTo}
                       />
+
+                      {/* Search + Direction filter */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={txSearch}
+                          onChange={(e) => setTxSearch(e.target.value)}
+                          placeholder="Search by SKU or item name..."
+                          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-xs text-on-surface focus:outline-none min-w-[220px]"
+                        />
+                        <div className="flex items-center gap-1">
+                          {(["All", "In", "Out"] as const).map((d) => (
+                            <button
+                              key={d}
+                              onClick={() => setTxDirection(d)}
+                              className={`px-3 py-1.5 border-2 font-label-sm text-xs uppercase font-bold transition-colors cursor-pointer ${
+                                txDirection === d
+                                  ? "bg-on-surface text-surface border-on-surface"
+                                  : "border-on-surface text-on-surface hover:bg-surface-container"
+                              }`}
+                            >
+                              {d === "In" ? "↑ In" : d === "Out" ? "↓ Out" : "All"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Transaction summary mini cards */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="border border-on-surface/30 bg-surface p-3">
+                          <p className="font-label-sm text-[10px] uppercase text-on-surface-variant">Transactions</p>
+                          <p className="font-data-mono text-xl font-bold text-on-surface">{txStats.count}</p>
+                        </div>
+                        <div className="border border-on-surface/30 bg-emerald-50 p-3">
+                          <p className="font-label-sm text-[10px] uppercase text-emerald-800">Total Stock In</p>
+                          <p className="font-data-mono text-xl font-bold text-emerald-700">+{num(txStats.totalIn)}</p>
+                        </div>
+                        <div className="border border-on-surface/30 bg-rose-50 p-3">
+                          <p className="font-label-sm text-[10px] uppercase text-rose-800">Total Stock Out</p>
+                          <p className="font-data-mono text-xl font-bold text-rose-700">-{num(txStats.totalOut)}</p>
+                        </div>
+                      </div>
+
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[720px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
@@ -374,7 +492,9 @@ function ImsInner() {
                             {filteredTransactions.length === 0 && (
                               <tr>
                                 <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                                  {transactions.length === 0 ? "No transactions yet." : `No transactions match "${txSearch}".`}
+                                  {transactions.length === 0
+                                    ? "No transactions yet."
+                                    : `No transactions found for selected range / filter.`}
                                 </td>
                               </tr>
                             )}
@@ -387,11 +507,13 @@ function ImsInner() {
                                 <td className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{nameBySku.get(t.skuCode) ?? "—"}</td>
                                 <td className="py-2 px-4 border-r border-surface-variant">
                                   <span
-                                    className={`inline-block px-2 py-0.5 border border-on-surface font-label-sm text-label-sm uppercase ${
-                                      t.direction === "In" ? "bg-primary/20" : "bg-error/20 text-error"
+                                    className={`inline-block px-2 py-0.5 border font-label-sm text-label-sm uppercase font-bold ${
+                                      t.direction === "In"
+                                        ? "bg-emerald-100 text-emerald-800 border-emerald-400"
+                                        : "bg-rose-100 text-rose-800 border-rose-400"
                                     }`}
                                   >
-                                    {t.direction}
+                                    {t.direction === "In" ? "↑ In" : "↓ Out"}
                                   </span>
                                 </td>
                                 <td className={tdCls}>{formatDMY(t.date)}</td>
@@ -399,7 +521,7 @@ function ImsInner() {
                                 <td className="py-2 px-4">
                                   <button
                                     onClick={() => handleDeleteTransaction(t.id)}
-                                    className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                                    className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors cursor-pointer"
                                   >
                                     Delete
                                   </button>
@@ -412,25 +534,20 @@ function ImsInner() {
                     </div>
                   )}
 
-                  {/* Section 3 — Stock Ledger */}
+                  {/* ─── Section 3: Stock Ledger ──────────────────────────── */}
                   {tab === "ledger" && (
-                    <div className="flex flex-col gap-stack-sm">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">Show:</span>
-                        {([7, 14, 30, "all"] as const).map((r) => (
-                          <button
-                            key={r}
-                            onClick={() => setLedgerRange(r)}
-                            className={`px-3 py-1.5 border-2 font-label-sm text-label-sm uppercase transition-colors ${
-                              ledgerRange === r
-                                ? "border-on-surface bg-on-surface text-surface"
-                                : "border-on-surface text-on-surface hover:bg-surface-container"
-                            }`}
-                          >
-                            {r === "all" ? "All History" : `Last ${r} Days`}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="flex flex-col gap-3">
+                      <RangeFilterBar
+                        range={ledgerRange} onRange={applyLedgerRange}
+                        from={ledgerFrom} onFrom={setLedgerFrom}
+                        to={ledgerTo} onTo={setLedgerTo}
+                      />
+
+                      {visibleLedgerDates.length === 0 && ledger.dates.length > 0 && (
+                        <p className="font-label-sm text-xs text-on-surface-variant border border-on-surface/30 px-3 py-2">
+                          No ledger dates fall within selected range. Try changing the date filter.
+                        </p>
+                      )}
 
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
                         <table className="w-full text-left border-collapse">
@@ -442,9 +559,7 @@ function ImsInner() {
                               <th className={thCls}>In Transit</th>
                               <th className={thCls}>Closing Stock</th>
                               {visibleLedgerDates.map((d) => (
-                                <th key={d} className={thCls}>
-                                  {formatDMY(d)}
-                                </th>
+                                <th key={d} className={thCls}>{formatDMY(d)}</th>
                               ))}
                             </tr>
                           </thead>
@@ -464,9 +579,7 @@ function ImsInner() {
                                 <td className={tdCls}>{num(r.materialInTransit)}</td>
                                 <td className={tdCls}>{num(r.closingStock)}</td>
                                 {visibleLedgerDates.map((d) => (
-                                  <td key={d} className={tdCls}>
-                                    {num(r.byDate[d] ?? 0)}
-                                  </td>
+                                  <td key={d} className={tdCls}>{num(r.byDate[d] ?? 0)}</td>
                                 ))}
                               </tr>
                             ))}
@@ -476,7 +589,7 @@ function ImsInner() {
                     </div>
                   )}
 
-                  {/* Section 4 — Reorder Sheet */}
+                  {/* ─── Section 4: Reorder Sheet ─────────────────────────── */}
                   {tab === "reorder" && (
                     <div className="flex flex-col gap-stack-sm">
                       {needsReorderCount > 0 ? (
@@ -513,10 +626,7 @@ function ImsInner() {
                               </tr>
                             )}
                             {sortedReorder.map((r) => (
-                              <tr
-                                key={r.skuCode}
-                                className={`border-b border-surface-variant last:border-b-0 ${r.reorderQty > 0 ? "bg-error/10" : ""}`}
-                              >
+                              <tr key={r.skuCode} className={`border-b border-surface-variant last:border-b-0 ${r.reorderQty > 0 ? "bg-error/10" : ""}`}>
                                 <td className={tdCls}>{r.skuCode}</td>
                                 <td className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{r.itemName}</td>
                                 <td className={tdCls}>{r.category}</td>
@@ -547,20 +657,14 @@ function ImsInner() {
         <ImsItemModal
           item={editingItem}
           onClose={() => setShowItemModal(false)}
-          onSaved={() => {
-            setShowItemModal(false);
-            load();
-          }}
+          onSaved={() => { setShowItemModal(false); load(); }}
         />
       )}
       {showTxModal && (
         <ImsTransactionModal
           items={items}
           onClose={() => setShowTxModal(false)}
-          onSaved={() => {
-            setShowTxModal(false);
-            load();
-          }}
+          onSaved={() => { setShowTxModal(false); load(); }}
         />
       )}
     </>
