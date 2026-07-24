@@ -17,18 +17,43 @@ function getTodayIso() {
 function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory {
   const isCompleted = task.status === "Completed";
   const isCancelled = task.status === "Cancelled";
-
   if (isCancelled) return "Pending";
-
   if (!isCompleted) {
     if (task.dueDate && task.dueDate < todayIso) return "Red";
     return "Pending";
   }
-
   const completedDate = task.updatedAt ? task.updatedAt.slice(0, 10) : todayIso;
   if (task.dueDate && completedDate > task.dueDate) return "Red";
   if (task.revisionCount > 0) return "Yellow";
   return "Green";
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  const grade =
+    score >= 90 ? { label: "Excellent", color: "text-emerald-700 bg-emerald-100 border-emerald-500" }
+    : score >= 70 ? { label: "Good", color: "text-blue-700 bg-blue-100 border-blue-500" }
+    : score >= 50 ? { label: "Average", color: "text-amber-700 bg-amber-100 border-amber-500" }
+    : { label: "Poor", color: "text-rose-700 bg-rose-100 border-rose-500" };
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 border font-bold font-data-mono text-sm ${grade.color}`}>
+      {score}% <span className="text-[10px] font-label-sm uppercase opacity-75">{grade.label}</span>
+    </span>
+  );
+}
+
+function ScoreBar({ score }: { score: number }) {
+  const color =
+    score >= 90 ? "bg-emerald-500"
+    : score >= 70 ? "bg-blue-500"
+    : score >= 50 ? "bg-amber-500"
+    : "bg-rose-500";
+
+  return (
+    <div className="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden mt-1">
+      <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${score}%` }} />
+    </div>
+  );
 }
 
 function CategoryBadge({ category }: { category: TaskScoreCategory }) {
@@ -121,6 +146,7 @@ function PerformanceInner() {
     yellow: categorizedTasks.filter((t) => t.scoreCategory === "Yellow").length,
     red: categorizedTasks.filter((t) => t.scoreCategory === "Red").length,
     pending: categorizedTasks.filter((t) => t.scoreCategory === "Pending").length,
+    performanceScore: 0,
   };
 
   return (
@@ -132,17 +158,15 @@ function PerformanceInner() {
         {/* Page Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-2 border-on-surface pb-4">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-headline-xl text-headline-xl text-on-surface uppercase font-black tracking-tight">
-                DGMAX Task Performance Module
-              </h2>
-            </div>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1 max-w-3xl">
-              Category-Based Performance Tracking &bull; Pure Task Lifecycle Assessment (Green / Yellow / Red)
+            <h2 className="font-headline-xl text-headline-xl text-on-surface uppercase font-black tracking-tight">
+              DGMAX Task Performance Module
+            </h2>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
+              Category-Based Performance Tracking · Green / Yellow / Red + Numerical Score
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-surface-container border-2 border-on-surface font-data-mono text-data-mono uppercase text-on-surface text-xs font-bold">
+            <span className="px-3 py-1 bg-surface-container border-2 border-on-surface font-data-mono text-xs uppercase text-on-surface font-bold">
               {dgmaxSummary?.weekLabel || "Current Week"}
             </span>
           </div>
@@ -152,73 +176,82 @@ function PerformanceInner() {
           <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
         )}
 
-        {/* Notion-Style Category Scorecard Bento Cards */}
-        <section className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        {/* TEAM Overall Score Card */}
+        <section className="grid grid-cols-2 md:grid-cols-7 gap-3">
+          {/* Score Card - prominent */}
+          <div className="col-span-2 md:col-span-1 bg-on-surface text-surface p-4 flex flex-col justify-between">
+            <span className="font-label-sm text-xs uppercase font-bold opacity-70">Team Score</span>
+            <div>
+              <div className="font-data-mono text-4xl font-black">{totals.performanceScore}%</div>
+              <div className="text-[10px] uppercase opacity-60 mt-1">
+                {totals.performanceScore >= 90 ? "Excellent"
+                  : totals.performanceScore >= 70 ? "Good"
+                  : totals.performanceScore >= 50 ? "Average"
+                  : "Needs Improvement"}
+              </div>
+            </div>
+          </div>
+
           <div className="bg-surface border-2 border-on-surface p-4 flex flex-col justify-between">
-            <span className="font-label-sm text-xs text-on-surface-variant uppercase font-bold border-b border-on-surface/30 pb-1">
-              Assigned Tasks
-            </span>
+            <span className="font-label-sm text-xs text-on-surface-variant uppercase font-bold">Assigned</span>
             <div className="font-data-mono text-3xl font-black text-on-surface mt-2">{totals.assigned}</div>
           </div>
 
           <div className="bg-surface border-2 border-on-surface p-4 flex flex-col justify-between">
-            <span className="font-label-sm text-xs text-on-surface-variant uppercase font-bold border-b border-on-surface/30 pb-1">
-              Completed
-            </span>
+            <span className="font-label-sm text-xs text-on-surface-variant uppercase font-bold">Completed</span>
             <div className="font-data-mono text-3xl font-black text-on-surface mt-2">{totals.completed}</div>
           </div>
 
           <div className="bg-emerald-50 border-2 border-emerald-600 p-4 flex flex-col justify-between">
-            <span className="font-label-sm text-xs text-emerald-900 uppercase font-bold border-b border-emerald-300 pb-1 flex items-center justify-between">
-              Green 🟢
-            </span>
+            <span className="font-label-sm text-xs text-emerald-900 uppercase font-bold">🟢 Green</span>
             <div>
               <div className="font-data-mono text-3xl font-black text-emerald-800">{totals.green}</div>
-              <span className="text-[10px] text-emerald-700 font-medium">1st Time On-Time</span>
+              <span className="text-[10px] text-emerald-700 font-medium">1st Time On-Time · 100pts</span>
             </div>
           </div>
 
           <div className="bg-amber-50 border-2 border-amber-600 p-4 flex flex-col justify-between">
-            <span className="font-label-sm text-xs text-amber-900 uppercase font-bold border-b border-amber-300 pb-1 flex items-center justify-between">
-              Yellow 🟡
-            </span>
+            <span className="font-label-sm text-xs text-amber-900 uppercase font-bold">🟡 Yellow</span>
             <div>
               <div className="font-data-mono text-3xl font-black text-amber-800">{totals.yellow}</div>
-              <span className="text-[10px] text-amber-700 font-medium">Revisions Required</span>
+              <span className="text-[10px] text-amber-700 font-medium">Revision Required · 50pts</span>
             </div>
           </div>
 
           <div className="bg-rose-50 border-2 border-rose-600 p-4 flex flex-col justify-between">
-            <span className="font-label-sm text-xs text-rose-900 uppercase font-bold border-b border-rose-300 pb-1 flex items-center justify-between">
-              Red 🔴
-            </span>
+            <span className="font-label-sm text-xs text-rose-900 uppercase font-bold">🔴 Red</span>
             <div>
               <div className="font-data-mono text-3xl font-black text-rose-800">{totals.red}</div>
-              <span className="text-[10px] text-rose-700 font-medium">Overdue / Late</span>
+              <span className="text-[10px] text-rose-700 font-medium">Overdue / Late · 0pts</span>
             </div>
           </div>
 
           <div className="bg-slate-50 border-2 border-slate-500 p-4 flex flex-col justify-between">
-            <span className="font-label-sm text-xs text-slate-800 uppercase font-bold border-b border-slate-300 pb-1 flex items-center justify-between">
-              Pending ⚪
-            </span>
+            <span className="font-label-sm text-xs text-slate-800 uppercase font-bold">⚪ Pending</span>
             <div>
               <div className="font-data-mono text-3xl font-black text-slate-800">{totals.pending}</div>
-              <span className="text-[10px] text-slate-600 font-medium">Work In Progress</span>
+              <span className="text-[10px] text-slate-600 font-medium">In Progress</span>
             </div>
           </div>
         </section>
+
+        {/* Score Formula Note */}
+        <div className="flex items-center gap-2 text-[11px] text-on-surface-variant font-data-mono border border-on-surface/30 px-3 py-2 bg-surface-container">
+          <span className="font-bold uppercase text-on-surface">Score Formula:</span>
+          <span>Score = ((Green × 100) + (Yellow × 50) + (Red × 0)) ÷ (Green + Yellow + Red) × 100</span>
+          <span className="ml-auto opacity-60">Pending tasks excluded from scoring</span>
+        </div>
 
         {/* Employee Performance Breakdown Table */}
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between border-b-2 border-on-surface pb-2">
             <h3 className="font-headline-md text-headline-md text-on-surface uppercase font-bold">
-              Employee Task Category Breakdown
+              Employee Performance Scores
             </h3>
           </div>
 
           <div className="w-full overflow-x-auto bg-surface-container-lowest border-2 border-on-surface">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+            <table className="w-full text-left border-collapse min-w-[780px]">
               <thead className="bg-surface-container text-on-surface font-label-sm text-xs uppercase border-b-2 border-on-surface">
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
@@ -233,20 +266,25 @@ function PerformanceInner() {
                   <th className="py-3 px-4 border-r border-surface-variant text-center text-rose-800 font-bold bg-rose-50/50">
                     🔴 Red
                   </th>
-                  <th className="py-3 px-4 text-center text-slate-700 font-bold bg-slate-50/50">⚪ Pending</th>
+                  <th className="py-3 px-4 border-r border-surface-variant text-center text-slate-700 font-bold bg-slate-50/50">
+                    ⚪ Pending
+                  </th>
+                  <th className="py-3 px-4 text-center bg-on-surface/5 font-bold text-on-surface uppercase">
+                    Score
+                  </th>
                 </tr>
               </thead>
               <tbody className="font-body-md text-sm text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">
+                    <td colSpan={8} className="py-6 text-center font-data-mono text-on-surface-variant">
                       Loading employee task scores...
                     </td>
                   </tr>
                 )}
                 {!loading && (dgmaxSummary?.summaries.length ?? 0) === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">
+                    <td colSpan={8} className="py-6 text-center font-data-mono text-on-surface-variant">
                       No active task scoring data.
                     </td>
                   </tr>
@@ -272,8 +310,14 @@ function PerformanceInner() {
                     <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold text-rose-700 bg-rose-50/30">
                       {row.redCount}
                     </td>
-                    <td className="py-3 px-4 text-center font-data-mono text-slate-600 bg-slate-50/30">
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-slate-600 bg-slate-50/30">
                       {row.pendingCount}
+                    </td>
+                    <td className="py-3 px-4 bg-on-surface/5">
+                      <div className="flex flex-col">
+                        <ScoreBadge score={row.performanceScore} />
+                        <ScoreBar score={row.performanceScore} />
+                      </div>
                     </td>
                   </tr>
                 ))}

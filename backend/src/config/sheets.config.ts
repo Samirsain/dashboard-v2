@@ -356,6 +356,7 @@ export const sheetsConfig = {
       "Yellow Count": "yellow_count",
       "Red Count": "red_count",
       "Pending Count": "pending_count",
+      "Performance Score": "performance_score",
       "Manager Remarks": "manager_remarks",
       "Archived By": "archived_by",
       "Archived At": "archived_at",

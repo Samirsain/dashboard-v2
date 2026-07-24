@@ -319,6 +319,7 @@ export interface DgmaxEmployeeSummary {
   yellowCount: number;
   redCount: number;
   pendingCount: number;
+  performanceScore: number; // calculated numeric score (0-100)
 }
 
 export interface DgmaxWeeklySummary {
@@ -333,6 +334,7 @@ export interface DgmaxWeeklySummary {
     yellow: number;
     red: number;
     pending: number;
+    performanceScore: number;
   };
 }
 
@@ -348,6 +350,7 @@ export interface WeeklyArchive {
   yellowCount: number;
   redCount: number;
   pendingCount: number;
+  performanceScore: number;
   managerRemarks: string;
   archivedBy: string;
   archivedAt: string;

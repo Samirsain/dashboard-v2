@@ -74,6 +74,7 @@ export function buildDgmaxWeeklySummary(
       yellowCount: 0,
       redCount: 0,
       pendingCount: 0,
+      performanceScore: 0,
     });
   }
 
@@ -105,9 +106,18 @@ export function buildDgmaxWeeklySummary(
     else if (cat === "Pending") s.pendingCount++;
   }
 
-  const summaries = Array.from(summaryMap.values()).sort((a, b) =>
-    a.doerName.localeCompare(b.doerName)
-  );
+  const summaries = Array.from(summaryMap.values())
+    .map(s => {
+      const scoredTasks = s.greenCount + s.yellowCount + s.redCount;
+      // Formula: ((Green * 100) + (Yellow * 50) + (Red * 0)) / ScoredTasks
+      if (scoredTasks > 0) {
+        s.performanceScore = Math.round(((s.greenCount * 100) + (s.yellowCount * 50)) / scoredTasks);
+      } else {
+        s.performanceScore = 0;
+      }
+      return s;
+    })
+    .sort((a, b) => a.doerName.localeCompare(b.doerName));
 
   const totals = {
     assigned: 0,
@@ -116,6 +126,7 @@ export function buildDgmaxWeeklySummary(
     yellow: 0,
     red: 0,
     pending: 0,
+    performanceScore: 0,
   };
 
   for (const s of summaries) {
@@ -125,6 +136,13 @@ export function buildDgmaxWeeklySummary(
     totals.yellow += s.yellowCount;
     totals.red += s.redCount;
     totals.pending += s.pendingCount;
+  }
+
+  const totalScored = totals.green + totals.yellow + totals.red;
+  if (totalScored > 0) {
+    totals.performanceScore = Math.round(((totals.green * 100) + (totals.yellow * 50)) / totalScored);
+  } else {
+    totals.performanceScore = 0;
   }
 
   return {
