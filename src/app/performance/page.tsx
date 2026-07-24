@@ -1,34 +1,91 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
+import InitialsAvatar from "@/components/InitialsAvatar";
 import { api, ApiError } from "@/lib/api";
-import type { Doer, FullDashboard, UserWiseTaskStat } from "@/lib/types";
+import { formatDMY } from "@/lib/format";
+import type { Task, Doer, DgmaxWeeklySummary, TaskScoreCategory } from "@/lib/types";
 
-function score(stat: UserWiseTaskStat): number {
-  if (stat.total === 0) return 0;
-  return Math.round((stat.completed / stat.total) * 100);
+function getTodayIso() {
+  const formatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
+  return formatter.format(new Date());
+}
+
+function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory {
+  const isCompleted = task.status === "Completed";
+  const isCancelled = task.status === "Cancelled";
+
+  if (isCancelled) return "Pending";
+
+  if (!isCompleted) {
+    if (task.dueDate && task.dueDate < todayIso) return "Red";
+    return "Pending";
+  }
+
+  const completedDate = task.updatedAt ? task.updatedAt.slice(0, 10) : todayIso;
+  if (task.dueDate && completedDate > task.dueDate) return "Red";
+  if (task.revisionCount > 0) return "Yellow";
+  return "Green";
+}
+
+function CategoryBadge({ category }: { category: TaskScoreCategory }) {
+  if (category === "Green") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-900 border border-emerald-500 font-label-sm text-xs font-bold uppercase rounded-sm">
+        <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+        Green
+      </span>
+    );
+  }
+  if (category === "Yellow") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-500 font-label-sm text-xs font-bold uppercase rounded-sm">
+        <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+        Yellow
+      </span>
+    );
+  }
+  if (category === "Red") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-100 text-rose-900 border border-rose-500 font-label-sm text-xs font-bold uppercase rounded-sm">
+        <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+        Red
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-400 font-label-sm text-xs font-medium uppercase rounded-sm">
+      <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+      Pending
+    </span>
+  );
 }
 
 function PerformanceInner() {
-  const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
+  const [dgmaxSummary, setDgmaxSummary] = useState<DgmaxWeeklySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const [dash, doerData] = await Promise.all([
-          api.get<FullDashboard>("/dashboard"),
+        const [taskData, doerData, summaryData] = await Promise.all([
+          api.get<Task[]>("/tasks"),
           api.get<Doer[]>("/users"),
+          api.get<DgmaxWeeklySummary>("/performance/dgmax"),
         ]);
-        setDashboard(dash);
+        setTasks(taskData);
         setDoers(doerData);
+        setDgmaxSummary(summaryData);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to load performance data.");
       } finally {
@@ -38,184 +95,273 @@ function PerformanceInner() {
     load();
   }, []);
 
-  const departmentByDoerId = new Map(doers.map((d) => [d.id, d.department || "-"]));
-  const leaderboard = [...(dashboard?.breakdowns.userWiseTasks ?? [])].sort(
-    (a, b) => score(b) - score(a)
-  );
-  const summary = dashboard?.summary;
-  const overallPct =
-    summary && summary.totalTasks > 0
-      ? Math.round((summary.completed / summary.totalTasks) * 100)
-      : 0;
+  const todayIso = getTodayIso();
 
-  const metrics = [
-    { label: "Overall Score", value: `${overallPct}%`, color: "text-primary-container" },
-    { label: "Tasks Done", value: String(summary?.completed ?? 0), color: "text-on-surface" },
-    {
-      label: "Late Items",
-      value: String(summary?.overdue ?? 0),
-      color: "text-on-surface",
-      icon: "schedule",
-    },
-  ];
+  const categorizedTasks = useMemo(() => {
+    return tasks.map((t) => ({
+      ...t,
+      scoreCategory: getTaskCategory(t, todayIso),
+    }));
+  }, [tasks, todayIso]);
+
+  const filteredTasks = useMemo(() => {
+    return categorizedTasks.filter((t) => {
+      const matchSearch =
+        t.title.toLowerCase().includes(search.toLowerCase()) ||
+        (t.doer?.name ?? "").toLowerCase().includes(search.toLowerCase());
+      const matchCat = categoryFilter === "ALL" || t.scoreCategory === categoryFilter;
+      return matchSearch && matchCat;
+    });
+  }, [categorizedTasks, search, categoryFilter]);
+
+  const totals = dgmaxSummary?.totals ?? {
+    assigned: tasks.length,
+    completed: tasks.filter((t) => t.status === "Completed").length,
+    green: categorizedTasks.filter((t) => t.scoreCategory === "Green").length,
+    yellow: categorizedTasks.filter((t) => t.scoreCategory === "Yellow").length,
+    red: categorizedTasks.filter((t) => t.scoreCategory === "Red").length,
+    pending: categorizedTasks.filter((t) => t.scoreCategory === "Pending").length,
+  };
 
   return (
     <>
       <MobileHeader />
       <SideNav active="dashboard" />
 
-      <main className="flex-1 md:ml-64 p-4 md:p-container-padding flex flex-col gap-6 md:gap-stack-lg max-w-[1440px] mx-auto w-full">
+      <main className="flex-1 md:ml-64 p-4 md:p-container-padding flex flex-col gap-6 max-w-[1440px] mx-auto w-full">
         {/* Page Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-2 border-on-surface pb-4">
           <div>
-            <h2 className="font-headline-xl text-headline-xl text-on-surface">
-              Performance Scorecard
-            </h2>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-2xl">
-              Enterprise resource utilization and individual contributor metrics for
-              current operational cycle.
+            <div className="flex items-center gap-2">
+              <h2 className="font-headline-xl text-headline-xl text-on-surface uppercase font-black tracking-tight">
+                DGMAX Task Performance Module
+              </h2>
+            </div>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1 max-w-3xl">
+              Category-Based Performance Tracking &bull; Pure Task Lifecycle Assessment (Green / Yellow / Red)
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-primary-container text-on-primary font-label-sm text-label-sm uppercase">
-              Status: Active
+            <span className="px-3 py-1 bg-surface-container border-2 border-on-surface font-data-mono text-data-mono uppercase text-on-surface text-xs font-bold">
+              {dgmaxSummary?.weekLabel || "Current Week"}
             </span>
           </div>
         </header>
 
         {error && (
-          <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
-            {error}
-          </p>
+          <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
         )}
 
-        {/* Key Metrics Bento Grid */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-gutter">
-          {metrics.map((m) => (
-            <div
-              key={m.label}
-              className="bg-surface-container-lowest swiss-border flex flex-col justify-between p-6 h-40"
-            >
-              <div className="font-label-sm text-label-sm text-on-surface-variant uppercase flex items-center gap-2">
-                {m.label}
-                {m.icon && (
-                  <span className="material-symbols-outlined text-[16px] text-[#000000]">
-                    {m.icon}
-                  </span>
-                )}
-              </div>
-              <div
-                className={`font-headline-xl text-headline-xl data-mono tracking-tighter ${m.color}`}
-              >
-                {m.value}
-              </div>
-            </div>
-          ))}
+        {/* Notion-Style Category Scorecard Bento Cards */}
+        <section className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="bg-surface border-2 border-on-surface p-4 flex flex-col justify-between">
+            <span className="font-label-sm text-xs text-on-surface-variant uppercase font-bold border-b border-on-surface/30 pb-1">
+              Assigned Tasks
+            </span>
+            <div className="font-data-mono text-3xl font-black text-on-surface mt-2">{totals.assigned}</div>
+          </div>
 
-          {/* Red Flags = critical-priority tasks */}
-          <div className="bg-surface-container-lowest swiss-border flex flex-col justify-between p-6 h-40 relative overflow-hidden group hover:bg-[#F5F5F5] transition-colors cursor-pointer">
-            <div className="font-label-sm text-label-sm text-error uppercase flex items-center gap-2">
-              Red Flags
-              <span className="material-symbols-outlined text-[16px]" data-weight="fill">
-                warning
-              </span>
+          <div className="bg-surface border-2 border-on-surface p-4 flex flex-col justify-between">
+            <span className="font-label-sm text-xs text-on-surface-variant uppercase font-bold border-b border-on-surface/30 pb-1">
+              Completed
+            </span>
+            <div className="font-data-mono text-3xl font-black text-on-surface mt-2">{totals.completed}</div>
+          </div>
+
+          <div className="bg-emerald-50 border-2 border-emerald-600 p-4 flex flex-col justify-between">
+            <span className="font-label-sm text-xs text-emerald-900 uppercase font-bold border-b border-emerald-300 pb-1 flex items-center justify-between">
+              Green 🟢
+            </span>
+            <div>
+              <div className="font-data-mono text-3xl font-black text-emerald-800">{totals.green}</div>
+              <span className="text-[10px] text-emerald-700 font-medium">1st Time On-Time</span>
             </div>
-            <div className="font-headline-xl text-headline-xl text-error data-mono tracking-tighter relative z-10">
-              {summary?.critical ?? 0}
+          </div>
+
+          <div className="bg-amber-50 border-2 border-amber-600 p-4 flex flex-col justify-between">
+            <span className="font-label-sm text-xs text-amber-900 uppercase font-bold border-b border-amber-300 pb-1 flex items-center justify-between">
+              Yellow 🟡
+            </span>
+            <div>
+              <div className="font-data-mono text-3xl font-black text-amber-800">{totals.yellow}</div>
+              <span className="text-[10px] text-amber-700 font-medium">Revisions Required</span>
             </div>
-            <div
-              className="absolute inset-0 opacity-10 pointer-events-none"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(45deg, #ba1a1a 0, #ba1a1a 2px, transparent 2px, transparent 10px)",
-              }}
-            />
+          </div>
+
+          <div className="bg-rose-50 border-2 border-rose-600 p-4 flex flex-col justify-between">
+            <span className="font-label-sm text-xs text-rose-900 uppercase font-bold border-b border-rose-300 pb-1 flex items-center justify-between">
+              Red 🔴
+            </span>
+            <div>
+              <div className="font-data-mono text-3xl font-black text-rose-800">{totals.red}</div>
+              <span className="text-[10px] text-rose-700 font-medium">Overdue / Late</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 border-2 border-slate-500 p-4 flex flex-col justify-between">
+            <span className="font-label-sm text-xs text-slate-800 uppercase font-bold border-b border-slate-300 pb-1 flex items-center justify-between">
+              Pending ⚪
+            </span>
+            <div>
+              <div className="font-data-mono text-3xl font-black text-slate-800">{totals.pending}</div>
+              <span className="text-[10px] text-slate-600 font-medium">Work In Progress</span>
+            </div>
           </div>
         </section>
 
-        {/* Leaderboard Section */}
-        <section className="mt-4">
-          <div className="flex items-center justify-between border-b-2 border-on-surface pb-2 mb-4">
-            <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
-              Contributor Leaderboard
+        {/* Employee Performance Breakdown Table */}
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between border-b-2 border-on-surface pb-2">
+            <h3 className="font-headline-md text-headline-md text-on-surface uppercase font-bold">
+              Employee Task Category Breakdown
             </h3>
           </div>
 
-          <div className="w-full overflow-x-auto bg-surface-container-lowest swiss-border">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#F5F5F5] swiss-border-b">
-                  <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant w-16">
-                    Rank
+          <div className="w-full overflow-x-auto bg-surface-container-lowest border-2 border-on-surface">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead className="bg-surface-container text-on-surface font-label-sm text-xs uppercase border-b-2 border-on-surface">
+                <tr>
+                  <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
+                  <th className="py-3 px-4 border-r border-surface-variant">Department</th>
+                  <th className="py-3 px-4 border-r border-surface-variant text-center">Assigned</th>
+                  <th className="py-3 px-4 border-r border-surface-variant text-center text-emerald-800 font-bold bg-emerald-50/50">
+                    🟢 Green
                   </th>
-                  <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant">
-                    Doer
+                  <th className="py-3 px-4 border-r border-surface-variant text-center text-amber-800 font-bold bg-amber-50/50">
+                    🟡 Yellow
                   </th>
-                  <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant hidden md:table-cell">
-                    Department
+                  <th className="py-3 px-4 border-r border-surface-variant text-center text-rose-800 font-bold bg-rose-50/50">
+                    🔴 Red
                   </th>
-                  <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant text-right">
-                    Score
-                  </th>
+                  <th className="py-3 px-4 text-center text-slate-700 font-bold bg-slate-50/50">⚪ Pending</th>
                 </tr>
               </thead>
-              <tbody className="font-body-md text-body-md text-on-surface">
-                {!loading && leaderboard.length === 0 && (
+              <tbody className="font-body-md text-sm text-on-surface">
+                {loading && (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                      No task data yet.
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">
+                      Loading employee task scores...
                     </td>
                   </tr>
                 )}
-                {leaderboard.map((row, i) => {
-                  const rank = String(i + 1).padStart(2, "0");
-                  const top = i === 0;
-                  const s = score(row);
-                  return (
-                    <tr
-                      key={row.doerId}
-                      className="swiss-divider last:border-b-0 hover:bg-[#F5F5F5] transition-colors group"
-                    >
-                      <td
-                        className={`py-4 px-4 font-headline-md text-headline-md data-mono ${
-                          top ? "font-black" : "font-bold text-on-surface-variant"
-                        }`}
-                      >
-                        {rank}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 flex items-center justify-center font-headline-md text-headline-md uppercase ${
-                              top
-                                ? "bg-[#000000] text-white"
-                                : "bg-surface-variant text-on-surface"
-                            }`}
-                          >
-                            {row.doerName.charAt(0)}
-                          </div>
-                          <div className="font-headline-md text-headline-md text-base">
-                            {row.doerName}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 hidden md:table-cell font-label-sm text-label-sm text-on-surface-variant">
-                        {departmentByDoerId.get(row.doerId) ?? "-"}
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        {top ? (
-                          <span className="font-headline-md text-headline-md font-bold data-mono bg-primary-container text-on-primary px-2 py-1">
-                            {s}%
-                          </span>
-                        ) : (
-                          <span className="font-headline-md text-headline-md font-bold data-mono">
-                            {s}%
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {!loading && (dgmaxSummary?.summaries.length ?? 0) === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">
+                      No active task scoring data.
+                    </td>
+                  </tr>
+                )}
+                {dgmaxSummary?.summaries.map((row) => (
+                  <tr key={row.doerId} className="border-b border-surface-variant hover:bg-surface-container-low transition-colors">
+                    <td className="py-3 px-4 border-r border-surface-variant font-bold">
+                      <div className="flex items-center gap-2">
+                        <InitialsAvatar name={row.doerName} className="w-7 h-7 text-xs border border-on-surface" />
+                        <span>{row.doerName}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{row.department}</td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold">
+                      {row.assignedTasks}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold text-emerald-700 bg-emerald-50/30">
+                      {row.greenCount}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold text-amber-700 bg-amber-50/30">
+                      {row.yellowCount}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold text-rose-700 bg-rose-50/30">
+                      {row.redCount}
+                    </td>
+                    <td className="py-3 px-4 text-center font-data-mono text-slate-600 bg-slate-50/30">
+                      {row.pendingCount}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Detailed Task Lifecycle Table */}
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-on-surface pb-2">
+            <h3 className="font-headline-md text-headline-md text-on-surface uppercase font-bold">
+              Task Execution & Review List
+            </h3>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search task or doer..."
+                className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-xs text-on-surface focus:outline-none min-w-[220px]"
+              />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-xs uppercase text-on-surface focus:outline-none"
+              >
+                <option value="ALL">All Categories</option>
+                <option value="Green">Green (First-time)</option>
+                <option value="Yellow">Yellow (Revisions)</option>
+                <option value="Red">Red (Overdue / Late)</option>
+                <option value="Pending">Pending (In Progress)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="w-full overflow-x-auto bg-surface-container-lowest border-2 border-on-surface">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead className="bg-surface-container text-on-surface font-label-sm text-xs uppercase border-b-2 border-on-surface">
+                <tr>
+                  <th className="py-3 px-4 border-r border-surface-variant">Task Title</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-40">Assigned Doer</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Due Date</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Revisions</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Status</th>
+                  <th className="py-3 px-4 w-36 text-center">DGMAX Category</th>
+                </tr>
+              </thead>
+              <tbody className="font-body-md text-sm text-on-surface">
+                {loading && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center font-data-mono text-on-surface-variant">
+                      Loading tasks...
+                    </td>
+                  </tr>
+                )}
+                {!loading && filteredTasks.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center font-data-mono text-on-surface-variant">
+                      No tasks found matching criteria.
+                    </td>
+                  </tr>
+                )}
+                {filteredTasks.map((t) => (
+                  <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                    <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.title}</td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
+                      {t.doer?.name ?? "—"}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono">
+                      {formatDMY(t.dueDate)}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono">
+                      {t.revisionCount > 0 ? (
+                        <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 border border-amber-400">
+                          {t.revisionCount}×
+                        </span>
+                      ) : (
+                        "0"
+                      )}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono">
+                      {t.status}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <CategoryBadge category={t.scoreCategory} />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

@@ -338,6 +338,30 @@ export const sheetsConfig = {
     },
     "WORKFLOW_STEP_EVENTS"
   ),
+
+  /** DGMAX — Weekly performance archives locked in by managers with remarks. */
+  weeklyArchives: entity(
+    "WEEKLY_ARCHIVES",
+    "weekly_archives",
+    "Archive ID",
+    {
+      "Archive ID": "id",
+      "Week Label": "week_label",
+      "Employee ID": "employee_id",
+      "Employee Name": "employee_name",
+      Department: "department",
+      "Assigned Tasks": "assigned_tasks",
+      "Completed Tasks": "completed_tasks",
+      "Green Count": "green_count",
+      "Yellow Count": "yellow_count",
+      "Red Count": "red_count",
+      "Pending Count": "pending_count",
+      "Manager Remarks": "manager_remarks",
+      "Archived By": "archived_by",
+      "Archived At": "archived_at",
+    },
+    "WEEKLY_ARCHIVES"
+  ),
 };
 
 export type SheetEntityKey = keyof typeof sheetsConfig;

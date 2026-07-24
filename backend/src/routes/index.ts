@@ -13,6 +13,7 @@ import backupRoutes from "./backup.routes";
 import ticketRoutes from "./ticket.routes";
 import attendanceRoutes from "./attendance.routes";
 import imsRoutes from "./ims.routes";
+import performanceRoutes from "./performance.routes";
 import { hasGoogleCredentials, hasSupabaseCredentials } from "../config/env";
 
 const router = Router();
@@ -44,5 +45,6 @@ router.use("/backup", backupRoutes);
 router.use("/tickets", ticketRoutes);
 router.use("/attendance", attendanceRoutes);
 router.use("/ims", imsRoutes);
+router.use("/performance", performanceRoutes);
 
 export default router;

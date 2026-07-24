@@ -345,3 +345,51 @@ export interface ImsReorderRow {
   reorderQty: number;
 }
 
+// ---- DGMAX Task Scoring System Types --------------------------------------
+
+export type TaskScoreCategory = "Green" | "Yellow" | "Red" | "Pending";
+
+export interface DgmaxEmployeeSummary {
+  doerId: string;
+  doerName: string;
+  department: string;
+  assignedTasks: number;
+  completedTasks: number;
+  greenCount: number;
+  yellowCount: number;
+  redCount: number;
+  pendingCount: number;
+}
+
+export interface DgmaxWeeklySummary {
+  weekLabel: string;
+  fromDate: string;
+  toDate: string;
+  summaries: DgmaxEmployeeSummary[];
+  totals: {
+    assigned: number;
+    completed: number;
+    green: number;
+    yellow: number;
+    red: number;
+    pending: number;
+  };
+}
+
+export interface WeeklyArchive {
+  id: string;
+  weekLabel: string;
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  assignedTasks: number;
+  completedTasks: number;
+  greenCount: number;
+  yellowCount: number;
+  redCount: number;
+  pendingCount: number;
+  managerRemarks: string;
+  archivedBy: string;
+  archivedAt: string;
+}
+
