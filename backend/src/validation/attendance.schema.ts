@@ -15,7 +15,7 @@ export const attendanceRangeQuerySchema = z.object({
 export const markStatusSchema = z.object({
   employeeIds: z.array(z.string().min(1)).min(1),
   date: isoDate.optional(),
-  status: z.enum(["Present", "Late", "Half Day", "Absent", "Leave"]),
+  status: z.enum(["Present", "Late", "Half Day", "Absent", "Leave", "Pending Checkout"]),
 });
 
 export const checkInOutSchema = z.object({
@@ -38,7 +38,7 @@ export const editAttendanceSchema = z.object({
   checkInTime: z.union([timeString, z.literal("")]).optional(),
   checkOutTime: z.union([timeString, z.literal("")]).optional(),
   // Manual override; omit to auto-calculate the status from the times above.
-  status: z.union([z.enum(["Present", "Late", "Half Day", "Absent", "Leave"]), z.literal("")]).optional(),
+  status: z.union([z.enum(["Present", "Late", "Half Day", "Absent", "Leave", "Pending Checkout"]), z.literal("")]).optional(),
   remarks: z.string().optional(),
 });
 

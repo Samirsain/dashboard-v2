@@ -5,7 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import type { Attendance, AttendanceStatus } from "@/lib/types";
 
-const STATUS_OPTIONS: (AttendanceStatus | "")[] = ["Present", "Late", "Half Day", "Absent", "Leave"];
+const STATUS_OPTIONS: (AttendanceStatus | "")[] = ["Present", "Late", "Half Day", "Absent", "Leave", "Pending Checkout"];
 
 /** "2026-07-20T04:15:00.000Z" -> "09:45" (in the browser's local time, which matches office hours). */
 function toTimeInput(iso: string): string {

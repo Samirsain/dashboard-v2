@@ -1,7 +1,8 @@
 import { env } from "../config/env";
+import type { AttendanceStatus } from "../types";
 
 /** Minutes since midnight for `date`, in the configured timezone. */
-function minutesSinceMidnight(date: Date, timeZone = env.scheduler.timezone): number {
+export function minutesSinceMidnight(date: Date, timeZone = env.scheduler.timezone): number {
   const formatter = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",
@@ -14,48 +15,94 @@ function minutesSinceMidnight(date: Date, timeZone = env.scheduler.timezone): nu
   return hour * 60 + minute;
 }
 
-// Office-hours policy (per the posted notice):
-//   LATE ("L")     — arrival after 9:45 AM, or departure before 6:15 PM.
-//   HALF DAY ("H") — arrival after 11:00 AM, or departure before 5:00 PM.
-//   Absent         — arrival after 2:00 PM (never showed up for real).
-const CHECK_IN_ON_TIME_END = 9 * 60 + 45; // 09:45 AM — arrive by this to be Present
-const CHECK_IN_LATE_END = 11 * 60; // 11:00 AM — after this, arrival is Half Day
-const CHECK_IN_HALF_DAY_END = 14 * 60; // 02:00 PM — after this, arrival counts as Absent
-const CHECK_OUT_HALF_DAY_BEFORE = 17 * 60; // 05:00 PM — leaving earlier forces Half Day
-const CHECK_OUT_LATE_BEFORE = 18 * 60 + 15; // 06:15 PM — leaving earlier downgrades Present to Late
+// Office-hours Policy Timings:
+// Office Start: 9:30 AM | Office End: 6:30 PM (18:30)
+// Step 1: Initial Status from Check-in
+//   9:30 AM - 9:45 AM  -> Present (P)
+//   9:46 AM - 11:00 AM -> Late (L)
+//   11:01 AM - 2:30 PM -> Half Day (H)
+//   After 2:30 PM      -> Absent (A)
+const ON_TIME_END_MINUTES = 9 * 60 + 45; // 09:45 AM
+const LATE_END_MINUTES = 11 * 60; // 11:00 AM
+const HALF_DAY_END_MINUTES = 14 * 60 + 30; // 02:30 PM (14:30)
+const OFFICE_END_MINUTES = 18 * 60 + 30; // 06:30 PM (18:30)
 
-export type CheckInStatus = "Present" | "Late" | "Half Day" | "Absent";
-
-/** Check-in status + how many minutes late (0 unless Late/Half Day/Absent), from the office-hours policy. */
-export function computeCheckInStatus(date: Date): { status: CheckInStatus; lateMinutes: number } {
-  const mins = minutesSinceMidnight(date);
-  if (mins <= CHECK_IN_ON_TIME_END) return { status: "Present", lateMinutes: 0 };
-  if (mins <= CHECK_IN_LATE_END) return { status: "Late", lateMinutes: mins - CHECK_IN_ON_TIME_END };
-  if (mins <= CHECK_IN_HALF_DAY_END)
-    return { status: "Half Day", lateMinutes: mins - CHECK_IN_ON_TIME_END };
-  return { status: "Absent", lateMinutes: mins - CHECK_IN_ON_TIME_END };
+export interface AttendanceCalculationResult {
+  status: AttendanceStatus;
+  lateMinutes: number;
+  earlyExitMinutes: number;
+  workingMinutes: number;
 }
 
 /**
- * Check-out effect on the day, per the notice:
- *  - before 5:00 PM  -> forces the day to Half Day
- *  - before 6:15 PM  -> forces at least Late (a Present day becomes Late)
- *  - 6:15 PM onwards -> no penalty
- * earlyExitMinutes is how many minutes before 6:15 PM the person left (0 if on time).
+ * Computes final attendance status, late minutes, early exit minutes, and working minutes
+ * using Check-in Time and Check-out Time per the Attendance Policy Rules.
  */
-export function computeCheckOutStatus(date: Date): {
-  earlyExitMinutes: number;
-  forcedHalfDay: boolean;
-  forcedLate: boolean;
-} {
-  const mins = minutesSinceMidnight(date);
-  if (mins < CHECK_OUT_HALF_DAY_BEFORE) {
-    return { earlyExitMinutes: CHECK_OUT_LATE_BEFORE - mins, forcedHalfDay: true, forcedLate: false };
+export function computeAttendance(
+  checkInDate?: Date | null,
+  checkOutDate?: Date | null
+): AttendanceCalculationResult {
+  // Step 6: If Check-in is missing -> Absent
+  if (!checkInDate) {
+    return { status: "Absent", lateMinutes: 0, earlyExitMinutes: 0, workingMinutes: 0 };
   }
-  if (mins < CHECK_OUT_LATE_BEFORE) {
-    return { earlyExitMinutes: CHECK_OUT_LATE_BEFORE - mins, forcedHalfDay: false, forcedLate: true };
+
+  const inMins = minutesSinceMidnight(checkInDate);
+  const lateMinutes = inMins > ON_TIME_END_MINUTES ? inMins - ON_TIME_END_MINUTES : 0;
+
+  // Step 1: Initial Status from Check-in
+  let initialStatus: AttendanceStatus;
+  if (inMins <= ON_TIME_END_MINUTES) {
+    initialStatus = "Present";
+  } else if (inMins <= LATE_END_MINUTES) {
+    initialStatus = "Late";
+  } else if (inMins <= HALF_DAY_END_MINUTES) {
+    initialStatus = "Half Day";
+  } else {
+    initialStatus = "Absent";
   }
-  return { earlyExitMinutes: 0, forcedHalfDay: false, forcedLate: false };
+
+  // Step 5: If Check-out is missing -> Pending Checkout
+  if (!checkOutDate) {
+    return {
+      status: "Pending Checkout",
+      lateMinutes,
+      earlyExitMinutes: 0,
+      workingMinutes: 0,
+    };
+  }
+
+  // Step 2: Working Hours = Check-out Time - Check-in Time
+  const outMins = minutesSinceMidnight(checkOutDate);
+  const earlyExitMinutes = outMins < OFFICE_END_MINUTES ? OFFICE_END_MINUTES - outMins : 0;
+  const workingMinutes = Math.max(0, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / 60000));
+
+  // Step 3: Apply Final Attendance Rules
+  let finalStatus: AttendanceStatus;
+
+  // Rule 4: If Check-in is after 2:30 PM -> Absent regardless of working hours
+  if (inMins > HALF_DAY_END_MINUTES) {
+    finalStatus = "Absent";
+  }
+  // Rule 1: Working Hours < 4 hours (240 mins) -> Absent
+  else if (workingMinutes < 240) {
+    finalStatus = "Absent";
+  }
+  // Rule 2: Working Hours >= 4 hours and < 8 hours (240 mins <= workingMinutes < 480 mins) -> Half Day
+  else if (workingMinutes < 480) {
+    finalStatus = "Half Day";
+  }
+  // Rule 3: Working Hours >= 8 hours (480 mins) -> Keep Check-in Status
+  else {
+    finalStatus = initialStatus;
+  }
+
+  return {
+    status: finalStatus,
+    lateMinutes,
+    earlyExitMinutes,
+    workingMinutes,
+  };
 }
 
 /** Whole minutes between two ISO timestamps. */

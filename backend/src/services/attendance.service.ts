@@ -3,7 +3,7 @@ import { dataService, type SheetRecord } from "./data.service";
 import { usersService } from "./users.service";
 import { generateId } from "../utils/id";
 import { todayIso } from "../utils/date";
-import { computeCheckInStatus, computeCheckOutStatus, minutesBetween, zonedTimeToUtcIso } from "../utils/attendanceTime";
+import { computeAttendance, zonedTimeToUtcIso } from "../utils/attendanceTime";
 import { AppError } from "../utils/AppError";
 import type { Attendance, AttendanceStatus, User } from "../types";
 
@@ -99,11 +99,12 @@ export const attendanceService = {
     if (existing && existing["CheckIn"]) {
       throw AppError.conflict("Already checked in for this date.", "ALREADY_CHECKED_IN");
     }
-    const { status, lateMinutes } = computeCheckInStatus(new Date());
+    const nowIso = new Date().toISOString();
+    const calc = computeAttendance(new Date(), null);
     return upsert(
       employeeId,
       date,
-      { CheckIn: new Date().toISOString(), Status: status, "Late Minutes": String(lateMinutes) },
+      { CheckIn: nowIso, Status: calc.status, "Late Minutes": String(calc.lateMinutes) },
       markedBy
     );
   },
@@ -117,22 +118,18 @@ export const attendanceService = {
       throw AppError.conflict("Already checked out for this date.", "ALREADY_CHECKED_OUT");
     }
     const nowIso = new Date().toISOString();
-    const { earlyExitMinutes, forcedHalfDay, forcedLate } = computeCheckOutStatus(new Date());
-    const workingMinutes = minutesBetween(existing["CheckIn"] as string, nowIso);
-    // Early departure can only make the day worse, never better: before 5 PM
-    // forces Half Day; before 6:15 PM downgrades a Present day to Late.
-    const current = ((existing["Status"] as AttendanceStatus) || "Present") as AttendanceStatus;
-    let status: AttendanceStatus = current;
-    if (forcedHalfDay && (current === "Present" || current === "Late")) status = "Half Day";
-    else if (forcedLate && current === "Present") status = "Late";
+    const checkInDate = new Date(existing["CheckIn"] as string);
+    const checkOutDate = new Date(nowIso);
+    const calc = computeAttendance(checkInDate, checkOutDate);
     return upsert(
       employeeId,
       date,
       {
         CheckOut: nowIso,
-        Status: status,
-        "Working Minutes": String(workingMinutes),
-        "Early Exit Minutes": String(Math.max(0, earlyExitMinutes)),
+        Status: calc.status,
+        "Working Minutes": String(calc.workingMinutes),
+        "Early Exit Minutes": String(calc.earlyExitMinutes),
+        "Late Minutes": String(calc.lateMinutes),
       },
       markedBy
     );
@@ -171,16 +168,14 @@ export const attendanceService = {
     let workingMinutes = 0;
 
     if (checkInIso) {
-      const inResult = computeCheckInStatus(new Date(checkInIso));
-      computedStatus = inResult.status;
-      lateMinutes = inResult.lateMinutes;
-    }
-    if (checkInIso && checkOutIso) {
-      const out = computeCheckOutStatus(new Date(checkOutIso));
-      earlyExitMinutes = Math.max(0, out.earlyExitMinutes);
-      workingMinutes = minutesBetween(checkInIso, checkOutIso);
-      if (out.forcedHalfDay && (computedStatus === "Present" || computedStatus === "Late")) computedStatus = "Half Day";
-      else if (out.forcedLate && computedStatus === "Present") computedStatus = "Late";
+      const calc = computeAttendance(
+        new Date(checkInIso),
+        checkOutIso ? new Date(checkOutIso) : null
+      );
+      computedStatus = calc.status;
+      lateMinutes = calc.lateMinutes;
+      earlyExitMinutes = calc.earlyExitMinutes;
+      workingMinutes = calc.workingMinutes;
     }
 
     // An explicit status (including clearing it back to "") always overrides the computed one.
@@ -212,27 +207,20 @@ export const attendanceService = {
       const checkIn = r["CheckIn"] as string;
       if (!checkIn) continue;
 
-      const { status: inStatus, lateMinutes } = computeCheckInStatus(new Date(checkIn));
-      let status: AttendanceStatus = inStatus;
-      let earlyExitMinutes = 0;
-      let workingMinutes = Number(r["Working Minutes"] ?? "0") || 0;
-
       const checkOut = r["CheckOut"] as string;
-      if (checkOut) {
-        const out = computeCheckOutStatus(new Date(checkOut));
-        earlyExitMinutes = Math.max(0, out.earlyExitMinutes);
-        workingMinutes = minutesBetween(checkIn, checkOut);
-        if (out.forcedHalfDay && (status === "Present" || status === "Late")) status = "Half Day";
-        else if (out.forcedLate && status === "Present") status = "Late";
-      }
+      const calc = computeAttendance(
+        new Date(checkIn),
+        checkOut ? new Date(checkOut) : null
+      );
 
       const patch: Partial<SheetRecord> = {};
-      if ((r["Status"] ?? "") !== status) patch["Status"] = status;
-      if ((Number(r["Late Minutes"] ?? "0") || 0) !== lateMinutes) patch["Late Minutes"] = String(lateMinutes);
-      if ((Number(r["Early Exit Minutes"] ?? "0") || 0) !== earlyExitMinutes)
-        patch["Early Exit Minutes"] = String(earlyExitMinutes);
-      if ((Number(r["Working Minutes"] ?? "0") || 0) !== workingMinutes)
-        patch["Working Minutes"] = String(workingMinutes);
+      if ((r["Status"] ?? "") !== calc.status) patch["Status"] = calc.status;
+      if ((Number(r["Late Minutes"] ?? "0") || 0) !== calc.lateMinutes)
+        patch["Late Minutes"] = String(calc.lateMinutes);
+      if ((Number(r["Early Exit Minutes"] ?? "0") || 0) !== calc.earlyExitMinutes)
+        patch["Early Exit Minutes"] = String(calc.earlyExitMinutes);
+      if ((Number(r["Working Minutes"] ?? "0") || 0) !== calc.workingMinutes)
+        patch["Working Minutes"] = String(calc.workingMinutes);
 
       if (Object.keys(patch).length === 0) continue;
       await dataService.updateById(entity, r["Attendance ID"] as string, {
@@ -284,6 +272,7 @@ export const attendanceService = {
           "Half Day": 0,
           Absent: 0,
           Leave: 0,
+          "Pending Checkout": 0,
         };
         let totalMarked = 0;
         for (const r of byEmployee.get(employee.id) ?? []) {

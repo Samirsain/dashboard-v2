@@ -16,7 +16,7 @@ export interface Doer {
   createdAt: string;
 }
 
-export type AttendanceStatus = "Present" | "Late" | "Half Day" | "Absent" | "Leave";
+export type AttendanceStatus = "Present" | "Late" | "Half Day" | "Absent" | "Leave" | "Pending Checkout";
 
 /** One row per employee per day, marked by the Attendance Manager (or Admin). */
 export interface Attendance {

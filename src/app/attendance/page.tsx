@@ -51,6 +51,7 @@ const STATUS_STYLES: Record<string, string> = {
   "Half Day": "bg-yellow-100 text-on-surface",
   Absent: "bg-error/20 text-error",
   Leave: "bg-surface-container text-on-surface-variant",
+  "Pending Checkout": "bg-amber-100 text-amber-900 border-amber-500",
   "": "bg-surface-container text-on-surface-variant",
 };
 
@@ -225,13 +226,14 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
 
   /** Summary totals for the filtered range */
   const rangeSummary = useMemo(() => {
-    const s = { Present: 0, Late: 0, "Half Day": 0, Absent: 0, Leave: 0, total: 0 };
+    const s = { Present: 0, Late: 0, "Half Day": 0, Absent: 0, Leave: 0, "Pending Checkout": 0, total: 0 };
     for (const r of filteredRangeRows) {
-      s.Present += r.counts.Present;
-      s.Late += r.counts.Late;
-      s["Half Day"] += r.counts["Half Day"];
-      s.Absent += r.counts.Absent;
-      s.Leave += r.counts.Leave;
+      s.Present += r.counts.Present || 0;
+      s.Late += r.counts.Late || 0;
+      s["Half Day"] += r.counts["Half Day"] || 0;
+      s.Absent += r.counts.Absent || 0;
+      s.Leave += r.counts.Leave || 0;
+      s["Pending Checkout"] += r.counts["Pending Checkout"] || 0;
       s.total += r.totalMarked;
     }
     return s;
