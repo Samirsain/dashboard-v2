@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { formatDMY } from "@/lib/format";
 import type { Attendance, AttendanceStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: (AttendanceStatus | "")[] = ["Present", "Late", "Half Day", "Absent", "Leave"];
@@ -69,7 +70,7 @@ export default function EditAttendanceModal({
 
         <div className="p-stack-lg flex flex-col gap-4">
           <p className="font-data-mono text-data-mono text-on-surface-variant">
-            {employeeName} — {date}
+            {employeeName} — {formatDMY(date)}
           </p>
 
           {error && (

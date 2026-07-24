@@ -223,8 +223,8 @@ function AllTasksInner() {
       dataRows = completedTasks.map((t) => [
         t.title,
         t.doer?.name ?? t.assignedDoerId,
-        t.dueDate,
-        taskCompletedOn(t) || "-",
+        formatDMY(t.dueDate),
+        formatDMY(taskCompletedOn(t)),
         String(t.revisionCount),
         t.priority,
       ]);
@@ -241,8 +241,8 @@ function AllTasksInner() {
       dataRows = completedChecklistInstances.map((c) => [
         c.taskName,
         nameById.get(c.assignedDoerId) ?? c.assignedDoerId,
-        c.date,
-        checklistCompletedOn(c) || "-",
+        formatDMY(c.date),
+        formatDMY(checklistCompletedOn(c)),
         nameById.get(c.completedBy) ?? c.completedBy,
       ]);
     }
@@ -472,7 +472,7 @@ function AllTasksInner() {
                       <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.title}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{t.doer?.name ?? "—"}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.dueDate)}</td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{taskCompletedOn(t) || "—"}</td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(taskCompletedOn(t))}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                         {t.revisionCount > 0 ? <span className="text-error font-bold">{t.revisionCount}×</span> : "0"}
                       </td>
@@ -562,7 +562,7 @@ function AllTasksInner() {
                             {nameById.get(c.assignedDoerId) ?? "—"}
                           </td>
                           <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(c.date)}</td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{checklistCompletedOn(c) || "—"}</td>
+                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(checklistCompletedOn(c))}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
                           <td className="py-3 px-4 text-center">
                             {currentUser?.role === "Admin" && (
