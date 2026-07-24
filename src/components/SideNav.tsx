@@ -104,7 +104,7 @@ export default function SideNav({ active }: { active: NavKey }) {
               <span className="material-symbols-outlined" data-icon="inventory_2">
                 inventory_2
               </span>
-              <span className={labelCls}>IMS</span>
+              <span className={labelCls}>Inventory</span>
             </Link>
           </>
         )}

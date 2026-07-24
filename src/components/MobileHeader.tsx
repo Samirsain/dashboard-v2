@@ -165,7 +165,7 @@ export default function MobileHeader() {
                     Settings
                   </Link>
                   <Link href="/ims" className={rowFor("/ims")}>
-                    IMS
+                    Inventory
                   </Link>
                 </>
               )}
