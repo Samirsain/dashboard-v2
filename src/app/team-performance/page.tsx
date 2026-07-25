@@ -24,6 +24,11 @@ function addDays(dateStr: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Archived rows store the 0-100 value; the final score is its negative form. */
+function toNegative(performanceScore: number): number {
+  return Math.round((performanceScore - 100) * 100) / 100;
+}
+
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex flex-col gap-1 border border-on-surface/25 px-3 py-2">
@@ -113,6 +118,7 @@ function TeamPerformanceInner() {
     yellow: 0,
     red: 0,
     pending: 0,
+    negativeScore: 0,
     performanceScore: 100,
   };
 
@@ -127,10 +133,10 @@ function TeamPerformanceInner() {
   }, [archives]);
 
   function exportCSV() {
-    const headers = ["Week", "Rank", "Employee Name", "Assigned", "On Time", "Late Done", "Not Done", "Negative Score", "Performance Score"];
+    const headers = ["Week", "Rank", "Employee Name", "Assigned", "On Time", "Late Done", "Not Done", "Score"];
     const rows = (dgmaxSummary?.summaries ?? []).map((s, i) => [
       weekLabel, i + 1, s.doerName,
-      s.assignedTasks, s.greenCount, s.yellowCount, s.redCount, s.negativeScore, s.performanceScore,
+      s.assignedTasks, s.greenCount, s.yellowCount, s.redCount, s.negativeScore,
     ]);
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map((e) => e.join(",")).join("\n");
     const link = document.createElement("a");
@@ -222,7 +228,7 @@ function TeamPerformanceInner() {
             <>
               {/* Summary */}
               <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-                <Stat label="Team Score" value={`${totals.performanceScore}%`} />
+                <Stat label="Team Score" value={`${totals.negativeScore}%`} />
                 <Stat label="Assigned" value={totals.assigned} />
                 <Stat label="On Time" value={totals.green} />
                 <Stat label="Late Done" value={totals.yellow} />
@@ -232,9 +238,9 @@ function TeamPerformanceInner() {
 
               {/* Formula */}
               <p className="text-[11px] text-on-surface-variant font-data-mono border border-on-surface/25 px-3 py-2 leading-relaxed">
-                Per Task % = 100 ÷ Assigned &nbsp;·&nbsp; Negative Score = −((Not Done × Per Task %) + (Late Done × Per Task % × {lateWeight}%)) &nbsp;·&nbsp; Performance Score = 100 + Negative Score
+                Per Task % = 100 ÷ Assigned &nbsp;·&nbsp; Score = −((Not Done × Per Task %) + (Late Done × Per Task % × {lateWeight}%))
                 <br />
-                <span className="opacity-70">Tasks not yet due are excluded from the calculation.</span>
+                <span className="opacity-70">0% is a perfect week; the score only goes down from there. Tasks not yet due are excluded.</span>
               </p>
 
               {/* Scoreboard */}
@@ -248,16 +254,15 @@ function TeamPerformanceInner() {
                       <th className="py-2 px-3 font-normal text-center">On Time</th>
                       <th className="py-2 px-3 font-normal text-center">Late Done</th>
                       <th className="py-2 px-3 font-normal text-center">Not Done</th>
-                      <th className="py-2 px-3 font-normal text-center">Negative</th>
                       <th className="py-2 px-3 font-normal text-right">Score</th>
                     </tr>
                   </thead>
                   <tbody className="font-body-md text-sm">
                     {loading && (
-                      <tr><td colSpan={8} className="py-6 text-center font-data-mono text-on-surface-variant">Loading…</td></tr>
+                      <tr><td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">Loading…</td></tr>
                     )}
                     {!loading && (dgmaxSummary?.summaries.length ?? 0) === 0 && (
-                      <tr><td colSpan={8} className="py-6 text-center font-data-mono text-on-surface-variant">No data for this week.</td></tr>
+                      <tr><td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">No data for this week.</td></tr>
                     )}
                     {dgmaxSummary?.summaries.map((s, i) => (
                       <tr key={s.doerId} className="border-b border-on-surface/15 hover:bg-surface-container-low transition-colors">
@@ -267,8 +272,7 @@ function TeamPerformanceInner() {
                         <td className="py-2 px-3 text-center font-data-mono">{s.greenCount}</td>
                         <td className="py-2 px-3 text-center font-data-mono">{s.yellowCount}</td>
                         <td className="py-2 px-3 text-center font-data-mono">{s.redCount}</td>
-                        <td className="py-2 px-3 text-center font-data-mono text-on-surface-variant">{s.negativeScore}%</td>
-                        <td className="py-2 px-3 text-right font-data-mono font-bold">{s.performanceScore}%</td>
+                        <td className="py-2 px-3 text-right font-data-mono font-bold">{s.negativeScore}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -313,7 +317,7 @@ function TeamPerformanceInner() {
                               <td className="p-2 text-center font-data-mono">{row.greenCount}</td>
                               <td className="p-2 text-center font-data-mono">{row.yellowCount}</td>
                               <td className="p-2 text-center font-data-mono">{row.redCount}</td>
-                              <td className="p-2 text-right font-data-mono font-bold">{row.performanceScore}%</td>
+                              <td className="p-2 text-right font-data-mono font-bold">{toNegative(row.performanceScore)}%</td>
                               <td className="p-2 text-on-surface-variant">{row.managerRemarks || "—"}</td>
                             </tr>
                           ))}
@@ -349,7 +353,7 @@ function TeamPerformanceInner() {
                     <div className="flex items-center justify-between text-xs">
                       <span>{s.doerName}</span>
                       <span className="font-data-mono text-on-surface-variant">
-                        {s.greenCount} / {s.yellowCount} / {s.redCount} &nbsp;·&nbsp; <span className="text-on-surface font-bold">{s.performanceScore}%</span>
+                        {s.greenCount} / {s.yellowCount} / {s.redCount} &nbsp;·&nbsp; <span className="text-on-surface font-bold">{s.negativeScore}%</span>
                       </span>
                     </div>
                     <textarea

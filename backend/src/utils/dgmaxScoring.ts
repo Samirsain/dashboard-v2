@@ -114,10 +114,10 @@ export function buildDgmaxWeeklySummary(
       s.performanceScore = result.performanceScore;
       return s;
     })
-    // Higher score first; tie -> whoever completed more work ranks higher.
-    .sort((a, b) => b.performanceScore - a.performanceScore || b.completedTasks - a.completedTasks);
+    // Least negative first (0 is a perfect week); tie -> more completed work ranks higher.
+    .sort((a, b) => b.negativeScore - a.negativeScore || b.completedTasks - a.completedTasks);
 
-  const totals = { assigned: 0, completed: 0, green: 0, yellow: 0, red: 0, pending: 0, performanceScore: 0 };
+  const totals = { assigned: 0, completed: 0, green: 0, yellow: 0, red: 0, pending: 0, negativeScore: 0, performanceScore: 0 };
   for (const s of summaries) {
     totals.assigned += s.assignedTasks;
     totals.completed += s.completedTasks;
@@ -126,10 +126,13 @@ export function buildDgmaxWeeklySummary(
     totals.red += s.redCount;
     totals.pending += s.pendingCount;
   }
-  totals.performanceScore =
-    summaries.length > 0
-      ? Math.round((summaries.reduce((sum, s) => sum + s.performanceScore, 0) / summaries.length) * 100) / 100
-      : 100;
+  if (summaries.length > 0) {
+    totals.negativeScore = Math.round((summaries.reduce((sum, s) => sum + s.negativeScore, 0) / summaries.length) * 100) / 100;
+    totals.performanceScore = Math.round((100 + totals.negativeScore) * 100) / 100;
+  } else {
+    totals.negativeScore = 0;
+    totals.performanceScore = 100;
+  }
 
   const weekLabel = `${formatDMY(fromDate)} to ${formatDMY(toDate)}`;
 

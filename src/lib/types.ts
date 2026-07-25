@@ -377,6 +377,9 @@ export interface DgmaxWeeklySummary {
     yellow: number;
     red: number;
     pending: number;
+    /** Team average of the final (negative) score, 0 down to -100. */
+    negativeScore: number;
+    /** Same team average on the 0-100 scale. */
     performanceScore: number;
   };
 }

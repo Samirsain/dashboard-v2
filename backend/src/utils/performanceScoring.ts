@@ -1,14 +1,17 @@
 /**
  * DGMAX Performance Scoring Engine — the single source of truth.
  *
- * Every employee starts the week at 100. Only delays and incomplete work pull
- * the score down; there are no bonus points, so the score can only decrease.
+ * Every employee starts the week clean at 0. Only delays and incomplete work
+ * pull the score down; there are no bonus points, so the score can only go
+ * negative. `negativeScore` IS the final score an employee is judged on —
+ * 0 is perfect, -100 is the worst possible week.
  *
  *   PerTaskPercentage = 100 / TotalAssignedTasks
  *   NotDonePenalty    = NotDone  x PerTaskPercentage
  *   LateDonePenalty   = LateDone x PerTaskPercentage x (lateDoneWeight / 100)
- *   NegativeScore     = -(NotDonePenalty + LateDonePenalty)
- *   PerformanceScore  = clamp(100 + NegativeScore, 0, 100)
+ *   NegativeScore     = clamp(-(NotDonePenalty + LateDonePenalty), -100, 0)  <- final score
+ *   PerformanceScore  = 100 + NegativeScore   (0-100 equivalent, kept for the
+ *                       weekly_archives column and any 0-100 reporting)
  *
  * Every dashboard, leaderboard, report and analytic must call this — never
  * reimplement the arithmetic elsewhere.
@@ -30,7 +33,9 @@ export interface PerformanceResult {
   perTaskPercentage: number;
   notDonePenalty: number;
   lateDonePenalty: number;
+  /** The final score: 0 (perfect) down to -100 (worst). */
   negativeScore: number;
+  /** The same score expressed on a 0-100 scale (100 + negativeScore). */
   performanceScore: number;
   statusColor: PerformanceStatusColor;
 }
@@ -71,7 +76,7 @@ export function calculatePerformance(
   const perTaskPercentage = 100 / assigned;
   const notDonePenalty = notDone * perTaskPercentage;
   const lateDonePenalty = lateDone * perTaskPercentage * weight;
-  const negativeScore = -(notDonePenalty + lateDonePenalty);
+  const negativeScore = Math.min(0, Math.max(-100, -(notDonePenalty + lateDonePenalty)));
   const performanceScore = Math.min(100, Math.max(0, 100 + negativeScore));
 
   return {
