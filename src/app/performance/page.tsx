@@ -6,7 +6,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import Stat from "@/components/Stat";
 import { api, ApiError } from "@/lib/api";
-import { formatDMY } from "@/lib/format";
+import { formatDMY, formatPct } from "@/lib/format";
 import { mondayOf, sundayOf, addDays, todayIso } from "@/lib/week";
 import { getTaskCategory, CATEGORY_LABEL } from "@/lib/scoring";
 import type { Task, DgmaxWeeklySummary, TaskScoreCategory } from "@/lib/types";
@@ -119,7 +119,7 @@ function PerformanceInner() {
 
         {/* Summary */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-          <Stat label="Team Score" value={`${totals.negativeScore}%`} />
+          <Stat label="Team Score" value={formatPct(totals.negativeScore)} />
           <Stat label="Assigned" value={totals.assigned} />
           <Stat label="On Time" value={totals.green} />
           <Stat label="Late Done" value={totals.yellow} />
@@ -164,7 +164,7 @@ function PerformanceInner() {
                     <td className="py-2 px-3 text-center font-data-mono">{row.greenCount}</td>
                     <td className="py-2 px-3 text-center font-data-mono">{row.yellowCount}</td>
                     <td className="py-2 px-3 text-center font-data-mono">{row.redCount}</td>
-                    <td className="py-2 px-3 text-right font-data-mono font-bold">{row.negativeScore}%</td>
+                    <td className="py-2 px-3 text-right font-data-mono font-bold">{formatPct(row.negativeScore)}</td>
                   </tr>
                 ))}
               </tbody>

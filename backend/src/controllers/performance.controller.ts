@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { usersService } from "../services/users.service";
 import { tasksService } from "../services/tasks.service";
-import { checklistService } from "../services/checklist.service";
 import { buildDgmaxWeeklySummary, DEFAULT_LATE_DONE_WEIGHT } from "../utils/dgmaxScoring";
 import { todayIso, mondayOfIso, addDaysIso, isValidIsoDate } from "../utils/date";
 
@@ -31,13 +30,10 @@ export const performanceController = {
       const today = todayIso();
       const { from, to } = resolveWeekRange(req);
       const lateWeight = resolveLateWeight(req);
-      const [users, tasks, checklistInstances] = await Promise.all([
-        usersService.list(),
-        tasksService.list({}),
-        checklistService.listInstances({}),
-      ]);
+      // Task List only — checklist items are routine work and are not scored.
+      const [users, tasks] = await Promise.all([usersService.list(), tasksService.list({})]);
 
-      const summary = buildDgmaxWeeklySummary(users, tasks, checklistInstances, today, from, to, lateWeight);
+      const summary = buildDgmaxWeeklySummary(users, tasks, today, from, to, lateWeight);
       res.json({ status: "success", data: summary });
     } catch (err) {
       next(err);

@@ -7,7 +7,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import Stat from "@/components/Stat";
 import { api, ApiError } from "@/lib/api";
-import { formatDMY } from "@/lib/format";
+import { formatDMY, formatPct } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
 import { mondayOf, sundayOf } from "@/lib/week";
@@ -362,7 +362,7 @@ function DashboardInner() {
               ) : isPrivileged ? (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                    <Stat label="Team Score" value={`${weekSummary.totals.negativeScore}%`} />
+                    <Stat label="Team Score" value={formatPct(weekSummary.totals.negativeScore)} />
                     <Stat label="Assigned" value={weekSummary.totals.assigned} />
                     <Stat label="On Time" value={weekSummary.totals.green} />
                     <Stat label="Late Done" value={weekSummary.totals.yellow} />
@@ -394,7 +394,7 @@ function DashboardInner() {
                             <td className="py-2 px-3 text-center font-data-mono">{s.greenCount}</td>
                             <td className="py-2 px-3 text-center font-data-mono">{s.yellowCount}</td>
                             <td className="py-2 px-3 text-center font-data-mono">{s.redCount}</td>
-                            <td className="py-2 px-3 text-right font-data-mono font-bold">{s.negativeScore}%</td>
+                            <td className="py-2 px-3 text-right font-data-mono font-bold">{formatPct(s.negativeScore)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -403,7 +403,7 @@ function DashboardInner() {
                 </>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  <Stat label="My Score" value={`${myScore?.negativeScore ?? 0}%`} />
+                  <Stat label="My Score" value={formatPct(myScore?.negativeScore)} />
                   <Stat label="Assigned" value={myScore?.assignedTasks ?? 0} />
                   <Stat label="On Time" value={myScore?.greenCount ?? 0} />
                   <Stat label="Late Done" value={myScore?.yellowCount ?? 0} />

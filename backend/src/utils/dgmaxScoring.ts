@@ -1,4 +1,4 @@
-import type { Task, ChecklistInstance, User, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
+import type { Task, User, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
 import { calculatePerformance, DEFAULT_LATE_DONE_WEIGHT } from "./performanceScoring";
 
 export { DEFAULT_LATE_DONE_WEIGHT };
@@ -9,7 +9,10 @@ export { DEFAULT_LATE_DONE_WEIGHT };
  * Every employee starts a week at 100. Only delays and incomplete work pull
  * the score down — see DGMAX-negative-scoring.md for the original spec.
  *
- * Category for a single task/checklist item, given today's date:
+ * Only Task List tasks are scored. Checklist items are recurring routine work
+ * and are deliberately left out of the score entirely.
+ *
+ * Category for a single task, given today's date:
  *  - Green ("On Time")   — completed on or before its due date.
  *  - Yellow ("Late Done") — completed after its due date.
  *  - Red ("Not Done")     — still incomplete and its due date has passed.
@@ -28,20 +31,11 @@ export function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory
   return task.dueDate < todayIso ? "Red" : "Pending";
 }
 
-/** Same categorization for a checklist instance. */
-export function getChecklistCategory(c: ChecklistInstance, todayIso: string): TaskScoreCategory | null {
-  if (!c.date) return null;
-  if (c.status === "Completed") {
-    const completedDate = c.completedAt ? c.completedAt.slice(0, 10) : todayIso;
-    return completedDate > c.date ? "Yellow" : "Green";
-  }
-  return c.date < todayIso ? "Red" : "Pending";
-}
-
 /**
- * Builds the DGMAX weekly summary for every active (non-Admin) doer, scoped
- * to tasks/checklist items whose due date falls within [fromDate, toDate]
- * (inclusive, both YYYY-MM-DD — normally a Monday..Sunday week).
+ * Builds the DGMAX weekly summary for every active (non-Admin) doer, scoped to
+ * Task List tasks whose due date falls within [fromDate, toDate] (inclusive,
+ * both YYYY-MM-DD — normally a Monday..Sunday week). Checklist items are not
+ * scored.
  *
  * Assigned = Green + Yellow + Red (Pending excluded — not yet scoreable). The
  * arithmetic itself lives in calculatePerformance(), the single source of truth.
@@ -49,7 +43,6 @@ export function getChecklistCategory(c: ChecklistInstance, todayIso: string): Ta
 export function buildDgmaxWeeklySummary(
   users: User[],
   tasks: Task[],
-  checklistInstances: ChecklistInstance[],
   todayIso: string,
   fromDate: string,
   toDate: string,
@@ -84,19 +77,6 @@ export function buildDgmaxWeeklySummary(
     const cat = getTaskCategory(t, todayIso);
     if (!cat) continue;
     if (t.status === "Completed") s.completedTasks++;
-    if (cat === "Green") s.greenCount++;
-    else if (cat === "Yellow") s.yellowCount++;
-    else if (cat === "Red") s.redCount++;
-    else s.pendingCount++;
-  }
-
-  for (const c of checklistInstances) {
-    if (!inWindow(c.date)) continue;
-    const s = summaryMap.get(c.assignedDoerId);
-    if (!s) continue;
-    const cat = getChecklistCategory(c, todayIso);
-    if (!cat) continue;
-    if (c.status === "Completed") s.completedTasks++;
     if (cat === "Green") s.greenCount++;
     else if (cat === "Yellow") s.yellowCount++;
     else if (cat === "Red") s.redCount++;

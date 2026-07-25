@@ -13,3 +13,12 @@ export function formatDMY(value: string | null | undefined): string {
   const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}-${m[2]}-${m[1]}` : value;
 }
+
+/**
+ * Renders a score as "-35%". Anything that isn't a real number — a field the
+ * API didn't send, a null, a NaN — becomes "—" rather than "undefined%", so a
+ * stale or mismatched backend shows a visible gap instead of broken text.
+ */
+export function formatPct(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "—";
+}
