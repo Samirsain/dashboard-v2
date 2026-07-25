@@ -1,4 +1,4 @@
-import type { Task, User, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
+import type { Task, User, Revision, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
 import { calculatePerformance, DEFAULT_LATE_DONE_WEIGHT } from "./performanceScoring";
 
 export { DEFAULT_LATE_DONE_WEIGHT };
@@ -12,23 +12,52 @@ export { DEFAULT_LATE_DONE_WEIGHT };
  * Only Task List tasks are scored. Checklist items are recurring routine work
  * and are deliberately left out of the score entirely.
  *
+ * Scoring always measures against the task's ORIGINAL due date — the deadline
+ * first committed to — not the current one. Revising a task genuinely moves its
+ * working deadline (it stops showing as overdue, the doer gets the new date),
+ * but it cannot buy back a clean score: a task revised and then finished is
+ * "Late Done", exactly as the spec describes it. Without this, extending a due
+ * date and finishing before the new one scored as On Time, so a task could be
+ * pushed indefinitely and still come out at a perfect 0%.
+ *
  * Category for a single task, given today's date:
- *  - Green ("On Time")   — completed on or before its due date.
- *  - Yellow ("Late Done") — completed after its due date.
- *  - Red ("Not Done")     — still incomplete and its due date has passed.
+ *  - Green ("On Time")   — completed on or before its original due date.
+ *  - Yellow ("Late Done") — completed after its original due date (this is the
+ *                            revised-then-completed case).
+ *  - Red ("Not Done")     — still incomplete and its original due date passed.
  *  - Pending              — still incomplete, not yet due. Excluded from
  *                            scoring entirely (hasn't had a chance to be late
  *                            or missed yet) — it simply isn't counted until
  *                            it resolves one way or the other.
  * Cancelled items, or items with no due date, return null (not counted at all).
  */
-export function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory | null {
-  if (task.status === "Cancelled" || !task.dueDate) return null;
+export function getTaskCategory(
+  task: Task,
+  todayIso: string,
+  originalDueDate?: string
+): TaskScoreCategory | null {
+  const dueDate = originalDueDate || task.dueDate;
+  if (task.status === "Cancelled" || !dueDate) return null;
   if (task.status === "Completed") {
     const completedDate = task.updatedAt ? task.updatedAt.slice(0, 10) : todayIso;
-    return completedDate > task.dueDate ? "Yellow" : "Green";
+    return completedDate > dueDate ? "Yellow" : "Green";
   }
-  return task.dueDate < todayIso ? "Red" : "Pending";
+  return dueDate < todayIso ? "Red" : "Pending";
+}
+
+/**
+ * taskId -> the due date the task originally carried, taken from the oldest
+ * revision's "old due date". Tasks that were never revised are absent, and the
+ * caller falls back to the task's own dueDate.
+ */
+export function buildOriginalDueDates(revisions: Revision[]): Map<string, string> {
+  const earliest = new Map<string, Revision>();
+  for (const r of revisions) {
+    if (!r.taskId || !r.oldDueDate) continue;
+    const current = earliest.get(r.taskId);
+    if (!current || r.revisedAt < current.revisedAt) earliest.set(r.taskId, r);
+  }
+  return new Map(Array.from(earliest, ([taskId, r]) => [taskId, r.oldDueDate]));
 }
 
 /**
@@ -43,11 +72,13 @@ export function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory
 export function buildDgmaxWeeklySummary(
   users: User[],
   tasks: Task[],
+  revisions: Revision[],
   todayIso: string,
   fromDate: string,
   toDate: string,
   lateDoneWeight: number = DEFAULT_LATE_DONE_WEIGHT
 ): DgmaxWeeklySummary {
+  const originalDueDates = buildOriginalDueDates(revisions);
   const doers = users.filter((u) => u.status === "Active" && u.role !== "Admin");
   const weight = Math.min(100, Math.max(0, lateDoneWeight));
 
@@ -71,17 +102,20 @@ export function buildDgmaxWeeklySummary(
   const inWindow = (dateStr: string) => !!dateStr && dateStr >= fromDate && dateStr <= toDate;
 
   for (const t of tasks) {
+    // The week a task counts in follows its original deadline, so revising a
+    // due date cannot move a miss into a different week either.
+    const dueDate = originalDueDates.get(t.id) || t.dueDate;
     // A completed task belongs to the week it was completed in (updatedAt).
     // An incomplete/overdue task belongs to the week its dueDate falls in.
     // If the task was completed, check both: dueDate in window OR completedAt (updatedAt) in window.
     // If not completed, only count if dueDate is in window.
     const completedAt = t.status === "Completed" && t.updatedAt ? t.updatedAt.slice(0, 10) : null;
-    const belongsToWindow = completedAt ? inWindow(completedAt) || inWindow(t.dueDate) : inWindow(t.dueDate);
+    const belongsToWindow = completedAt ? inWindow(completedAt) || inWindow(dueDate) : inWindow(dueDate);
     if (!belongsToWindow) continue;
 
     const s = summaryMap.get(t.assignedDoerId);
     if (!s) continue;
-    const cat = getTaskCategory(t, todayIso);
+    const cat = getTaskCategory(t, todayIso, dueDate);
     if (!cat) continue;
     if (t.status === "Completed") s.completedTasks++;
     if (cat === "Green") s.greenCount++;

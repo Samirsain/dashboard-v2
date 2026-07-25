@@ -7,18 +7,15 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import Stat from "@/components/Stat";
 import { api, ApiError } from "@/lib/api";
-import { formatDMY, formatPct } from "@/lib/format";
+import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
-import { addDays, mondayOf, sundayOf } from "@/lib/week";
-import { getTaskCategory, CATEGORY_LABEL } from "@/lib/scoring";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
 import type {
   ChecklistInstance,
   ChecklistTemplate,
-  DgmaxWeeklySummary,
   Doer,
   FullDashboard,
   List,
@@ -78,10 +75,6 @@ function DashboardInner() {
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
-  const [weekStart, setWeekStart] = useState(() => mondayOf());
-  const weekEnd = sundayOf(weekStart);
-  const [weekSummary, setWeekSummary] = useState<DgmaxWeeklySummary | null>(null);
-  const [weekLoading, setWeekLoading] = useState(false);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [hasPendingTickets, setHasPendingTickets] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -96,18 +89,6 @@ function DashboardInner() {
   // choose from.
   const [showCreatePicker, setShowCreatePicker] = useState(false);
   const [createMode, setCreateMode] = useState<"task" | "checklist" | null>(null);
-
-  async function fetchWeekSummary(start: string, end: string) {
-    setWeekLoading(true);
-    try {
-      const summary = await api.get<DgmaxWeeklySummary>(`/performance/dgmax?from=${start}&to=${end}`);
-      setWeekSummary(summary);
-    } catch {
-      setWeekSummary(null);
-    } finally {
-      setWeekLoading(false);
-    }
-  }
 
   async function load() {
     setLoading(true);
@@ -144,12 +125,6 @@ function DashboardInner() {
       load();
     });
   }, []);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      fetchWeekSummary(weekStart, weekEnd);
-    });
-  }, [weekStart, weekEnd]);
 
   const templateListMap = new Map(templates.map((t) => [t.id, t.listId]));
 
@@ -244,13 +219,6 @@ function DashboardInner() {
     { label: "Overdue", value: summary?.overdue ?? 0 },
     { label: "Pending", value: summary?.pending ?? 0 },
   ];
-
-  // This week's DGMAX score. Everyone sees their own; privileged users also
-  // get the whole team's scoreboard.
-  const myScore = weekSummary?.summaries.find((s) => s.doerId === user?.id) ?? null;
-  const weekRange = weekSummary
-    ? `${formatDMY(weekSummary.fromDate)} — ${formatDMY(weekSummary.toDate)}`
-    : "";
 
   return (
     <>
@@ -355,41 +323,6 @@ function DashboardInner() {
                 ))}
               </div>
             )}
-
-            {/* This week's performance score */}
-            <section className="col-span-12 flex flex-col gap-2">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="font-label-sm text-xs uppercase text-on-surface-variant">
-                  This Week&apos;s Score
-                  {weekRange && <span className="ml-2 font-data-mono normal-case">{weekRange}</span>}
-                </h3>
-                <Link href="/performance" className="font-label-sm text-xs uppercase text-on-surface-variant hover:text-on-surface hover:underline">
-                  View detail →
-                </Link>
-              </div>
-
-              {!weekSummary ? (
-                <div className="border border-on-surface/25 px-3 py-3 font-data-mono text-xs text-on-surface-variant">
-                  {loading ? "Loading…" : "Score unavailable."}
-                </div>
-              ) : isPrivileged ? (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  <Stat label="Team Score" value={formatPct(weekSummary.totals.negativeScore)} />
-                  <Stat label="Assigned" value={weekSummary.totals.assigned} />
-                  <Stat label="On Time" value={weekSummary.totals.green} />
-                  <Stat label="Late Done" value={weekSummary.totals.yellow} />
-                  <Stat label="Not Done" value={weekSummary.totals.red} />
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  <Stat label="My Score" value={formatPct(myScore?.negativeScore)} />
-                  <Stat label="Assigned" value={myScore?.assignedTasks ?? 0} />
-                  <Stat label="On Time" value={myScore?.greenCount ?? 0} />
-                  <Stat label="Late Done" value={myScore?.yellowCount ?? 0} />
-                  <Stat label="Not Done" value={myScore?.redCount ?? 0} />
-                </div>
-              )}
-            </section>
 
             {/* Pending Tasks — all open items (tasks + checklist), All / Today */}
             <div className="col-span-12 bg-surface border border-on-surface flex flex-col">

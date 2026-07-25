@@ -14,6 +14,11 @@ import type { Task, TaskScoreCategory } from "./types";
 export function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory | null {
   if (task.status === "Cancelled" || !task.dueDate) return null;
   if (task.status === "Completed") {
+    // A revised task missed its original deadline by definition, so finishing
+    // it can never read as On Time. The backend compares against the real
+    // original due date; here revisionCount stands in for it, since the list
+    // endpoint doesn't carry revision history.
+    if (task.revisionCount > 0) return "Yellow";
     const completedDate = task.updatedAt ? task.updatedAt.slice(0, 10) : todayIso;
     return completedDate > task.dueDate ? "Yellow" : "Green";
   }
