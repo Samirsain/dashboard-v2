@@ -1,6 +1,7 @@
 import type { Task, ChecklistInstance, User, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
+import { calculatePerformance, DEFAULT_LATE_DONE_WEIGHT } from "./performanceScoring";
 
-export const DEFAULT_LATE_DONE_WEIGHT = 60;
+export { DEFAULT_LATE_DONE_WEIGHT };
 
 /**
  * DGMAX Negative Performance Scoring System.
@@ -42,13 +43,8 @@ export function getChecklistCategory(c: ChecklistInstance, todayIso: string): Ta
  * to tasks/checklist items whose due date falls within [fromDate, toDate]
  * (inclusive, both YYYY-MM-DD — normally a Monday..Sunday week).
  *
- * Formula per doer:
- *   Assigned      = Green + Yellow + Red   (Pending excluded)
- *   Per Task %    = 100 / Assigned
- *   Not Done Pen. = Red    x Per Task %
- *   Late Done Pen.= Yellow x Per Task % x (lateDoneWeight / 100)
- *   Negative      = -(Not Done Pen. + Late Done Pen.)
- *   Score         = clamp(100 + Negative, 0, 100)
+ * Assigned = Green + Yellow + Red (Pending excluded — not yet scoreable). The
+ * arithmetic itself lives in calculatePerformance(), the single source of truth.
  */
 export function buildDgmaxWeeklySummary(
   users: User[],
@@ -110,16 +106,12 @@ export function buildDgmaxWeeklySummary(
   const summaries = Array.from(summaryMap.values())
     .map((s) => {
       s.assignedTasks = s.greenCount + s.yellowCount + s.redCount;
-      if (s.assignedTasks > 0) {
-        const perTaskPct = 100 / s.assignedTasks;
-        const notDonePenalty = s.redCount * perTaskPct;
-        const lateDonePenalty = s.yellowCount * perTaskPct * (weight / 100);
-        s.negativeScore = -Math.round((notDonePenalty + lateDonePenalty) * 100) / 100;
-        s.performanceScore = Math.max(0, Math.min(100, Math.round((100 + s.negativeScore) * 100) / 100));
-      } else {
-        s.negativeScore = 0;
-        s.performanceScore = 100;
-      }
+      const result = calculatePerformance(
+        { assigned: s.assignedTasks, onTime: s.greenCount, lateDone: s.yellowCount, notDone: s.redCount },
+        weight
+      );
+      s.negativeScore = result.negativeScore;
+      s.performanceScore = result.performanceScore;
       return s;
     })
     // Higher score first; tie -> whoever completed more work ranks higher.
