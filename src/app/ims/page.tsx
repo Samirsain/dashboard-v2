@@ -388,16 +388,16 @@ function ImsInner() {
                         <table className="w-full text-left border-collapse min-w-[1100px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                             <tr>
-                              <th className={thCls}>SKU Code</th>
+                              <th className={thCls}>Item Code</th>
                               <th className={thCls}>Item Name</th>
                               <th className={thCls}>Category</th>
-                              <th className={thCls} title="Roughly how many units are used per day">Avg Daily Use</th>
-                              <th className={thCls} title="Days from placing an order to receiving stock">Lead Time</th>
-                              <th className={thCls} title="Multiplier applied to Base Max Level">Safety Factor</th>
-                              <th className={thCls} title="Minimum Order Quantity">MOQ</th>
-                              <th className={thCls}>Base Max Level</th>
-                              <th className={thCls} title="Base Max Level x Safety Factor, calculated automatically">Effective Max (Auto)</th>
-                              <th className={thCls} title="Stock already ordered but not yet received">In Transit</th>
+                              <th className={thCls} title="Kitna roz use hota hai">Daily Use</th>
+                              <th className={thCls} title="Order karne ke baad kitne din mein aata hai">Delivery Days</th>
+                              <th className={thCls} title="Extra buffer multiplier">Safety Factor</th>
+                              <th className={thCls} title="Minimum Order Quantity">Min. Order</th>
+                              <th className={thCls}>Max Stock</th>
+                              <th className={thCls} title="Max Stock × Buffer, auto calculate">Target Stock</th>
+                              <th className={thCls} title="Jo order hua hai lekin abhi aaya nahi">On the Way</th>
                               <th className="py-3 px-4">Actions</th>
                             </tr>
                           </thead>
@@ -585,11 +585,11 @@ function ImsInner() {
                         <table className="w-full text-left border-collapse">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                             <tr>
-                              <th className={thCls}>SKU Code</th>
+                              <th className={thCls}>Item Code</th>
                               <th className={thCls}>Item Name</th>
-                              <th className={thCls}>Max Level</th>
-                              <th className={thCls}>In Transit</th>
-                              <th className={thCls}>Closing Stock</th>
+                              <th className={thCls}>Target Stock</th>
+                              <th className={thCls}>On the Way</th>
+                              <th className={thCls}>Current Stock</th>
                               {visibleLedgerDates.map((d) => (
                                 <th key={d} className={thCls}>{formatDMY(d)}</th>
                               ))}
@@ -647,16 +647,16 @@ function ImsInner() {
                         <table className="w-full text-left border-collapse min-w-[1100px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                             <tr>
-                              <th className={thCls}>SKU</th>
-                              <th className={thCls}>Item</th>
+                              <th className={thCls}>Item Code</th>
+                              <th className={thCls}>Item Name</th>
                               <th className={thCls}>Category</th>
-                              <th className={thCls}>MOQ</th>
-                              <th className={thCls}>Base Max</th>
+                              <th className={thCls}>Min. Order</th>
+                              <th className={thCls}>Max Stock</th>
                               <th className={thCls}>Safety Factor</th>
-                              <th className={thCls}>Effective Max</th>
-                              <th className={thCls}>Closing Stock</th>
-                              <th className={thCls}>In Transit</th>
-                              <th className="py-3 px-4">Reorder Qty</th>
+                              <th className={thCls}>Target Stock</th>
+                              <th className={thCls}>Current Stock</th>
+                              <th className={thCls}>On the Way</th>
+                              <th className="py-3 px-4">Order Now</th>
                             </tr>
                           </thead>
                           <tbody className="font-body-md text-body-md text-on-surface">
