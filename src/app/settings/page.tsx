@@ -89,15 +89,22 @@ function SettingsInner() {
   // The full set of access rows shown for every doer: Office (implicit, no
   // list record) plus each named list, split into a Task-List (TL) and
   // Checklist (CL) side — mirroring the sidebar's OFFICE/SAHIL TL & CL.
+  // OFFICE TL/CL are real lists matched by name — their listId comes from the
+  // actual list record so toggleAccess can patch their memberIds normally.
   const buckets = useMemo<Bucket[]>(() => {
-    const taskBuckets: Bucket[] = [
-      { key: "office-task", label: "OFFICE TL", kind: "task", listId: "", isOffice: true },
-    ];
-    const checklistBuckets: Bucket[] = [
-      { key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: "", isOffice: true },
-    ];
+    const officeTl = lists.find((l) => l.type === "task" && l.name.toUpperCase().startsWith("OFFICE"));
+    const officeCl = lists.find((l) => l.type === "checklist" && l.name.toUpperCase().startsWith("OFFICE"));
+
+    const taskBuckets: Bucket[] = officeTl
+      ? [{ key: "office-task", label: "OFFICE TL", kind: "task", listId: officeTl.id, isOffice: true }]
+      : [];
+    const checklistBuckets: Bucket[] = officeCl
+      ? [{ key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: officeCl.id, isOffice: true }]
+      : [];
+
     for (const l of lists) {
       const short = listGroupKey(l.name);
+      if (l.name.toUpperCase().startsWith("OFFICE")) continue; // already handled above
       if (l.type === "task") {
         taskBuckets.push({ key: `t-${l.id}`, label: `${short} TL`, kind: "task", listId: l.id, isOffice: false });
       } else {
@@ -107,17 +114,16 @@ function SettingsInner() {
     return [...taskBuckets, ...checklistBuckets];
   }, [lists]);
 
-  // Whether a doer currently has access to a bucket: Office is always yes;
-  // a named list is yes if the doer is in its member set.
+  // Whether a doer currently has access to a bucket.
+  // Office buckets also have a real listId — check membership like any other list.
   function hasAccess(doerId: string, bucket: Bucket): boolean {
-    if (bucket.isOffice) return true;
     const list = lists.find((l) => l.id === bucket.listId);
-    return list ? list.memberIds.includes(doerId) : false;
+    if (!list) return bucket.isOffice; // fallback: office = yes if list not found
+    return list.memberIds.includes(doerId);
   }
 
-  // Grant/revoke a doer's access to a named list by rewriting its member set.
+  // Grant/revoke a doer's access to a list by rewriting its member set.
   async function toggleAccess(doerId: string, bucket: Bucket, shouldHaveAccess: boolean) {
-    if (bucket.isOffice) return; // office is implicit — nothing to toggle
     const list = lists.find((l) => l.id === bucket.listId);
     if (!list) return;
     const memberIds = shouldHaveAccess
@@ -318,14 +324,12 @@ function SettingsInner() {
                                   return (
                                     <label
                                       key={b.key}
-                                      className={`flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 ${
-                                        b.isOffice ? "opacity-70" : "hover:bg-surface-container cursor-pointer"
-                                      }`}
+                                      className="flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container cursor-pointer"
                                     >
                                       <input
                                         type="checkbox"
                                         checked={checked}
-                                        disabled={b.isOffice || busy}
+                                        disabled={busy}
                                         onChange={(e) => toggleAccess(d.id, b, e.target.checked)}
                                       />
                                       <span className="font-label-sm text-label-sm uppercase text-on-surface">
