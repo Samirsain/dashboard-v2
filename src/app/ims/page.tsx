@@ -414,13 +414,13 @@ function ImsInner() {
                               const raw = rd ? rd.effectiveMaxLevel - rd.closingStock - rd.materialInTransit : null;
                               const isBigShortage = raw !== null && raw >= i.moq;
                               const isSmallShortage = raw !== null && raw > 0 && raw < i.moq;
-                              const rowBg = isBigShortage
-                                ? "bg-error/10"
+                              const rowStyle = isBigShortage
+                                ? { backgroundColor: "rgba(254,226,226,0.6)" }
                                 : isSmallShortage
-                                ? "bg-purple-50"
-                                : "bg-emerald-50";
+                                ? { backgroundColor: "rgba(216,180,254,0.35)", borderLeft: "3px solid #9333ea" }
+                                : { backgroundColor: "rgba(209,250,229,0.5)" };
                               return (
-                              <tr key={i.skuCode} className={`border-b border-surface-variant last:border-b-0 transition-colors ${rowBg}`}>
+                              <tr key={i.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0 transition-colors">
                                 <td className={tdCls}>{i.skuCode}</td>
                                 <td className="py-2 px-4 border-r border-surface-variant font-medium whitespace-nowrap">{i.itemName}</td>
                                 <td className={tdCls}>{i.category}</td>
@@ -671,18 +671,18 @@ function ImsInner() {
                               const raw = r.effectiveMaxLevel - r.closingStock - r.materialInTransit;
                               const isBigShortage = raw >= r.moq;
                               const isSmallShortage = raw > 0 && raw < r.moq;
-                              const rowBg = isBigShortage
-                                ? "bg-error/10"
+                              const rowStyle = isBigShortage
+                                ? { backgroundColor: "rgba(254,226,226,0.6)" }
                                 : isSmallShortage
-                                ? "bg-purple-50"
-                                : "bg-emerald-50";
+                                ? { backgroundColor: "rgba(216,180,254,0.35)", borderLeft: "3px solid #9333ea" }
+                                : { backgroundColor: "rgba(209,250,229,0.5)" };
                               const qtyColor = isBigShortage
                                 ? "text-error"
                                 : isSmallShortage
                                 ? "text-purple-700"
                                 : "text-emerald-700";
                               return (
-                              <tr key={r.skuCode} className={`border-b border-surface-variant last:border-b-0 ${rowBg}`}>
+                              <tr key={r.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0">
                                 <td className={tdCls}>{r.skuCode}</td>
                                 <td className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{r.itemName}</td>
                                 <td className={tdCls}>{r.category}</td>
