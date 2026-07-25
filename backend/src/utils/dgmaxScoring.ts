@@ -68,10 +68,17 @@ export function buildDgmaxWeeklySummary(
     });
   }
 
-  const inWindow = (dateStr: string) => dateStr >= fromDate && dateStr <= toDate;
+  const inWindow = (dateStr: string) => !!dateStr && dateStr >= fromDate && dateStr <= toDate;
 
   for (const t of tasks) {
-    if (!inWindow(t.dueDate)) continue;
+    // A completed task belongs to the week it was completed in (updatedAt).
+    // An incomplete/overdue task belongs to the week its dueDate falls in.
+    // If the task was completed, check both: dueDate in window OR completedAt (updatedAt) in window.
+    // If not completed, only count if dueDate is in window.
+    const completedAt = t.status === "Completed" && t.updatedAt ? t.updatedAt.slice(0, 10) : null;
+    const belongsToWindow = completedAt ? inWindow(completedAt) || inWindow(t.dueDate) : inWindow(t.dueDate);
+    if (!belongsToWindow) continue;
+
     const s = summaryMap.get(t.assignedDoerId);
     if (!s) continue;
     const cat = getTaskCategory(t, todayIso);

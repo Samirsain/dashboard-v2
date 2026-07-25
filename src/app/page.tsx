@@ -360,47 +360,13 @@ function DashboardInner() {
                   {loading ? "Loading…" : "Score unavailable."}
                 </div>
               ) : isPrivileged ? (
-                <>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                    <Stat label="Team Score" value={formatPct(weekSummary.totals.negativeScore)} />
-                    <Stat label="Assigned" value={weekSummary.totals.assigned} />
-                    <Stat label="On Time" value={weekSummary.totals.green} />
-                    <Stat label="Late Done" value={weekSummary.totals.yellow} />
-                    <Stat label="Not Done" value={weekSummary.totals.red} />
-                  </div>
-
-                  <div className="border border-on-surface overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[560px]">
-                      <thead className="font-label-sm text-[11px] uppercase text-on-surface-variant border-b border-on-surface">
-                        <tr>
-                          <th className="py-2 px-3 font-normal text-center w-12">#</th>
-                          <th className="py-2 px-3 font-normal">Employee</th>
-                          <th className="py-2 px-3 font-normal text-center">Assigned</th>
-                          <th className="py-2 px-3 font-normal text-center">On Time</th>
-                          <th className="py-2 px-3 font-normal text-center">Late Done</th>
-                          <th className="py-2 px-3 font-normal text-center">Not Done</th>
-                          <th className="py-2 px-3 font-normal text-right">Score</th>
-                        </tr>
-                      </thead>
-                      <tbody className="font-body-md text-sm text-on-surface">
-                        {weekSummary.summaries.length === 0 && (
-                          <tr><td colSpan={7} className="py-4 text-center font-data-mono text-on-surface-variant">No data this week.</td></tr>
-                        )}
-                        {weekSummary.summaries.map((s, i) => (
-                          <tr key={s.doerId} className="border-b border-on-surface/15 last:border-b-0">
-                            <td className="py-2 px-3 text-center font-data-mono text-on-surface-variant">{i + 1}</td>
-                            <td className="py-2 px-3">{s.doerName}</td>
-                            <td className="py-2 px-3 text-center font-data-mono">{s.assignedTasks}</td>
-                            <td className="py-2 px-3 text-center font-data-mono">{s.greenCount}</td>
-                            <td className="py-2 px-3 text-center font-data-mono">{s.yellowCount}</td>
-                            <td className="py-2 px-3 text-center font-data-mono">{s.redCount}</td>
-                            <td className="py-2 px-3 text-right font-data-mono font-bold">{formatPct(s.negativeScore)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <Stat label="Team Score" value={formatPct(weekSummary.totals.negativeScore)} />
+                  <Stat label="Assigned" value={weekSummary.totals.assigned} />
+                  <Stat label="On Time" value={weekSummary.totals.green} />
+                  <Stat label="Late Done" value={weekSummary.totals.yellow} />
+                  <Stat label="Not Done" value={weekSummary.totals.red} />
+                </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                   <Stat label="My Score" value={formatPct(myScore?.negativeScore)} />
