@@ -5,16 +5,19 @@ import { useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
+import Stat from "@/components/Stat";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
+import { mondayOf, sundayOf } from "@/lib/week";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
 import type {
   ChecklistInstance,
   ChecklistTemplate,
+  DgmaxWeeklySummary,
   Doer,
   FullDashboard,
   List,
@@ -74,6 +77,7 @@ function DashboardInner() {
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
+  const [weekSummary, setWeekSummary] = useState<DgmaxWeeklySummary | null>(null);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [hasPendingTickets, setHasPendingTickets] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -97,7 +101,9 @@ function DashboardInner() {
       // active template still missing today's instance gets one generated —
       // keeps every page's pending-checklist view consistent.
       await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
-      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData] = await Promise.all([
+      const weekFrom = mondayOf();
+      const weekTo = sundayOf(weekFrom);
+      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData, summary] = await Promise.all([
         api.get<FullDashboard>("/dashboard"),
         api.get<Task[]>("/tasks"),
         api.get<List[]>("/lists").catch(() => [] as List[]),
@@ -107,6 +113,9 @@ function DashboardInner() {
         api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
         api.get<Doer[]>("/users").catch(() => [] as Doer[]),
         api.get<Ticket[]>("/tickets").catch(() => [] as Ticket[]),
+        api
+          .get<DgmaxWeeklySummary>(`/performance/dgmax?from=${weekFrom}&to=${weekTo}`)
+          .catch(() => null),
       ]);
       setDashboard(dash);
       setLists(listsData);
@@ -115,6 +124,7 @@ function DashboardInner() {
       setTemplates(templateData);
       setDoers(doerData);
       setHasPendingTickets((ticketData ?? []).some((t) => t.status !== "Completed"));
+      setWeekSummary(summary);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load dashboard.");
     } finally {
@@ -214,17 +224,20 @@ function DashboardInner() {
     .filter((r) => (pendingDoerFilter ? r.assignedDoerId === pendingDoerFilter : true));
 
   const summary = dashboard?.summary;
-  const overallPct =
-    summary && summary.totalTasks > 0
-      ? Math.round((summary.completed / summary.totalTasks) * 100)
-      : 0;
 
   const kpis = [
-    { label: "Total Tasks", value: summary?.totalTasks ?? 0, color: "text-on-surface" },
-    { label: "Completed", value: summary?.completed ?? 0, color: "text-on-surface" },
-    { label: "Overdue", value: summary?.overdue ?? 0, color: "text-error" },
-    { label: "Pending", value: summary?.pending ?? 0, color: "text-on-surface-variant" },
+    { label: "Total Tasks", value: summary?.totalTasks ?? 0 },
+    { label: "Completed", value: summary?.completed ?? 0 },
+    { label: "Overdue", value: summary?.overdue ?? 0 },
+    { label: "Pending", value: summary?.pending ?? 0 },
   ];
+
+  // This week's DGMAX score. Everyone sees their own; privileged users also
+  // get the whole team's scoreboard.
+  const myScore = weekSummary?.summaries.find((s) => s.doerId === user?.id) ?? null;
+  const weekRange = weekSummary
+    ? `${formatDMY(weekSummary.fromDate)} — ${formatDMY(weekSummary.toDate)}`
+    : "";
 
   return (
     <>
@@ -246,7 +259,7 @@ function DashboardInner() {
             {canCreateTasks && (
               <button
                 onClick={() => setShowCreatePicker(true)}
-                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors"
+                className="border border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-surface transition-colors"
               >
                 + Create Task
               </button>
@@ -255,7 +268,7 @@ function DashboardInner() {
               <button
                 onClick={() => exportTasksToCsv(allTasks)}
                 disabled={allTasks.length === 0}
-                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors disabled:opacity-50"
+                className="border border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-surface transition-colors disabled:opacity-50"
               >
                 Export Report (CSV)
               </button>
@@ -265,7 +278,7 @@ function DashboardInner() {
               className={
                 hasPendingTickets
                   ? "border-2 border-red-600 px-3 py-1.5 font-label-sm text-label-sm uppercase font-bold animate-blink-red transition-colors"
-                  : "border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                  : "border border-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-on-surface hover:bg-surface-container transition-colors"
               }
             >
               Help Ticket
@@ -273,14 +286,14 @@ function DashboardInner() {
             {isAdmin && (
               <Link
                 href="/settings"
-                className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                className="border border-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-on-surface hover:bg-surface-container transition-colors"
               >
                 Settings
               </Link>
             )}
             <button
               onClick={logout}
-              className="border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-on-surface hover:text-surface transition-colors"
+              className="border border-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-on-surface hover:bg-on-surface hover:text-surface transition-colors"
             >
               Logout
             </button>
@@ -297,7 +310,7 @@ function DashboardInner() {
                 className={
                   hasPendingTickets
                     ? "flex-1 text-center border-2 border-red-600 px-3 py-2 font-label-sm text-label-sm uppercase font-bold animate-blink-red"
-                    : "flex-1 text-center border-2 border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+                    : "flex-1 text-center border border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
                 }
               >
                 Help Ticket
@@ -306,7 +319,7 @@ function DashboardInner() {
                 <button
                   onClick={() => exportTasksToCsv(allTasks)}
                   disabled={allTasks.length === 0}
-                  className="flex-1 border-2 border-on-surface bg-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
+                  className="flex-1 border border-on-surface bg-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
                 >
                   Export CSV
                 </button>
@@ -315,52 +328,99 @@ function DashboardInner() {
 
             {error && (
               <div className="col-span-12">
-                <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+                <p className="font-label-sm text-label-sm text-error border border-error px-3 py-2">
                   {error}
                 </p>
               </div>
             )}
 
-            {/* System Status + KPIs — admin/manager only */}
+            {/* KPIs — admin/manager only */}
             {isPrivileged && (
-              <>
-                <div className="col-span-12 bg-on-surface text-inverse-on-surface border-2 border-on-surface p-6 md:p-stack-lg flex flex-col justify-center relative overflow-hidden group">
-                  <div className="absolute -right-10 -top-10 w-64 h-64 border-4 border-surface/10 rounded-full opacity-20 pointer-events-none group-hover:scale-110 transition-transform duration-700" />
-                  <span className="font-label-sm text-label-sm uppercase tracking-widest text-surface-variant mb-stack-md relative z-10">
-                    System Status
-                  </span>
-                  <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-surface-container-lowest relative z-10">
-                    {loading ? "Loading..." : `${overallPct}% Overall Completion`}
-                  </h2>
-                </div>
-
-                <div className="col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-gutter">
-                  {kpis.map((kpi) => (
-                    <div
-                      key={kpi.label}
-                      className="bg-surface border-2 border-on-surface p-stack-md flex flex-col justify-between hover:bg-surface-container-lowest transition-colors"
-                    >
-                      <span className="font-label-sm text-label-sm text-on-surface-variant uppercase border-b-2 border-on-surface pb-2 mb-4">
-                        {kpi.label}
-                      </span>
-                      <div className={`font-data-mono text-data-mono text-4xl font-bold ${kpi.color}`}>
-                        {String(kpi.value).padStart(2, "0")}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <div className="col-span-12 grid grid-cols-2 md:grid-cols-4 gap-2">
+                {kpis.map((kpi) => (
+                  <Stat key={kpi.label} label={kpi.label} value={kpi.value} />
+                ))}
+              </div>
             )}
 
+            {/* This week's performance score */}
+            <section className="col-span-12 flex flex-col gap-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="font-label-sm text-xs uppercase text-on-surface-variant">
+                  This Week&apos;s Score
+                  {weekRange && <span className="ml-2 font-data-mono normal-case">{weekRange}</span>}
+                </h3>
+                <Link href="/performance" className="font-label-sm text-xs uppercase text-on-surface-variant hover:text-on-surface hover:underline">
+                  View detail →
+                </Link>
+              </div>
+
+              {!weekSummary ? (
+                <div className="border border-on-surface/25 px-3 py-3 font-data-mono text-xs text-on-surface-variant">
+                  {loading ? "Loading…" : "Score unavailable."}
+                </div>
+              ) : isPrivileged ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    <Stat label="Team Score" value={`${weekSummary.totals.negativeScore}%`} />
+                    <Stat label="Assigned" value={weekSummary.totals.assigned} />
+                    <Stat label="On Time" value={weekSummary.totals.green} />
+                    <Stat label="Late Done" value={weekSummary.totals.yellow} />
+                    <Stat label="Not Done" value={weekSummary.totals.red} />
+                  </div>
+
+                  <div className="border border-on-surface overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[560px]">
+                      <thead className="font-label-sm text-[11px] uppercase text-on-surface-variant border-b border-on-surface">
+                        <tr>
+                          <th className="py-2 px-3 font-normal text-center w-12">#</th>
+                          <th className="py-2 px-3 font-normal">Employee</th>
+                          <th className="py-2 px-3 font-normal text-center">Assigned</th>
+                          <th className="py-2 px-3 font-normal text-center">On Time</th>
+                          <th className="py-2 px-3 font-normal text-center">Late Done</th>
+                          <th className="py-2 px-3 font-normal text-center">Not Done</th>
+                          <th className="py-2 px-3 font-normal text-right">Score</th>
+                        </tr>
+                      </thead>
+                      <tbody className="font-body-md text-sm text-on-surface">
+                        {weekSummary.summaries.length === 0 && (
+                          <tr><td colSpan={7} className="py-4 text-center font-data-mono text-on-surface-variant">No data this week.</td></tr>
+                        )}
+                        {weekSummary.summaries.map((s, i) => (
+                          <tr key={s.doerId} className="border-b border-on-surface/15 last:border-b-0">
+                            <td className="py-2 px-3 text-center font-data-mono text-on-surface-variant">{i + 1}</td>
+                            <td className="py-2 px-3">{s.doerName}</td>
+                            <td className="py-2 px-3 text-center font-data-mono">{s.assignedTasks}</td>
+                            <td className="py-2 px-3 text-center font-data-mono">{s.greenCount}</td>
+                            <td className="py-2 px-3 text-center font-data-mono">{s.yellowCount}</td>
+                            <td className="py-2 px-3 text-center font-data-mono">{s.redCount}</td>
+                            <td className="py-2 px-3 text-right font-data-mono font-bold">{s.negativeScore}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <Stat label="My Score" value={`${myScore?.negativeScore ?? 0}%`} />
+                  <Stat label="Assigned" value={myScore?.assignedTasks ?? 0} />
+                  <Stat label="On Time" value={myScore?.greenCount ?? 0} />
+                  <Stat label="Late Done" value={myScore?.yellowCount ?? 0} />
+                  <Stat label="Not Done" value={myScore?.redCount ?? 0} />
+                </div>
+              )}
+            </section>
+
             {/* Pending Tasks — all open items (tasks + checklist), All / Today */}
-            <div className="col-span-12 bg-surface border-2 border-on-surface flex flex-col">
-              <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-wrap justify-between items-center gap-3">
-                <h3 className="font-headline-md text-headline-md text-on-surface">Pending Tasks</h3>
+            <div className="col-span-12 bg-surface border border-on-surface flex flex-col">
+              <div className="border-b border-on-surface p-3 flex flex-wrap justify-between items-center gap-3">
+                <h3 className="font-label-sm text-xs uppercase text-on-surface-variant">Pending Tasks</h3>
                 <div className="flex flex-wrap items-center gap-2">
                   {canCreateTasks && (
                     <button
                       onClick={() => setShowCreatePicker(true)}
-                      className="md:hidden px-3 py-1.5 border-2 border-on-surface bg-on-surface text-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                      className="md:hidden px-3 py-1.5 border border-on-surface bg-on-surface text-surface font-label-sm text-xs uppercase transition-colors"
                     >
                       + Create
                     </button>
@@ -369,7 +429,7 @@ function DashboardInner() {
                     <select
                       value={pendingDoerFilter}
                       onChange={(e) => setPendingDoerFilter(e.target.value)}
-                      className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                      className="border border-on-surface bg-surface px-2 py-1.5 font-label-sm text-xs uppercase text-on-surface focus:outline-none"
                     >
                       <option value="">All Doers</option>
                       {assignableDoers.map((d) => (
@@ -383,7 +443,7 @@ function DashboardInner() {
                     <button
                       key={f}
                       onClick={() => setPendingFilter(f)}
-                      className={`px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase transition-colors ${
+                      className={`px-3 py-1.5 border border-on-surface font-label-sm text-xs uppercase transition-colors ${
                         pendingFilter === f
                           ? "bg-on-surface text-surface"
                           : "text-on-surface hover:bg-surface-container"
@@ -397,15 +457,13 @@ function DashboardInner() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[720px]">
                   <thead>
-                    <tr className="bg-surface-container-low border-b-2 border-on-surface">
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">Task</th>
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">System Name</th>
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">System Type</th>
-                      {showDoerColumn && (
-                        <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface">Doer Name</th>
-                      )}
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-center">Due Date</th>
-                      <th className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface text-center">Action</th>
+                    <tr className="border-b border-on-surface font-label-sm text-[11px] uppercase text-on-surface-variant">
+                      <th className="py-2 px-3 font-normal">Task</th>
+                      <th className="py-2 px-3 font-normal">System Name</th>
+                      <th className="py-2 px-3 font-normal">System Type</th>
+                      {showDoerColumn && <th className="py-2 px-3 font-normal">Doer Name</th>}
+                      <th className="py-2 px-3 font-normal text-center">Due Date</th>
+                      <th className="py-2 px-3 font-normal text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="font-body-md text-body-md text-on-surface">
@@ -432,27 +490,17 @@ function DashboardInner() {
                       return (
                       <tr
                         key={`${r.kind}-${r.id}`}
-                        className={`border-b border-outline-variant last:border-b-0 transition-colors ${
-                          overdue
-                            ? "bg-red-50 border-l-4 border-l-red-600 hover:bg-red-100"
-                            : urgent
-                              ? "bg-yellow-50 border-l-4 border-l-yellow-500 hover:bg-yellow-100"
-                              : "hover:bg-surface-container-lowest"
-                        }`}
+                        className="border-b border-on-surface/15 last:border-b-0 hover:bg-surface-container-low transition-colors"
                       >
-                        <td className={`py-3 px-4 font-medium ${overdue ? "text-red-700" : ""}`}>
-                          {r.task}
+                        <td className="py-2 px-3">{r.task}</td>
+                        <td className="py-2 px-3 font-label-sm text-xs uppercase text-on-surface-variant">
+                          {r.systemName}
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant border border-on-surface-variant px-2 py-0.5">
-                            {r.systemName}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                        <td className="py-2 px-3 font-label-sm text-xs uppercase text-on-surface-variant">
                           {r.systemType}
                         </td>
                         {showDoerColumn && (
-                          <td className="py-3 px-4 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                          <td className="py-2 px-3 text-on-surface-variant">
                             {r.kind === "task" && r.taskObj?.doer?.name
                               ? r.taskObj.doer.name
                               : doers.find((d) => d.id === r.assignedDoerId)?.name ||
@@ -460,27 +508,25 @@ function DashboardInner() {
                                 "—"}
                           </td>
                         )}
-                        <td
-                          className={`py-3 px-4 text-center font-data-mono text-data-mono whitespace-nowrap ${
-                            overdue ? "text-red-700 font-bold" : ""
-                          }`}
-                        >
+                        <td className="py-2 px-3 text-center font-data-mono whitespace-nowrap">
                           {formatDMY(r.dueDate)}
+                          {overdue && <span className="ml-1 text-on-surface-variant">(overdue)</span>}
+                          {urgent && <span className="ml-1 text-on-surface-variant">({r.taskObj?.priority?.toLowerCase()})</span>}
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2 px-3 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() =>
                                 r.kind === "task" ? handleTaskDone(r.id) : handleChecklistDone(r.id)
                               }
-                              className="px-3 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                              className="px-3 py-1 bg-on-surface text-surface font-label-sm text-xs uppercase transition-colors"
                             >
                               Done
                             </button>
                             {r.kind === "task" && r.taskObj && (
                               <button
                                 onClick={() => setTaskToRevise(r.taskObj!)}
-                                className="px-3 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                                className="px-3 py-1 border border-on-surface text-on-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors"
                               >
                                 Revise
                               </button>
@@ -511,7 +557,7 @@ function DashboardInner() {
 
       {showCreatePicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm bg-surface-container-lowest border-2 border-on-surface">
+          <div className="w-full max-w-sm bg-surface-container-lowest border border-on-surface">
             <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
               <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
                 Create Task
@@ -532,7 +578,7 @@ function DashboardInner() {
                   setShowCreatePicker(false);
                   setCreateMode("task");
                 }}
-                className="px-4 py-3 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
+                className="px-4 py-3 border border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
               >
                 Task List — one-time or recurring tasks
               </button>
@@ -541,7 +587,7 @@ function DashboardInner() {
                   setShowCreatePicker(false);
                   setCreateMode("checklist");
                 }}
-                className="px-4 py-3 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
+                className="px-4 py-3 border border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
               >
                 Checklist — repeating checklist item
               </button>

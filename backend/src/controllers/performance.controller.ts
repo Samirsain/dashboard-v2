@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from "express";
 import { usersService } from "../services/users.service";
 import { tasksService } from "../services/tasks.service";
 import { checklistService } from "../services/checklist.service";
-import { archiveService } from "../services/archive.service";
 import { buildDgmaxWeeklySummary, DEFAULT_LATE_DONE_WEIGHT } from "../utils/dgmaxScoring";
 import { todayIso, mondayOfIso, addDaysIso, isValidIsoDate } from "../utils/date";
 
@@ -17,6 +16,10 @@ function resolveWeekRange(req: Request): { from: string; to: string } {
   return { from, to: addDaysIso(from, 6) };
 }
 
+/**
+ * Late Done penalty weight. Defaults to 60% and can be overridden per request
+ * via ?lateWeight= so the figure stays tunable without a code change.
+ */
 function resolveLateWeight(req: Request): number {
   const raw = Number((req.query as { lateWeight?: string }).lateWeight);
   return Number.isFinite(raw) ? raw : DEFAULT_LATE_DONE_WEIGHT;
@@ -36,35 +39,6 @@ export const performanceController = {
 
       const summary = buildDgmaxWeeklySummary(users, tasks, checklistInstances, today, from, to, lateWeight);
       res.json({ status: "success", data: summary });
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  async archiveWeek(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const body = req.body as { from?: string; to?: string; weekLabel?: string; lateWeight?: number; remarks?: Record<string, string> };
-      const from = body.from && isValidIsoDate(body.from) ? body.from : mondayOfIso();
-      const to = body.to && isValidIsoDate(body.to) ? body.to : addDaysIso(from, 6);
-      const lateWeight = Number(body.lateWeight) || DEFAULT_LATE_DONE_WEIGHT;
-      const weekLabel = body.weekLabel || `${from} to ${to}`;
-      const remarks = body.remarks || {};
-      const archivedBy = (req as unknown as { user?: { sub?: string } }).user?.sub || "Admin";
-
-      const created = await archiveService.archiveWeek(weekLabel, from, to, lateWeight, remarks, archivedBy);
-      res.status(201).json({ status: "success", data: created });
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  async listArchives(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const weekLabel = req.query.weekLabel as string | undefined;
-      const employeeId = req.query.employeeId as string | undefined;
-
-      const archives = await archiveService.listArchives(weekLabel, employeeId);
-      res.json({ status: "success", data: archives });
     } catch (err) {
       next(err);
     }

@@ -10,8 +10,8 @@
  *   NotDonePenalty    = NotDone  x PerTaskPercentage
  *   LateDonePenalty   = LateDone x PerTaskPercentage x (lateDoneWeight / 100)
  *   NegativeScore     = clamp(-(NotDonePenalty + LateDonePenalty), -100, 0)  <- final score
- *   PerformanceScore  = 100 + NegativeScore   (0-100 equivalent, kept for the
- *                       weekly_archives column and any 0-100 reporting)
+ *   PerformanceScore  = 100 + NegativeScore   (the same score on a 0-100 scale,
+ *                       for anything that wants a positive figure)
  *
  * Every dashboard, leaderboard, report and analytic must call this — never
  * reimplement the arithmetic elsewhere.

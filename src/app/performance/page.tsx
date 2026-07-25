@@ -4,20 +4,12 @@ import { useEffect, useState, useMemo } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
+import Stat from "@/components/Stat";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { mondayOf, sundayOf, addDays, todayIso } from "@/lib/week";
 import { getTaskCategory, CATEGORY_LABEL } from "@/lib/scoring";
 import type { Task, DgmaxWeeklySummary, TaskScoreCategory } from "@/lib/types";
-
-function Stat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="flex flex-col gap-1 border border-on-surface/25 px-3 py-2">
-      <span className="font-label-sm text-[10px] uppercase tracking-wide text-on-surface-variant">{label}</span>
-      <span className="font-data-mono text-lg font-bold text-on-surface">{value}</span>
-    </div>
-  );
-}
 
 function PerformanceInner() {
   const [tasks, setTasks] = useState<Task[]>([]);

@@ -384,21 +384,4 @@ export interface DgmaxWeeklySummary {
   };
 }
 
-export interface WeeklyArchive {
-  id: string;
-  weekLabel: string;
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  assignedTasks: number;
-  completedTasks: number;
-  greenCount: number;
-  yellowCount: number;
-  redCount: number;
-  pendingCount: number;
-  performanceScore: number;
-  managerRemarks: string;
-  archivedBy: string;
-  archivedAt: string;
-}
 
