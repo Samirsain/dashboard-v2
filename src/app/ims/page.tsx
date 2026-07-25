@@ -98,6 +98,8 @@ function ImsInner() {
 
   const nameBySku = new Map(items.map((i) => [i.skuCode, i.itemName]));
   const needsReorderCount = reorder.filter((r) => r.reorderQty > 0).length;
+  // Map for quick lookup of reorder data by SKU (used in Item List color coding)
+  const reorderBySku = new Map(reorder.map((r) => [r.skuCode, r]));
 
   const sortedReorder = useMemo(
     () =>
@@ -363,6 +365,25 @@ function ImsInner() {
                         placeholder="Search by SKU or item name..."
                         className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none max-w-sm"
                       />
+                      {/* Color Legend */}
+                      <div className="flex flex-wrap items-center gap-3 border border-on-surface/30 px-3 py-2 bg-surface-container-lowest font-label-sm text-[11px] uppercase">
+                        <span className="text-on-surface-variant font-bold">Color Guide:</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-sm bg-error/30 border border-error"></span>
+                          <span className="text-error font-bold">Red</span>
+                          <span className="text-on-surface-variant">— Stock critically low, order qty ≥ MOQ</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-sm bg-purple-200 border border-purple-500"></span>
+                          <span className="text-purple-700 font-bold">Purple</span>
+                          <span className="text-on-surface-variant">— Stock slightly low, minimum order (MOQ) required</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-500"></span>
+                          <span className="text-emerald-700 font-bold">Green</span>
+                          <span className="text-on-surface-variant">— Stock sufficient, no order needed</span>
+                        </span>
+                      </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[1100px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
@@ -388,8 +409,18 @@ function ImsInner() {
                                 </td>
                               </tr>
                             )}
-                            {filteredItems.map((i) => (
-                              <tr key={i.skuCode} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                            {filteredItems.map((i) => {
+                              const rd = reorderBySku.get(i.skuCode);
+                              const raw = rd ? rd.effectiveMaxLevel - rd.closingStock - rd.materialInTransit : null;
+                              const isBigShortage = raw !== null && raw >= i.moq;
+                              const isSmallShortage = raw !== null && raw > 0 && raw < i.moq;
+                              const rowBg = isBigShortage
+                                ? "bg-error/10"
+                                : isSmallShortage
+                                ? "bg-purple-50"
+                                : "bg-emerald-50";
+                              return (
+                              <tr key={i.skuCode} className={`border-b border-surface-variant last:border-b-0 transition-colors ${rowBg}`}>
                                 <td className={tdCls}>{i.skuCode}</td>
                                 <td className="py-2 px-4 border-r border-surface-variant font-medium whitespace-nowrap">{i.itemName}</td>
                                 <td className={tdCls}>{i.category}</td>
@@ -417,7 +448,8 @@ function ImsInner() {
                                   </div>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
