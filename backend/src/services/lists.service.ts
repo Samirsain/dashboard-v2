@@ -4,7 +4,8 @@ import { generateId } from "../utils/id";
 import { todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
 import { canViewAllData } from "../utils/access";
-import type { JwtClaims, List, ListType } from "../types";
+import { usersService } from "./users.service";
+import type { JwtClaims, List, ListType, User } from "../types";
 
 const entity = sheetsConfig.lists;
 
@@ -30,13 +31,13 @@ export const listsService = {
       const lists = records.map(toList);
       const allUsers = await usersService.list();
       const sahilUser = allUsers.find(
-        (u) => (u.employeeCode ?? "").toUpperCase() === "TM02" || u.name.toUpperCase().includes("SAHIL SETIA")
+        (u: User) => (u.employeeCode ?? "").toUpperCase() === "TM02" || u.name.toUpperCase().includes("SAHIL SETIA")
       );
       const sahilId = sahilUser?.id;
 
       const defaultMemberIds = allUsers
-        .map((u) => u.id)
-        .filter((id) => id !== sahilId);
+        .map((u: User) => u.id)
+        .filter((id: string) => id !== sahilId);
 
       const officeTl = lists.find((l) => l.type === "task" && l.name.toUpperCase().startsWith("OFFICE"));
       if (!officeTl) {
