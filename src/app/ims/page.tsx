@@ -366,22 +366,22 @@ function ImsInner() {
                         className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none max-w-sm"
                       />
                       {/* Color Legend */}
-                      <div className="flex flex-wrap items-center gap-3 border border-on-surface/30 px-3 py-2 bg-surface-container-lowest font-label-sm text-[11px] uppercase">
-                        <span className="text-on-surface-variant font-bold">Color Guide:</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-3 h-3 rounded-sm bg-error/30 border border-error"></span>
+                      <div className="flex items-center gap-0 border border-on-surface/30 bg-surface-container-lowest font-label-sm text-[10px] uppercase divide-x divide-on-surface/20 overflow-hidden">
+                        <span className="px-3 py-2 text-on-surface-variant font-bold whitespace-nowrap">Color Guide</span>
+                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
+                          <span className="inline-block w-2.5 h-2.5 bg-error/30 border border-error flex-shrink-0"></span>
                           <span className="text-error font-bold">Red</span>
-                          <span className="text-on-surface-variant">— Stock critically low, order qty ≥ MOQ</span>
+                          <span className="text-on-surface-variant hidden sm:inline">— Stock critically low (order ≥ MOQ)</span>
                         </span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-3 h-3 rounded-sm bg-purple-200 border border-purple-500"></span>
+                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
+                          <span className="inline-block w-2.5 h-2.5 bg-purple-200 border border-purple-500 flex-shrink-0"></span>
                           <span className="text-purple-700 font-bold">Purple</span>
-                          <span className="text-on-surface-variant">— Stock slightly low, minimum order (MOQ) required</span>
+                          <span className="text-on-surface-variant hidden sm:inline">— Stock slightly low (min. MOQ order)</span>
                         </span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-500"></span>
+                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
+                          <span className="inline-block w-2.5 h-2.5 bg-emerald-200 border border-emerald-500 flex-shrink-0"></span>
                           <span className="text-emerald-700 font-bold">Green</span>
-                          <span className="text-on-surface-variant">— Stock sufficient, no order needed</span>
+                          <span className="text-on-surface-variant hidden sm:inline">— Stock sufficient</span>
                         </span>
                       </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
@@ -625,22 +625,22 @@ function ImsInner() {
                   {tab === "reorder" && (
                     <div className="flex flex-col gap-stack-sm">
                       {/* Color Legend */}
-                      <div className="flex flex-wrap items-center gap-3 border border-on-surface/30 px-3 py-2 bg-surface-container-lowest font-label-sm text-[11px] uppercase">
-                        <span className="text-on-surface-variant font-bold">Color Guide:</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-3 h-3 rounded-sm bg-error/30 border border-error"></span>
+                      <div className="flex items-center gap-0 border border-on-surface/30 bg-surface-container-lowest font-label-sm text-[10px] uppercase divide-x divide-on-surface/20 overflow-hidden">
+                        <span className="px-3 py-2 text-on-surface-variant font-bold whitespace-nowrap">Color Guide</span>
+                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
+                          <span className="inline-block w-2.5 h-2.5 bg-error/30 border border-error flex-shrink-0"></span>
                           <span className="text-error font-bold">Red</span>
-                          <span className="text-on-surface-variant">— Stock critically low, order qty ≥ MOQ</span>
+                          <span className="text-on-surface-variant hidden sm:inline">— Stock critically low (order ≥ MOQ)</span>
                         </span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-3 h-3 rounded-sm bg-purple-200 border border-purple-500"></span>
+                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
+                          <span className="inline-block w-2.5 h-2.5 bg-purple-200 border border-purple-500 flex-shrink-0"></span>
                           <span className="text-purple-700 font-bold">Purple</span>
-                          <span className="text-on-surface-variant">— Stock slightly low, minimum order (MOQ) required</span>
+                          <span className="text-on-surface-variant hidden sm:inline">— Stock slightly low (min. MOQ order)</span>
                         </span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-500"></span>
+                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
+                          <span className="inline-block w-2.5 h-2.5 bg-emerald-200 border border-emerald-500 flex-shrink-0"></span>
                           <span className="text-emerald-700 font-bold">Green</span>
-                          <span className="text-on-surface-variant">— Stock sufficient, no order needed</span>
+                          <span className="text-on-surface-variant hidden sm:inline">— Stock sufficient</span>
                         </span>
                       </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
