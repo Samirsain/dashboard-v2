@@ -86,25 +86,24 @@ function SettingsInner() {
     });
   }, []);
 
-  // The full set of access rows shown for every doer: Office (implicit, no
-  // list record) plus each named list, split into a Task-List (TL) and
-  // Checklist (CL) side — mirroring the sidebar's OFFICE/SAHIL TL & CL.
-  // OFFICE TL/CL are real lists matched by name — their listId comes from the
-  // actual list record so toggleAccess can patch their memberIds normally.
+  // The full set of access rows shown for every doer.
+  // OFFICE TL/CL always appear first. If a real list starting with "OFFICE"
+  // exists, we link its ID so the checkbox can toggle membership. Otherwise
+  // they show as read-only (isOffice fallback).
   const buckets = useMemo<Bucket[]>(() => {
     const officeTl = lists.find((l) => l.type === "task" && l.name.toUpperCase().startsWith("OFFICE"));
     const officeCl = lists.find((l) => l.type === "checklist" && l.name.toUpperCase().startsWith("OFFICE"));
 
-    const taskBuckets: Bucket[] = officeTl
-      ? [{ key: "office-task", label: "OFFICE TL", kind: "task", listId: officeTl.id, isOffice: true }]
-      : [];
-    const checklistBuckets: Bucket[] = officeCl
-      ? [{ key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: officeCl.id, isOffice: true }]
-      : [];
+    const taskBuckets: Bucket[] = [
+      { key: "office-task", label: "OFFICE TL", kind: "task", listId: officeTl?.id ?? "", isOffice: !officeTl },
+    ];
+    const checklistBuckets: Bucket[] = [
+      { key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: officeCl?.id ?? "", isOffice: !officeCl },
+    ];
 
     for (const l of lists) {
+      if (l.name.toUpperCase().startsWith("OFFICE")) continue; // already in fixed slots above
       const short = listGroupKey(l.name);
-      if (l.name.toUpperCase().startsWith("OFFICE")) continue; // already handled above
       if (l.type === "task") {
         taskBuckets.push({ key: `t-${l.id}`, label: `${short} TL`, kind: "task", listId: l.id, isOffice: false });
       } else {
