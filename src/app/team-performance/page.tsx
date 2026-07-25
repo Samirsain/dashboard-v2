@@ -8,10 +8,14 @@ import Stat from "@/components/Stat";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY, formatPct } from "@/lib/format";
 import { mondayOf, sundayOf, addDays } from "@/lib/week";
-import type { DgmaxWeeklySummary } from "@/lib/types";
+import { getTaskCategory, CATEGORY_LABEL } from "@/lib/scoring";
+import type { DgmaxWeeklySummary, List, Task, Doer } from "@/lib/types";
 
 function TeamPerformanceInner() {
   const [dgmaxSummary, setDgmaxSummary] = useState<DgmaxWeeklySummary | null>(null);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [lists, setLists] = useState<List[]>([]);
+  const [doers, setDoers] = useState<Doer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,8 +27,16 @@ function TeamPerformanceInner() {
     setLoading(true);
     setError(null);
     try {
-      const summaryData = await api.get<DgmaxWeeklySummary>(`/performance/dgmax?from=${from}&to=${to}`);
+      const [summaryData, tasksData, listsData, doerData] = await Promise.all([
+        api.get<DgmaxWeeklySummary>(`/performance/dgmax?from=${from}&to=${to}`),
+        api.get<Task[]>("/tasks").catch(() => [] as Task[]),
+        api.get<List[]>("/lists").catch(() => [] as List[]),
+        api.get<Doer[]>("/users").catch(() => [] as Doer[]),
+      ]);
       setDgmaxSummary(summaryData);
+      setAllTasks(tasksData);
+      setLists(listsData);
+      setDoers(doerData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load performance data.");
     } finally {
@@ -164,6 +176,148 @@ function TeamPerformanceInner() {
               </tbody>
             </table>
           </div>
+
+          {/* Weekly Task List Section */}
+          {(() => {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const isOverdue = (dueDate: string) => !!dueDate && dueDate < todayStr;
+            const listLabelFor = (listId: string) => {
+              if (!listId) return "Office";
+              const list = lists.find((l) => l.id === listId);
+              return list ? list.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST" : "Office";
+            };
+
+            const weeklyTasks = allTasks
+              .filter((t) => {
+                if (t.status === "Cancelled" || !t.dueDate) return false;
+                const completedAt = t.status === "Completed" && t.updatedAt ? t.updatedAt.slice(0, 10) : null;
+                if (completedAt) {
+                  return (completedAt >= weekStart && completedAt <= weekEnd) || (t.dueDate >= weekStart && t.dueDate <= weekEnd);
+                }
+                return t.dueDate >= weekStart && t.dueDate <= weekEnd;
+              })
+              .sort((a, b) => {
+                const aCompleted = a.status === "Completed";
+                const bCompleted = b.status === "Completed";
+                if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
+
+                const aOverdue = isOverdue(a.dueDate);
+                const bOverdue = isOverdue(b.dueDate);
+                if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+
+                const aToday = a.dueDate === todayStr;
+                const bToday = b.dueDate === todayStr;
+                if (aToday !== bToday) return aToday ? -1 : 1;
+
+                return a.dueDate.localeCompare(b.dueDate);
+              });
+
+            return (
+              <div className="bg-surface border border-on-surface flex flex-col mt-4">
+                <div className="border-b border-on-surface p-3 flex justify-between items-center">
+                  <h3 className="font-headline-md text-headline-md text-on-surface uppercase font-bold">
+                    Weekly Task List ({weeklyTasks.length})
+                  </h3>
+                  <span className="font-data-mono text-xs text-on-surface-variant">
+                    Mon–Sun Scored Work
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[780px]">
+                    <thead>
+                      <tr className="bg-surface-container-low border-b border-on-surface font-label-sm text-xs uppercase text-on-surface">
+                        <th className="py-2.5 px-3">Task Name</th>
+                        <th className="py-2.5 px-3">List / System</th>
+                        <th className="py-2.5 px-3">Assigned To</th>
+                        <th className="py-2.5 px-3 text-center">Due Date</th>
+                        <th className="py-2.5 px-3 text-center">Completed On</th>
+                        <th className="py-2.5 px-3 text-center">Category</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="font-body-md text-sm text-on-surface">
+                      {loading && (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">
+                            Loading tasks…
+                          </td>
+                        </tr>
+                      )}
+                      {!loading && weeklyTasks.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">
+                            No tasks scheduled or completed for this week.
+                          </td>
+                        </tr>
+                      )}
+                      {weeklyTasks.map((t) => {
+                        const cat = getTaskCategory(t, todayStr);
+                        const categoryBadge =
+                          cat === "Green"
+                            ? "bg-emerald-900/30 border-emerald-600 text-emerald-300"
+                            : cat === "Yellow"
+                            ? "bg-amber-900/30 border-amber-600 text-amber-300"
+                            : cat === "Red"
+                            ? "bg-red-900/30 border-red-600 text-red-300"
+                            : "border-on-surface/40 text-on-surface-variant";
+
+                        const completedOnStr =
+                          t.status === "Completed" && t.updatedAt ? formatDMY(t.updatedAt.slice(0, 10)) : "—";
+
+                        return (
+                          <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                            <td className="py-2.5 px-3 font-medium">
+                              {t.title}
+                              {t.priority === "Urgent" || t.priority === "Critical" ? (
+                                <span className="ml-2 font-label-sm text-[10px] uppercase border border-error text-error px-1 py-0.2">
+                                  {t.priority}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="py-2.5 px-3 font-label-sm text-xs uppercase text-on-surface-variant">
+                              {listLabelFor(t.listId)}
+                            </td>
+                            <td className="py-2.5 px-3 text-on-surface-variant">
+                              {t.doer?.name || doers.find((d) => d.id === t.assignedDoerId)?.name || t.assignedDoerId || "—"}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-data-mono text-xs whitespace-nowrap">
+                              {formatDMY(t.dueDate)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-data-mono text-xs text-on-surface-variant whitespace-nowrap">
+                              {completedOnStr}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {cat ? (
+                                <span className={`inline-block border font-label-sm text-[10px] uppercase px-2 py-0.5 font-bold ${categoryBadge}`}>
+                                  {CATEGORY_LABEL[cat]}
+                                </span>
+                              ) : (
+                                <span className="font-data-mono text-xs text-on-surface-variant">—</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span
+                                className={`inline-block border font-label-sm text-[10px] uppercase px-2 py-0.5 ${
+                                  t.status === "Completed"
+                                    ? "border-emerald-600 text-emerald-300"
+                                    : isOverdue(t.dueDate)
+                                    ? "border-red-600 text-red-300"
+                                    : "border-on-surface text-on-surface"
+                                }`}
+                              >
+                                {t.status === "Completed" ? "Completed" : isOverdue(t.dueDate) ? "Overdue" : "Pending"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </main>
       </div>
     </>
