@@ -33,6 +33,9 @@ function toWeeklyArchive(record: SheetRecord): WeeklyArchive {
 export const archiveService = {
   async archiveWeek(
     weekLabel: string,
+    fromDate: string,
+    toDate: string,
+    lateDoneWeight: number,
     remarks: Record<string, string>, // employeeId -> remark
     archivedBy: string
   ): Promise<WeeklyArchive[]> {
@@ -43,7 +46,7 @@ export const archiveService = {
       checklistService.listInstances({}),
     ]);
 
-    const summary = buildDgmaxWeeklySummary(users, tasks, checklistInstances, today, weekLabel);
+    const summary = buildDgmaxWeeklySummary(users, tasks, checklistInstances, today, fromDate, toDate, lateDoneWeight);
     const nowIso = new Date().toISOString();
 
     const created: WeeklyArchive[] = [];

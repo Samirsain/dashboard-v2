@@ -3,31 +3,50 @@ import { usersService } from "../services/users.service";
 import { tasksService } from "../services/tasks.service";
 import { checklistService } from "../services/checklist.service";
 import { archiveService } from "../services/archive.service";
-import { buildDgmaxWeeklySummary } from "../utils/dgmaxScoring";
+import { buildDgmaxWeeklySummary, DEFAULT_LATE_DONE_WEIGHT } from "../utils/dgmaxScoring";
 import { todayIso } from "../utils/date";
 
-function currentWeekLabel(): string {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+/** Monday (YYYY-MM-DD) of the week containing `dateStr` (or today, if omitted). */
+function mondayOf(dateStr?: string): string {
+  const base = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
+  const day = base.getDay(); // 0 = Sunday .. 6 = Saturday
+  const diff = day === 0 ? -6 : 1 - day;
+  base.setDate(base.getDate() + diff);
+  return base.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Resolves the [from, to] week window from query params, defaulting to the current Mon-Sun week. */
+function resolveWeekRange(req: Request): { from: string; to: string } {
+  const q = req.query as { from?: string; to?: string; week?: string };
+  if (q.from && q.to) return { from: q.from, to: q.to };
+  const from = mondayOf(q.week);
+  return { from, to: addDays(from, 6) };
+}
+
+function resolveLateWeight(req: Request): number {
+  const raw = Number((req.query as { lateWeight?: string }).lateWeight);
+  return Number.isFinite(raw) ? raw : DEFAULT_LATE_DONE_WEIGHT;
 }
 
 export const performanceController = {
   async getDgmaxSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const today = todayIso();
-      const weekLabel = (req.query.week as string) || currentWeekLabel();
+      const { from, to } = resolveWeekRange(req);
+      const lateWeight = resolveLateWeight(req);
       const [users, tasks, checklistInstances] = await Promise.all([
         usersService.list(),
         tasksService.list({}),
         checklistService.listInstances({}),
       ]);
 
-      const summary = buildDgmaxWeeklySummary(users, tasks, checklistInstances, today, weekLabel);
+      const summary = buildDgmaxWeeklySummary(users, tasks, checklistInstances, today, from, to, lateWeight);
       res.json({ status: "success", data: summary });
     } catch (err) {
       next(err);
@@ -36,11 +55,15 @@ export const performanceController = {
 
   async archiveWeek(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const weekLabel = req.body.weekLabel || currentWeekLabel();
-      const remarks = req.body.remarks || {};
+      const body = req.body as { from?: string; to?: string; weekLabel?: string; lateWeight?: number; remarks?: Record<string, string> };
+      const from = body.from || mondayOf();
+      const to = body.to || addDays(from, 6);
+      const lateWeight = Number(body.lateWeight) || DEFAULT_LATE_DONE_WEIGHT;
+      const weekLabel = body.weekLabel || `${from} to ${to}`;
+      const remarks = body.remarks || {};
       const archivedBy = (req as unknown as { user?: { sub?: string } }).user?.sub || "Admin";
 
-      const created = await archiveService.archiveWeek(weekLabel, remarks, archivedBy);
+      const created = await archiveService.archiveWeek(weekLabel, from, to, lateWeight, remarks, archivedBy);
       res.status(201).json({ status: "success", data: created });
     } catch (err) {
       next(err);

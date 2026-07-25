@@ -305,7 +305,14 @@ export interface WorkflowStepEvent {
   reworkCount: number;
 }
 
-// ---- DGMAX Task Scoring System Types --------------------------------------
+// ---- DGMAX Negative Performance Scoring System Types ----------------------
+//
+// Green/Yellow/Red are the DB column names (unchanged, no migration needed)
+// but now carry DGMAX's exact meanings:
+//   Green  = On Time  (completed on or before due date)
+//   Yellow = Late Done (completed after due date)
+//   Red    = Not Done (still incomplete, due date has passed)
+//   Pending = still incomplete, not yet due — excluded from the score entirely.
 
 export type TaskScoreCategory = "Green" | "Yellow" | "Red" | "Pending";
 
@@ -313,19 +320,21 @@ export interface DgmaxEmployeeSummary {
   doerId: string;
   doerName: string;
   department: string;
-  assignedTasks: number;
+  assignedTasks: number; // Green + Yellow + Red (Pending excluded — not yet scoreable)
   completedTasks: number;
-  greenCount: number;
-  yellowCount: number;
-  redCount: number;
-  pendingCount: number;
-  performanceScore: number; // calculated numeric score (0-100)
+  greenCount: number; // On Time
+  yellowCount: number; // Late Done
+  redCount: number; // Not Done
+  pendingCount: number; // not yet due — informational only
+  negativeScore: number; // -(Not Done Penalty + Late Done Penalty), 0 to -100
+  performanceScore: number; // 100 + negativeScore, clamped 0-100
 }
 
 export interface DgmaxWeeklySummary {
-  weekLabel: string;
-  fromDate: string;
-  toDate: string;
+  weekLabel: string; // e.g. "21-07-2026 to 27-07-2026" (Monday-Sunday)
+  fromDate: string; // YYYY-MM-DD, Monday
+  toDate: string; // YYYY-MM-DD, Sunday
+  lateDoneWeight: number; // 0-100, the weight used for this summary
   summaries: DgmaxEmployeeSummary[];
   totals: {
     assigned: number;

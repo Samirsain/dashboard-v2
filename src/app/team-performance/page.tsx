@@ -8,43 +8,29 @@ import InitialsAvatar from "@/components/InitialsAvatar";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import type { Task, Doer, DgmaxWeeklySummary, WeeklyArchive, TaskScoreCategory } from "@/lib/types";
+import type { DgmaxWeeklySummary, WeeklyArchive } from "@/lib/types";
 
-function getTodayIso() {
-  const formatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
-  return formatter.format(new Date());
+/** Monday (YYYY-MM-DD) of the week containing `dateStr` (or today, if omitted). */
+function mondayOf(dateStr?: string): string {
+  const base = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
+  const day = base.getDay(); // 0 = Sunday .. 6 = Saturday
+  const diff = day === 0 ? -6 : 1 - day;
+  base.setDate(base.getDate() + diff);
+  return base.toISOString().slice(0, 10);
 }
 
-function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory {
-  const isCompleted = task.status === "Completed";
-  const isCancelled = task.status === "Cancelled";
-  if (isCancelled) return "Pending";
-  if (!isCompleted) {
-    if (task.dueDate && task.dueDate < todayIso) return "Red";
-    return "Pending";
-  }
-  const completedDate = task.updatedAt ? task.updatedAt.slice(0, 10) : todayIso;
-  if (task.dueDate && completedDate > task.dueDate) return "Red";
-  if (task.revisionCount > 0) return "Yellow";
-  return "Green";
-}
-
-function currentWeekLabel(): string {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 function ScoreBadge({ score }: { score: number }) {
   const { label, color } =
-    score >= 90 ? { label: "Excellent", color: "text-emerald-700 bg-emerald-100 border-emerald-500" }
-    : score >= 70 ? { label: "Good", color: "text-blue-700 bg-blue-100 border-blue-500" }
-    : score >= 50 ? { label: "Average", color: "text-amber-700 bg-amber-100 border-amber-500" }
-    : { label: "Poor", color: "text-rose-700 bg-rose-100 border-rose-500" };
+    score >= 90 ? { label: "Green", color: "text-emerald-700 bg-emerald-100 border-emerald-500" }
+    : score >= 70 ? { label: "Yellow", color: "text-amber-700 bg-amber-100 border-amber-500" }
+    : score >= 50 ? { label: "Orange", color: "text-orange-700 bg-orange-100 border-orange-500" }
+    : { label: "Red", color: "text-rose-700 bg-rose-100 border-rose-500" };
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 border font-bold font-data-mono text-sm ${color}`}>
@@ -56,8 +42,8 @@ function ScoreBadge({ score }: { score: number }) {
 function ScoreBar({ score }: { score: number }) {
   const color =
     score >= 90 ? "bg-emerald-500"
-    : score >= 70 ? "bg-blue-500"
-    : score >= 50 ? "bg-amber-500"
+    : score >= 70 ? "bg-amber-500"
+    : score >= 50 ? "bg-orange-500"
     : "bg-rose-500";
 
   return (
@@ -69,33 +55,30 @@ function ScoreBar({ score }: { score: number }) {
 
 function TeamPerformanceInner() {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [doers, setDoers] = useState<Doer[]>([]);
   const [dgmaxSummary, setDgmaxSummary] = useState<DgmaxWeeklySummary | null>(null);
   const [archives, setArchives] = useState<WeeklyArchive[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Monday of the currently-selected week. Week always runs Monday -> Sunday.
+  const [weekStart, setWeekStart] = useState(() => mondayOf());
+  const weekEnd = addDays(weekStart, 6);
+  const [lateWeight, setLateWeight] = useState(60);
+  const [lateWeightDraft, setLateWeightDraft] = useState("60");
+
   const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [weekLabel, setWeekLabel] = useState(currentWeekLabel());
   const [remarksMap, setRemarksMap] = useState<Record<string, string>>({});
   const [archiving, setArchiving] = useState(false);
   const [activeTab, setActiveTab] = useState<"current" | "archive">("current");
 
-  const todayIso = getTodayIso();
-
-  async function loadData() {
+  async function loadData(from: string, to: string, weight: number) {
     setLoading(true);
     setError(null);
     try {
-      const [taskData, doerData, summaryData, archiveData] = await Promise.all([
-        api.get<Task[]>("/tasks"),
-        api.get<Doer[]>("/users"),
-        api.get<DgmaxWeeklySummary>("/performance/dgmax"),
+      const [summaryData, archiveData] = await Promise.all([
+        api.get<DgmaxWeeklySummary>(`/performance/dgmax?from=${from}&to=${to}&lateWeight=${weight}`),
         api.get<WeeklyArchive[]>("/performance/archives").catch(() => [] as WeeklyArchive[]),
       ]);
-      setTasks(taskData);
-      setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "Admin"));
       setDgmaxSummary(summaryData);
       setArchives(archiveData);
     } catch (err) {
@@ -106,16 +89,35 @@ function TeamPerformanceInner() {
   }
 
   useEffect(() => {
-    loadData();
-  }, []);
+    queueMicrotask(() => {
+      loadData(weekStart, weekEnd, lateWeight);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStart, lateWeight]);
+
+  function goToWeek(offsetWeeks: number) {
+    setWeekStart((prev) => addDays(prev, offsetWeeks * 7));
+  }
+
+  function applyLateWeight() {
+    const n = Number(lateWeightDraft);
+    if (Number.isFinite(n)) setLateWeight(Math.min(100, Math.max(0, Math.round(n))));
+  }
 
   async function handleArchiveSubmit() {
     setArchiving(true);
     try {
-      await api.post("/performance/archive", { weekLabel, remarks: remarksMap });
+      const weekLabel = dgmaxSummary?.weekLabel || `${formatDMY(weekStart)} to ${formatDMY(weekEnd)}`;
+      await api.post("/performance/archive", {
+        weekLabel,
+        from: weekStart,
+        to: weekEnd,
+        lateWeight,
+        remarks: remarksMap,
+      });
       alert(`Weekly Performance archived for ${weekLabel}!`);
       setShowArchiveModal(false);
-      await loadData();
+      await loadData(weekStart, weekEnd, lateWeight);
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to archive week.");
     } finally {
@@ -124,13 +126,13 @@ function TeamPerformanceInner() {
   }
 
   const totals = dgmaxSummary?.totals ?? {
-    assigned: tasks.length,
-    completed: tasks.filter((t) => t.status === "Completed").length,
-    green: tasks.filter((t) => getTaskCategory(t, todayIso) === "Green").length,
-    yellow: tasks.filter((t) => getTaskCategory(t, todayIso) === "Yellow").length,
-    red: tasks.filter((t) => getTaskCategory(t, todayIso) === "Red").length,
-    pending: tasks.filter((t) => getTaskCategory(t, todayIso) === "Pending").length,
-    performanceScore: 0,
+    assigned: 0,
+    completed: 0,
+    green: 0,
+    yellow: 0,
+    red: 0,
+    pending: 0,
+    performanceScore: 100,
   };
 
   const archivedWeeks = useMemo(() => {
@@ -144,15 +146,15 @@ function TeamPerformanceInner() {
   }, [archives]);
 
   function exportCSV() {
-    const headers = ["Week", "Employee Name", "Department", "Assigned", "Completed", "Green", "Yellow", "Red", "Pending", "Score (%)"];
-    const rows = (dgmaxSummary?.summaries ?? []).map((s) => [
-      dgmaxSummary?.weekLabel || weekLabel, s.doerName, s.department,
-      s.assignedTasks, s.completedTasks, s.greenCount, s.yellowCount, s.redCount, s.pendingCount, s.performanceScore,
+    const headers = ["Week", "Employee Name", "Department", "Assigned", "On Time", "Late Done", "Not Done", "Negative Score", "Final Score", "Rank"];
+    const rows = (dgmaxSummary?.summaries ?? []).map((s, i) => [
+      dgmaxSummary?.weekLabel || `${weekStart} to ${weekEnd}`, s.doerName, s.department,
+      s.assignedTasks, s.greenCount, s.yellowCount, s.redCount, s.negativeScore, s.performanceScore, i + 1,
     ]);
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map((e) => e.join(",")).join("\n");
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `dgmax-summary-${weekLabel}.csv`);
+    link.setAttribute("download", `dgmax-summary-${weekStart}-to-${weekEnd}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -182,11 +184,56 @@ function TeamPerformanceInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg max-w-full overflow-hidden">
+          {/* Week Selector + Late Weight Admin Setting */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-surface border-2 border-on-surface p-3">
+            <div className="flex items-center gap-2">
+              <button onClick={() => goToWeek(-1)} className="px-3 py-1.5 border-2 border-on-surface bg-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors cursor-pointer font-bold">
+                ← Prev Week
+              </button>
+              <button onClick={() => setWeekStart(mondayOf())} className="px-3 py-1.5 border-2 border-on-surface bg-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors cursor-pointer font-bold">
+                This Week
+              </button>
+              <button onClick={() => goToWeek(1)} className="px-3 py-1.5 border-2 border-on-surface bg-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors cursor-pointer font-bold">
+                Next Week →
+              </button>
+              <div className="flex items-center gap-2 ml-2">
+                <label className="font-label-sm text-[10px] uppercase font-bold text-on-surface-variant">Jump to week of:</label>
+                <input
+                  type="date"
+                  value={weekStart}
+                  onChange={(e) => e.target.value && setWeekStart(mondayOf(e.target.value))}
+                  className="border-2 border-on-surface bg-surface px-2 py-1 font-data-mono text-xs text-on-surface focus:outline-none"
+                />
+              </div>
+              <span className="font-data-mono text-sm font-bold ml-2">
+                {formatDMY(weekStart)} — {formatDMY(weekEnd)} (Mon–Sun)
+              </span>
+            </div>
+
+            {user?.role === "Admin" && (
+              <div className="flex items-center gap-2">
+                <label className="font-label-sm text-[10px] uppercase font-bold text-on-surface-variant">Late Done Weight:</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={lateWeightDraft}
+                  onChange={(e) => setLateWeightDraft(e.target.value)}
+                  className="border-2 border-on-surface bg-surface px-2 py-1 w-16 font-data-mono text-xs text-on-surface focus:outline-none"
+                />
+                <span className="font-data-mono text-xs">%</span>
+                <button onClick={applyLateWeight} className="px-3 py-1.5 border-2 border-on-surface bg-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors cursor-pointer font-bold">
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Tabs */}
           <div className="flex items-center justify-between border-b-2 border-on-surface pb-2">
             <div className="flex gap-2">
               <button onClick={() => setActiveTab("current")} className={`px-4 py-2 border-2 border-on-surface font-label-sm text-xs uppercase font-bold transition-colors cursor-pointer ${activeTab === "current" ? "bg-on-surface text-surface" : "text-on-surface hover:bg-surface-container"}`}>
-                Current Week ({dgmaxSummary?.weekLabel || weekLabel})
+                Selected Week ({dgmaxSummary?.weekLabel || `${formatDMY(weekStart)} to ${formatDMY(weekEnd)}`})
               </button>
               <button onClick={() => setActiveTab("archive")} className={`px-4 py-2 border-2 border-on-surface font-label-sm text-xs uppercase font-bold transition-colors cursor-pointer ${activeTab === "archive" ? "bg-on-surface text-surface" : "text-on-surface hover:bg-surface-container"}`}>
                 Archive History ({archivedWeeks.length} Weeks)
@@ -205,7 +252,7 @@ function TeamPerformanceInner() {
                   <div>
                     <div className="font-data-mono text-4xl font-black">{totals.performanceScore}%</div>
                     <div className="text-[10px] uppercase opacity-60 mt-1">
-                      {totals.performanceScore >= 90 ? "Excellent" : totals.performanceScore >= 70 ? "Good" : totals.performanceScore >= 50 ? "Average" : "Needs Improvement"}
+                      {totals.performanceScore >= 90 ? "Green" : totals.performanceScore >= 70 ? "Yellow" : totals.performanceScore >= 50 ? "Orange" : "Red"}
                     </div>
                   </div>
                 </div>
@@ -218,54 +265,66 @@ function TeamPerformanceInner() {
                   <div className="font-data-mono text-2xl font-bold text-on-surface mt-1">{totals.completed}</div>
                 </div>
                 <div className="bg-emerald-50 border-2 border-emerald-600 p-4 flex flex-col justify-between">
-                  <span className="font-label-sm text-xs text-emerald-900 uppercase font-bold">🟢 Green</span>
+                  <span className="font-label-sm text-xs text-emerald-900 uppercase font-bold">🟢 On Time</span>
                   <div className="font-data-mono text-2xl font-bold text-emerald-800 mt-1">{totals.green}</div>
                 </div>
                 <div className="bg-amber-50 border-2 border-amber-600 p-4 flex flex-col justify-between">
-                  <span className="font-label-sm text-xs text-amber-900 uppercase font-bold">🟡 Yellow</span>
+                  <span className="font-label-sm text-xs text-amber-900 uppercase font-bold">🟡 Late Done</span>
                   <div className="font-data-mono text-2xl font-bold text-amber-800 mt-1">{totals.yellow}</div>
                 </div>
                 <div className="bg-rose-50 border-2 border-rose-600 p-4 flex flex-col justify-between">
-                  <span className="font-label-sm text-xs text-rose-900 uppercase font-bold">🔴 Red</span>
+                  <span className="font-label-sm text-xs text-rose-900 uppercase font-bold">🔴 Not Done</span>
                   <div className="font-data-mono text-2xl font-bold text-rose-800 mt-1">{totals.red}</div>
                 </div>
                 <div className="bg-slate-50 border-2 border-slate-500 p-4 flex flex-col justify-between">
-                  <span className="font-label-sm text-xs text-slate-800 uppercase font-bold">⚪ Pending</span>
+                  <span className="font-label-sm text-xs text-slate-800 uppercase font-bold">⚪ Not Yet Due</span>
                   <div className="font-data-mono text-2xl font-bold text-slate-800 mt-1">{totals.pending}</div>
                 </div>
               </div>
 
               {/* Score Formula */}
-              <div className="flex items-center gap-2 text-[11px] text-on-surface-variant font-data-mono border border-on-surface/30 px-3 py-2 bg-surface-container">
-                <span className="font-bold uppercase text-on-surface">Score =</span>
-                <span>((Green × 100) + (Yellow × 50)) ÷ (Green + Yellow + Red)</span>
-                <span className="ml-auto opacity-60">Pending excluded from score calculation</span>
+              <div className="flex flex-col gap-1 text-[11px] text-on-surface-variant font-data-mono border border-on-surface/30 px-3 py-2 bg-surface-container">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold uppercase text-on-surface">Per Task % =</span>
+                  <span>100 ÷ Assigned Tasks</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold uppercase text-on-surface">Negative Score =</span>
+                  <span>-((Not Done × Per Task %) + (Late Done × Per Task % × {lateWeight}%))</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold uppercase text-on-surface">Final Score =</span>
+                  <span>100 + Negative Score (clamped 0–100)</span>
+                  <span className="ml-auto opacity-60">Not-yet-due tasks excluded from scoring</span>
+                </div>
               </div>
 
               {/* DGMAX Employee Table */}
               <div className="bg-surface-container-lowest border-2 border-on-surface overflow-x-auto max-w-full">
-                <table className="w-full text-left border-collapse min-w-[820px]">
+                <table className="w-full text-left border-collapse min-w-[960px]">
                   <thead className="bg-surface-container text-on-surface font-label-sm text-xs uppercase border-b-2 border-on-surface">
                     <tr>
+                      <th className="py-3 px-4 border-r border-surface-variant text-center">Rank</th>
                       <th className="py-3 px-4 border-r border-surface-variant">Employee Name</th>
                       <th className="py-3 px-4 border-r border-surface-variant">Department</th>
                       <th className="py-3 px-4 border-r border-surface-variant text-center">Assigned</th>
-                      <th className="py-3 px-4 border-r border-surface-variant text-center text-emerald-800 font-bold bg-emerald-50/50">🟢 Green</th>
-                      <th className="py-3 px-4 border-r border-surface-variant text-center text-amber-800 font-bold bg-amber-50/50">🟡 Yellow</th>
-                      <th className="py-3 px-4 border-r border-surface-variant text-center text-rose-800 font-bold bg-rose-50/50">🔴 Red</th>
-                      <th className="py-3 px-4 border-r border-surface-variant text-center text-slate-700 font-bold bg-slate-50/50">⚪ Pending</th>
-                      <th className="py-3 px-4 text-center bg-on-surface/5 font-bold text-on-surface uppercase">Score</th>
+                      <th className="py-3 px-4 border-r border-surface-variant text-center text-emerald-800 font-bold bg-emerald-50/50">🟢 On Time</th>
+                      <th className="py-3 px-4 border-r border-surface-variant text-center text-amber-800 font-bold bg-amber-50/50">🟡 Late Done</th>
+                      <th className="py-3 px-4 border-r border-surface-variant text-center text-rose-800 font-bold bg-rose-50/50">🔴 Not Done</th>
+                      <th className="py-3 px-4 border-r border-surface-variant text-center text-slate-700 font-bold bg-slate-50/50">Negative Score</th>
+                      <th className="py-3 px-4 text-center bg-on-surface/5 font-bold text-on-surface uppercase">Final Score</th>
                     </tr>
                   </thead>
                   <tbody className="font-body-md text-sm">
                     {loading && (
-                      <tr><td colSpan={8} className="py-6 text-center font-data-mono">Loading weekly summary...</td></tr>
+                      <tr><td colSpan={9} className="py-6 text-center font-data-mono">Loading weekly summary...</td></tr>
                     )}
                     {!loading && (dgmaxSummary?.summaries.length ?? 0) === 0 && (
-                      <tr><td colSpan={8} className="py-6 text-center font-data-mono">No active doers found.</td></tr>
+                      <tr><td colSpan={9} className="py-6 text-center font-data-mono">No active doers found.</td></tr>
                     )}
-                    {dgmaxSummary?.summaries.map((s) => (
+                    {dgmaxSummary?.summaries.map((s, i) => (
                       <tr key={s.doerId} className="border-b border-surface-variant hover:bg-surface-container-low transition-colors">
+                        <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold">{i + 1}</td>
                         <td className="py-3 px-4 border-r border-surface-variant font-bold">
                           <div className="flex items-center gap-2">
                             <InitialsAvatar name={s.doerName} className="w-7 h-7 text-xs border border-on-surface" />
@@ -277,7 +336,7 @@ function TeamPerformanceInner() {
                         <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold text-emerald-700 bg-emerald-50/30">{s.greenCount}</td>
                         <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold text-amber-700 bg-amber-50/30">{s.yellowCount}</td>
                         <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono font-bold text-rose-700 bg-rose-50/30">{s.redCount}</td>
-                        <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-slate-600 bg-slate-50/30">{s.pendingCount}</td>
+                        <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-slate-600 bg-slate-50/30">{s.negativeScore}%</td>
                         <td className="py-3 px-4 bg-on-surface/5">
                           <div className="flex flex-col">
                             <ScoreBadge score={s.performanceScore} />
@@ -315,10 +374,9 @@ function TeamPerformanceInner() {
                           <tr>
                             <th className="p-2 border-r border-surface-variant">Employee</th>
                             <th className="p-2 border-r border-surface-variant text-center">Assigned</th>
-                            <th className="p-2 border-r border-surface-variant text-center text-emerald-800 font-bold">🟢 Green</th>
-                            <th className="p-2 border-r border-surface-variant text-center text-amber-800 font-bold">🟡 Yellow</th>
-                            <th className="p-2 border-r border-surface-variant text-center text-rose-800 font-bold">🔴 Red</th>
-                            <th className="p-2 border-r border-surface-variant text-center">⚪ Pending</th>
+                            <th className="p-2 border-r border-surface-variant text-center text-emerald-800 font-bold">🟢 On Time</th>
+                            <th className="p-2 border-r border-surface-variant text-center text-amber-800 font-bold">🟡 Late Done</th>
+                            <th className="p-2 border-r border-surface-variant text-center text-rose-800 font-bold">🔴 Not Done</th>
                             <th className="p-2 border-r border-surface-variant text-center bg-on-surface/5 font-bold">Score</th>
                             <th className="p-2">Manager Remarks</th>
                           </tr>
@@ -331,7 +389,6 @@ function TeamPerformanceInner() {
                               <td className="p-2 border-r border-surface-variant text-center font-data-mono font-bold text-emerald-700">{row.greenCount}</td>
                               <td className="p-2 border-r border-surface-variant text-center font-data-mono font-bold text-amber-700">{row.yellowCount}</td>
                               <td className="p-2 border-r border-surface-variant text-center font-data-mono font-bold text-rose-700">{row.redCount}</td>
-                              <td className="p-2 border-r border-surface-variant text-center font-data-mono">{row.pendingCount}</td>
                               <td className="p-2 border-r border-surface-variant bg-on-surface/5">
                                 <ScoreBadge score={row.performanceScore} />
                               </td>
@@ -360,8 +417,11 @@ function TeamPerformanceInner() {
 
             <div className="p-4 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
               <div className="flex items-center gap-3">
-                <label className="font-label-sm text-xs uppercase font-bold">Week Label:</label>
-                <input type="text" value={weekLabel} onChange={(e) => setWeekLabel(e.target.value)} className="border-2 border-on-surface bg-surface px-3 py-1 font-data-mono text-sm text-on-surface focus:outline-none" />
+                <label className="font-label-sm text-xs uppercase font-bold">Week:</label>
+                <span className="border-2 border-on-surface bg-surface px-3 py-1 font-data-mono text-sm text-on-surface">
+                  {dgmaxSummary?.weekLabel || `${formatDMY(weekStart)} to ${formatDMY(weekEnd)}`}
+                </span>
+                <span className="font-label-sm text-xs text-on-surface-variant">Late Done Weight: {lateWeight}%</span>
               </div>
 
               <div className="flex flex-col gap-3">
@@ -372,7 +432,7 @@ function TeamPerformanceInner() {
                       <span>{s.doerName} ({s.department})</span>
                       <div className="flex items-center gap-3">
                         <span className="font-data-mono text-[11px] text-on-surface-variant">
-                          🟢 {s.greenCount} | 🟡 {s.yellowCount} | 🔴 {s.redCount} | ⚪ {s.pendingCount}
+                          🟢 {s.greenCount} | 🟡 {s.yellowCount} | 🔴 {s.redCount}
                         </span>
                         <span className="font-data-mono font-black text-sm">
                           Score: {s.performanceScore}%

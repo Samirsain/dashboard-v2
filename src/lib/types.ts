@@ -345,7 +345,8 @@ export interface ImsReorderRow {
   reorderQty: number;
 }
 
-// ---- DGMAX Task Scoring System Types --------------------------------------
+// ---- DGMAX Negative Performance Scoring System Types ----------------------
+// green = On Time, yellow = Late Done, red = Not Done, pending = not yet due.
 
 export type TaskScoreCategory = "Green" | "Yellow" | "Red" | "Pending";
 
@@ -359,6 +360,7 @@ export interface DgmaxEmployeeSummary {
   yellowCount: number;
   redCount: number;
   pendingCount: number;
+  negativeScore: number;
   performanceScore: number;
 }
 
@@ -366,6 +368,7 @@ export interface DgmaxWeeklySummary {
   weekLabel: string;
   fromDate: string;
   toDate: string;
+  lateDoneWeight: number;
   summaries: DgmaxEmployeeSummary[];
   totals: {
     assigned: number;

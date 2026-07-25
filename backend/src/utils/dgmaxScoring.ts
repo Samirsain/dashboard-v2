@@ -1,66 +1,66 @@
 import type { Task, ChecklistInstance, User, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
 
+export const DEFAULT_LATE_DONE_WEIGHT = 60;
+
 /**
- * Determines the DGMAX Task Score Category for a single task:
- *  - GREEN:  Completed on or before Due Date with 0 revisions.
- *  - YELLOW: Completed, but required 1 or more revisions.
- *  - RED:    Completed after Due Date OR currently overdue.
- *  - PENDING: Still active/pending and not yet past Due Date.
+ * DGMAX Negative Performance Scoring System.
+ *
+ * Every employee starts a week at 100. Only delays and incomplete work pull
+ * the score down — see DGMAX-negative-scoring.md for the original spec.
+ *
+ * Category for a single task/checklist item, given today's date:
+ *  - Green ("On Time")   — completed on or before its due date.
+ *  - Yellow ("Late Done") — completed after its due date.
+ *  - Red ("Not Done")     — still incomplete and its due date has passed.
+ *  - Pending              — still incomplete, not yet due. Excluded from
+ *                            scoring entirely (hasn't had a chance to be late
+ *                            or missed yet) — it simply isn't counted until
+ *                            it resolves one way or the other.
+ * Cancelled items, or items with no due date, return null (not counted at all).
  */
-export function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory {
-  const isCompleted = task.status === "Completed";
-  const isCancelled = task.status === "Cancelled";
-
-  if (isCancelled) return "Pending";
-
-  if (!isCompleted) {
-    // Active task — if past due date, it's RED (overdue); otherwise PENDING.
-    if (task.dueDate && task.dueDate < todayIso) {
-      return "Red";
-    }
-    return "Pending";
+export function getTaskCategory(task: Task, todayIso: string): TaskScoreCategory | null {
+  if (task.status === "Cancelled" || !task.dueDate) return null;
+  if (task.status === "Completed") {
+    const completedDate = task.updatedAt ? task.updatedAt.slice(0, 10) : todayIso;
+    return completedDate > task.dueDate ? "Yellow" : "Green";
   }
+  return task.dueDate < todayIso ? "Red" : "Pending";
+}
 
-  // Completed task:
-  const completedDate = task.updatedAt ? task.updatedAt.slice(0, 10) : todayIso;
-  const isLateCompletion = task.dueDate && completedDate > task.dueDate;
-
-  if (isLateCompletion) {
-    return "Red";
+/** Same categorization for a checklist instance. */
+export function getChecklistCategory(c: ChecklistInstance, todayIso: string): TaskScoreCategory | null {
+  if (!c.date) return null;
+  if (c.status === "Completed") {
+    const completedDate = c.completedAt ? c.completedAt.slice(0, 10) : todayIso;
+    return completedDate > c.date ? "Yellow" : "Green";
   }
-
-  if (task.revisionCount > 0) {
-    return "Yellow";
-  }
-
-  return "Green";
+  return c.date < todayIso ? "Red" : "Pending";
 }
 
 /**
- * Determines DGMAX Category for a checklist instance.
- */
-export function getChecklistCategory(c: ChecklistInstance, todayIso: string): TaskScoreCategory {
-  const isCompleted = c.status === "Completed";
-  if (!isCompleted) {
-    if (c.date && c.date < todayIso) return "Red";
-    return "Pending";
-  }
-  const completedDate = c.completedAt ? c.completedAt.slice(0, 10) : todayIso;
-  if (c.date && completedDate > c.date) return "Red";
-  return "Green";
-}
-
-/**
- * Generates the DGMAX Weekly Summary across all active doers for a given set of tasks & checklist items.
+ * Builds the DGMAX weekly summary for every active (non-Admin) doer, scoped
+ * to tasks/checklist items whose due date falls within [fromDate, toDate]
+ * (inclusive, both YYYY-MM-DD — normally a Monday..Sunday week).
+ *
+ * Formula per doer:
+ *   Assigned      = Green + Yellow + Red   (Pending excluded)
+ *   Per Task %    = 100 / Assigned
+ *   Not Done Pen. = Red    x Per Task %
+ *   Late Done Pen.= Yellow x Per Task % x (lateDoneWeight / 100)
+ *   Negative      = -(Not Done Pen. + Late Done Pen.)
+ *   Score         = clamp(100 + Negative, 0, 100)
  */
 export function buildDgmaxWeeklySummary(
   users: User[],
   tasks: Task[],
   checklistInstances: ChecklistInstance[],
   todayIso: string,
-  weekLabel = ""
+  fromDate: string,
+  toDate: string,
+  lateDoneWeight: number = DEFAULT_LATE_DONE_WEIGHT
 ): DgmaxWeeklySummary {
   const doers = users.filter((u) => u.status === "Active" && u.role !== "Admin");
+  const weight = Math.min(100, Math.max(0, lateDoneWeight));
 
   const summaryMap = new Map<string, DgmaxEmployeeSummary>();
   for (const d of doers) {
@@ -74,61 +74,58 @@ export function buildDgmaxWeeklySummary(
       yellowCount: 0,
       redCount: 0,
       pendingCount: 0,
-      performanceScore: 0,
+      negativeScore: 0,
+      performanceScore: 100,
     });
   }
 
-  // Process Tasks
+  const inWindow = (dateStr: string) => dateStr >= fromDate && dateStr <= toDate;
+
   for (const t of tasks) {
+    if (!inWindow(t.dueDate)) continue;
     const s = summaryMap.get(t.assignedDoerId);
     if (!s) continue;
-    s.assignedTasks++;
-    if (t.status === "Completed") s.completedTasks++;
-
     const cat = getTaskCategory(t, todayIso);
+    if (!cat) continue;
+    if (t.status === "Completed") s.completedTasks++;
     if (cat === "Green") s.greenCount++;
     else if (cat === "Yellow") s.yellowCount++;
     else if (cat === "Red") s.redCount++;
-    else if (cat === "Pending") s.pendingCount++;
+    else s.pendingCount++;
   }
 
-  // Process Checklist Instances
   for (const c of checklistInstances) {
+    if (!inWindow(c.date)) continue;
     const s = summaryMap.get(c.assignedDoerId);
     if (!s) continue;
-    s.assignedTasks++;
-    if (c.status === "Completed") s.completedTasks++;
-
     const cat = getChecklistCategory(c, todayIso);
+    if (!cat) continue;
+    if (c.status === "Completed") s.completedTasks++;
     if (cat === "Green") s.greenCount++;
     else if (cat === "Yellow") s.yellowCount++;
     else if (cat === "Red") s.redCount++;
-    else if (cat === "Pending") s.pendingCount++;
+    else s.pendingCount++;
   }
 
   const summaries = Array.from(summaryMap.values())
-    .map(s => {
-      const scoredTasks = s.greenCount + s.yellowCount + s.redCount;
-      // Formula: ((Green * 100) + (Yellow * 50) + (Red * 0)) / ScoredTasks
-      if (scoredTasks > 0) {
-        s.performanceScore = Math.round(((s.greenCount * 100) + (s.yellowCount * 50)) / scoredTasks);
+    .map((s) => {
+      s.assignedTasks = s.greenCount + s.yellowCount + s.redCount;
+      if (s.assignedTasks > 0) {
+        const perTaskPct = 100 / s.assignedTasks;
+        const notDonePenalty = s.redCount * perTaskPct;
+        const lateDonePenalty = s.yellowCount * perTaskPct * (weight / 100);
+        s.negativeScore = -Math.round((notDonePenalty + lateDonePenalty) * 100) / 100;
+        s.performanceScore = Math.max(0, Math.min(100, Math.round((100 + s.negativeScore) * 100) / 100));
       } else {
-        s.performanceScore = 0;
+        s.negativeScore = 0;
+        s.performanceScore = 100;
       }
       return s;
     })
-    .sort((a, b) => a.doerName.localeCompare(b.doerName));
+    // Higher score first; tie -> whoever completed more work ranks higher.
+    .sort((a, b) => b.performanceScore - a.performanceScore || b.completedTasks - a.completedTasks);
 
-  const totals = {
-    assigned: 0,
-    completed: 0,
-    green: 0,
-    yellow: 0,
-    red: 0,
-    pending: 0,
-    performanceScore: 0,
-  };
-
+  const totals = { assigned: 0, completed: 0, green: 0, yellow: 0, red: 0, pending: 0, performanceScore: 0 };
   for (const s of summaries) {
     totals.assigned += s.assignedTasks;
     totals.completed += s.completedTasks;
@@ -137,19 +134,17 @@ export function buildDgmaxWeeklySummary(
     totals.red += s.redCount;
     totals.pending += s.pendingCount;
   }
+  totals.performanceScore =
+    summaries.length > 0
+      ? Math.round((summaries.reduce((sum, s) => sum + s.performanceScore, 0) / summaries.length) * 100) / 100
+      : 100;
 
-  const totalScored = totals.green + totals.yellow + totals.red;
-  if (totalScored > 0) {
-    totals.performanceScore = Math.round(((totals.green * 100) + (totals.yellow * 50)) / totalScored);
-  } else {
-    totals.performanceScore = 0;
-  }
+  const weekLabel = `${formatDMY(fromDate)} to ${formatDMY(toDate)}`;
 
-  return {
-    weekLabel,
-    fromDate: "",
-    toDate: "",
-    summaries,
-    totals,
-  };
+  return { weekLabel, fromDate, toDate, lateDoneWeight: weight, summaries, totals };
+}
+
+function formatDMY(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : iso;
 }
