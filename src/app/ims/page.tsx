@@ -592,15 +592,25 @@ function ImsInner() {
                   {/* ─── Section 4: Reorder Sheet ─────────────────────────── */}
                   {tab === "reorder" && (
                     <div className="flex flex-col gap-stack-sm">
-                      {needsReorderCount > 0 ? (
-                        <p className="font-label-sm text-label-sm uppercase text-error border-2 border-error px-3 py-2 bg-error/10">
-                          ⚠ {needsReorderCount} item{needsReorderCount === 1 ? "" : "s"} need{needsReorderCount === 1 ? "s" : ""} reordering — shown first, highlighted below.
-                        </p>
-                      ) : (
-                        <p className="font-label-sm text-label-sm uppercase text-on-surface-variant px-1">
-                          ✓ Nothing needs reordering right now.
-                        </p>
-                      )}
+                      {/* Color Legend */}
+                      <div className="flex flex-wrap items-center gap-3 border border-on-surface/30 px-3 py-2 bg-surface-container-lowest font-label-sm text-[11px] uppercase">
+                        <span className="text-on-surface-variant font-bold">Color Guide:</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-sm bg-error/30 border border-error"></span>
+                          <span className="text-error font-bold">Red</span>
+                          <span className="text-on-surface-variant">— Stock critically low, order qty ≥ MOQ</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-sm bg-purple-200 border border-purple-500"></span>
+                          <span className="text-purple-700 font-bold">Purple</span>
+                          <span className="text-on-surface-variant">— Stock slightly low, minimum order (MOQ) required</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-500"></span>
+                          <span className="text-emerald-700 font-bold">Green</span>
+                          <span className="text-on-surface-variant">— Stock sufficient, no order needed</span>
+                        </span>
+                      </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[1100px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
@@ -625,8 +635,22 @@ function ImsInner() {
                                 </td>
                               </tr>
                             )}
-                            {sortedReorder.map((r) => (
-                              <tr key={r.skuCode} className={`border-b border-surface-variant last:border-b-0 ${r.reorderQty > 0 ? "bg-error/10" : ""}`}>
+                            {sortedReorder.map((r) => {
+                              const raw = r.effectiveMaxLevel - r.closingStock - r.materialInTransit;
+                              const isBigShortage = raw >= r.moq;
+                              const isSmallShortage = raw > 0 && raw < r.moq;
+                              const rowBg = isBigShortage
+                                ? "bg-error/10"
+                                : isSmallShortage
+                                ? "bg-purple-50"
+                                : "bg-emerald-50";
+                              const qtyColor = isBigShortage
+                                ? "text-error"
+                                : isSmallShortage
+                                ? "text-purple-700"
+                                : "text-emerald-700";
+                              return (
+                              <tr key={r.skuCode} className={`border-b border-surface-variant last:border-b-0 ${rowBg}`}>
                                 <td className={tdCls}>{r.skuCode}</td>
                                 <td className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{r.itemName}</td>
                                 <td className={tdCls}>{r.category}</td>
@@ -637,10 +661,11 @@ function ImsInner() {
                                 <td className={tdCls}>{num(r.closingStock)}</td>
                                 <td className={tdCls}>{num(r.materialInTransit)}</td>
                                 <td className="py-2 px-4 font-data-mono text-data-mono font-bold">
-                                  {r.reorderQty > 0 ? <span className="text-error">{num(r.reorderQty)}</span> : num(0)}
+                                  <span className={qtyColor}>{num(r.reorderQty)}</span>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
