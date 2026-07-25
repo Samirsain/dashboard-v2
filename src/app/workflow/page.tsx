@@ -282,7 +282,21 @@ function WorkflowInner() {
                       }`}
                     >
                       <td className="py-4 px-4 font-medium">
-                        {inst.title}
+                        <div className="flex items-center gap-2">
+                          {inst.title}
+                          {inst.link && (
+                            <a
+                              href={inst.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-on-surface-variant hover:text-on-surface"
+                              title="Open Reference Link"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>open_in_new</span>
+                            </a>
+                          )}
+                        </div>
                         {inst.details && (
                           <div className="font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5 truncate max-w-xs">
                             {inst.details}
@@ -306,7 +320,20 @@ function WorkflowInner() {
           {selectedId && (
             <div className="bg-surface border-2 border-on-surface p-stack-lg">
               <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md">
-                <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
+                <div className="flex items-center justify-between gap-4">
+                  <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
+                  {selectedInstance?.link && (
+                    <a
+                      href={selectedInstance.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors whitespace-nowrap"
+                    >
+                      <span className="material-symbols-outlined text-base" style={{ fontSize: "16px" }}>open_in_new</span>
+                      Open Link
+                    </a>
+                  )}
+                </div>
                 {selectedInstance?.details && (
                   <p className="font-data-mono text-data-mono text-on-surface-variant text-sm mt-1 whitespace-pre-wrap">
                     {selectedInstance.details}

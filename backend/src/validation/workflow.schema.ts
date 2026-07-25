@@ -24,6 +24,7 @@ export const startWorkflowInstanceSchema = z.object({
   templateId: z.string().min(1),
   title: z.string().min(1),
   details: z.string().default(""),
+  link: z.string().url("Must be a valid URL").or(z.literal("")).default(""),
 });
 
 export const stepNoParamSchema = z.object({

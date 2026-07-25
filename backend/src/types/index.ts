@@ -284,6 +284,8 @@ export interface WorkflowInstance {
   title: string;
   /** Free-text extra info (e.g. "Video Title: X, Sub Part: Y, Location: Z"). */
   details: string;
+  /** Optional reference link (e.g. Google Sheet, Drive, etc). */
+  link: string;
   startedAt: string; // ISO timestamp
   status: WorkflowInstanceStatus;
   requestedBy: string;
