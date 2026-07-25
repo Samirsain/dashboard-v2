@@ -50,8 +50,8 @@ export default function ManageListAccessModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md bg-surface-container-lowest border-2 border-on-surface">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border border-on-surface bg-surface">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
           <div>
             <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
@@ -100,7 +100,7 @@ export default function ManageListAccessModal({
           </div>
 
           {error && (
-            <p className="font-body-sm text-body-sm text-error border-2 border-error px-3 py-2">
+            <p className="font-body-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
           )}
@@ -109,7 +109,7 @@ export default function ManageListAccessModal({
             <button
               type="button"
               onClick={onClose}
-              className="border-2 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -117,7 +117,7 @@ export default function ManageListAccessModal({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="border-2 border-on-surface bg-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? "Saving..." : "Save Access"}
             </button>

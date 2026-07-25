@@ -6,6 +6,23 @@ import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import Stat from "@/components/Stat";
+import {
+  Button,
+  Card,
+  ErrorNote,
+  PageBody,
+  PageHeader,
+  Modal,
+  StateRow,
+  TableWrap,
+  buttonClass,
+  fieldInlineClass,
+  tableClass,
+  tdClass,
+  thClass,
+  theadClass,
+  trClass,
+} from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
@@ -225,239 +242,164 @@ function DashboardInner() {
       <MobileHeader />
       <SideNav active="dashboard" />
 
-      <div className="md:ml-64 flex flex-col min-h-screen bg-background">
-        {/* TopNavBar */}
-        <header className="hidden md:flex justify-between items-center h-16 w-full px-container-padding sticky top-0 z-30 border-b-2 border-on-surface bg-surface text-primary">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 font-headline-md text-headline-md">
-              <span className="text-on-surface font-bold border-b-2 border-on-surface pb-0.5">
-                Dashboard
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {canCreateTasks && (
-              <button
-                onClick={() => setShowCreatePicker(true)}
-                className="border border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-surface transition-colors"
-              >
-                + Create Task
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={() => exportTasksToCsv(allTasks)}
-                disabled={allTasks.length === 0}
-                className="border border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-surface transition-colors disabled:opacity-50"
-              >
-                Export Report (CSV)
-              </button>
-            )}
-            <Link
-              href="/help-ticket"
-              className={
-                hasPendingTickets
-                  ? "border-2 border-red-600 px-3 py-1.5 font-label-sm text-label-sm uppercase font-bold animate-blink-red transition-colors"
-                  : "border border-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-on-surface hover:bg-surface-container transition-colors"
-              }
-            >
-              Help Ticket
-            </Link>
-            {isAdmin && (
-              <Link
-                href="/settings"
-                className="border border-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-on-surface hover:bg-surface-container transition-colors"
-              >
-                Settings
-              </Link>
-            )}
-            <button
-              onClick={logout}
-              className="border border-on-surface px-3 py-1.5 font-label-sm text-xs uppercase text-on-surface hover:bg-on-surface hover:text-surface transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </header>
-
-        {/* Dashboard Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-container-padding">
-          <div className="max-w-[1440px] mx-auto grid grid-cols-12 gap-4 md:gap-gutter">
-            {/* Mobile quick actions (desktop header is hidden below md) */}
-            <div className="col-span-12 md:hidden flex flex-wrap gap-2">
+      <PageBody>
+        <PageHeader
+          title="Dashboard"
+          actions={
+            <>
+              {canCreateTasks && (
+                <Button variant="primary" onClick={() => setShowCreatePicker(true)}>
+                  + Create Task
+                </Button>
+              )}
+              {isAdmin && (
+                <Button onClick={() => exportTasksToCsv(allTasks)} disabled={allTasks.length === 0}>
+                  Export CSV
+                </Button>
+              )}
               <Link
                 href="/help-ticket"
                 className={
                   hasPendingTickets
-                    ? "flex-1 text-center border-2 border-red-600 px-3 py-2 font-label-sm text-label-sm uppercase font-bold animate-blink-red"
-                    : "flex-1 text-center border border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+                    ? `${buttonClass("secondary")} border-2 border-red-600 font-bold animate-blink-red`
+                    : buttonClass("secondary")
                 }
               >
                 Help Ticket
               </Link>
               {isAdmin && (
-                <button
-                  onClick={() => exportTasksToCsv(allTasks)}
-                  disabled={allTasks.length === 0}
-                  className="flex-1 border border-on-surface bg-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
-                >
-                  Export CSV
-                </button>
+                <Link href="/settings" className={buttonClass("secondary")}>
+                  Settings
+                </Link>
               )}
-            </div>
+              <Button variant="ghost" onClick={logout}>
+                Logout
+              </Button>
+            </>
+          }
+        />
 
-            {error && (
-              <div className="col-span-12">
-                <p className="font-label-sm text-label-sm text-error border border-error px-3 py-2">
-                  {error}
-                </p>
-              </div>
-            )}
+        {error && <ErrorNote>{error}</ErrorNote>}
 
-            {/* KPIs — admin/manager only */}
-            {isPrivileged && (
-              <div className="col-span-12 grid grid-cols-2 md:grid-cols-4 gap-2">
-                {kpis.map((kpi) => (
-                  <Stat key={kpi.label} label={kpi.label} value={kpi.value} />
-                ))}
-              </div>
-            )}
+        {/* KPIs — admin/manager only */}
+        {isPrivileged && (
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {kpis.map((kpi) => (
+              <Stat key={kpi.label} label={kpi.label} value={kpi.value} />
+            ))}
+          </div>
+        )}
 
-            {/* Pending Tasks — all open items (tasks + checklist), All / Today */}
-            <div className="col-span-12 bg-surface border border-on-surface flex flex-col">
-              <div className="border-b border-on-surface p-3 flex flex-wrap justify-between items-center gap-3">
-                <h3 className="font-label-sm text-xs uppercase text-on-surface-variant">Pending Tasks</h3>
-                <div className="flex flex-wrap items-center gap-2">
-                  {canCreateTasks && (
-                    <button
-                      onClick={() => setShowCreatePicker(true)}
-                      className="md:hidden px-3 py-1.5 border border-on-surface bg-on-surface text-surface font-label-sm text-xs uppercase transition-colors"
-                    >
-                      + Create
-                    </button>
-                  )}
-                  {showDoerColumn && (
-                    <select
-                      value={pendingDoerFilter}
-                      onChange={(e) => setPendingDoerFilter(e.target.value)}
-                      className="border border-on-surface bg-surface px-2 py-1.5 font-label-sm text-xs uppercase text-on-surface focus:outline-none"
-                    >
-                      <option value="">All Doers</option>
-                      {assignableDoers.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {(["all", "today"] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setPendingFilter(f)}
-                      className={`px-3 py-1.5 border border-on-surface font-label-sm text-xs uppercase transition-colors ${
-                        pendingFilter === f
-                          ? "bg-on-surface text-surface"
-                          : "text-on-surface hover:bg-surface-container"
-                      }`}
-                    >
-                      {f === "all" ? "All Tasks" : "Today"}
-                    </button>
+        {/* Pending Tasks — all open items (tasks + checklist), All / Today */}
+        <Card
+          title={`Pending Tasks (${pendingRows.length})`}
+          bodyClassName=""
+          actions={
+            <>
+              {showDoerColumn && (
+                <select
+                  value={pendingDoerFilter}
+                  onChange={(e) => setPendingDoerFilter(e.target.value)}
+                  aria-label="Filter by doer"
+                  className={`${fieldInlineClass} text-xs uppercase`}
+                >
+                  <option value="">All Doers</option>
+                  {assignableDoers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
                   ))}
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[720px]">
-                  <thead>
-                    <tr className="border-b border-on-surface font-label-sm text-[11px] uppercase text-on-surface-variant">
-                      <th className="py-2 px-3 font-normal">Task</th>
-                      <th className="py-2 px-3 font-normal">System Name</th>
-                      <th className="py-2 px-3 font-normal">System Type</th>
-                      {showDoerColumn && <th className="py-2 px-3 font-normal">Doer Name</th>}
-                      <th className="py-2 px-3 font-normal text-center">Due Date</th>
-                      <th className="py-2 px-3 font-normal text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="font-body-md text-body-md text-on-surface">
-                    {loading && (
-                      <tr>
-                        <td colSpan={showDoerColumn ? 6 : 5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                          Loading...
-                        </td>
-                      </tr>
-                    )}
-                    {!loading && pendingRows.length === 0 && (
-                      <tr>
-                        <td colSpan={showDoerColumn ? 6 : 5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                          {pendingFilter === "today" ? "Nothing pending today. 🎉" : "Nothing pending. 🎉"}
-                        </td>
-                      </tr>
-                    )}
-                    {pendingRows.map((r) => {
-                      const overdue = isOverdue(r.dueDate);
-                      const urgent =
-                        !overdue &&
-                        r.kind === "task" &&
-                        (r.taskObj?.priority === "Urgent" || r.taskObj?.priority === "Critical");
-                      return (
-                      <tr
-                        key={`${r.kind}-${r.id}`}
-                        className="border-b border-on-surface/15 last:border-b-0 hover:bg-surface-container-low transition-colors"
-                      >
-                        <td className="py-2 px-3">{r.task}</td>
-                        <td className="py-2 px-3 font-label-sm text-xs uppercase text-on-surface-variant">
+                </select>
+              )}
+              {(["all", "today"] as const).map((f) => (
+                <Button
+                  key={f}
+                  size="sm"
+                  variant={pendingFilter === f ? "primary" : "secondary"}
+                  aria-pressed={pendingFilter === f}
+                  onClick={() => setPendingFilter(f)}
+                >
+                  {f === "all" ? "All" : "Today"}
+                </Button>
+              ))}
+            </>
+          }
+        >
+          <TableWrap className="border-0">
+            <table className={`${tableClass} min-w-[720px]`}>
+              <thead className={theadClass}>
+                <tr>
+                  <th className={thClass}>Task</th>
+                  <th className={thClass}>System</th>
+                  <th className={thClass}>Type</th>
+                  {showDoerColumn && <th className={thClass}>Doer</th>}
+                  <th className={`${thClass} text-center`}>Due Date</th>
+                  <th className={`${thClass} text-center`}>Action</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {loading && <StateRow colSpan={showDoerColumn ? 6 : 5}>Loading…</StateRow>}
+                {!loading && pendingRows.length === 0 && (
+                  <StateRow colSpan={showDoerColumn ? 6 : 5}>
+                    {pendingFilter === "today" ? "Nothing pending today. 🎉" : "Nothing pending. 🎉"}
+                  </StateRow>
+                )}
+                {!loading &&
+                  pendingRows.map((r) => {
+                    const overdue = isOverdue(r.dueDate);
+                    const urgent =
+                      !overdue &&
+                      r.kind === "task" &&
+                      (r.taskObj?.priority === "Urgent" || r.taskObj?.priority === "Critical");
+                    return (
+                      <tr key={`${r.kind}-${r.id}`} className={trClass}>
+                        <td className={`${tdClass} min-w-[200px]`}>{r.task}</td>
+                        <td className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
                           {r.systemName}
                         </td>
-                        <td className="py-2 px-3 font-label-sm text-xs uppercase text-on-surface-variant">
+                        <td className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
                           {r.systemType}
                         </td>
                         {showDoerColumn && (
-                          <td className="py-2 px-3 text-on-surface-variant">
+                          <td className={`${tdClass} text-on-surface-variant`}>
                             {r.kind === "task" && r.taskObj?.doer?.name
                               ? r.taskObj.doer.name
-                              : doers.find((d) => d.id === r.assignedDoerId)?.name ||
-                                r.assignedDoerId ||
-                                "—"}
+                              : doers.find((d) => d.id === r.assignedDoerId)?.name || r.assignedDoerId || "—"}
                           </td>
                         )}
-                        <td className="py-2 px-3 text-center font-data-mono whitespace-nowrap">
+                        <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs`}>
                           {formatDMY(r.dueDate)}
-                          {overdue && <span className="ml-1 text-on-surface-variant">(overdue)</span>}
-                          {urgent && <span className="ml-1 text-on-surface-variant">({r.taskObj?.priority?.toLowerCase()})</span>}
+                          {overdue && <span className="ml-1 text-error">(overdue)</span>}
+                          {urgent && (
+                            <span className="ml-1 text-on-surface-variant">
+                              ({r.taskObj?.priority?.toLowerCase()})
+                            </span>
+                          )}
                         </td>
-                        <td className="py-2 px-3 text-center">
+                        <td className={tdClass}>
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() =>
-                                r.kind === "task" ? handleTaskDone(r.id) : handleChecklistDone(r.id)
-                              }
-                              className="px-3 py-1 bg-on-surface text-surface font-label-sm text-xs uppercase transition-colors"
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              onClick={() => (r.kind === "task" ? handleTaskDone(r.id) : handleChecklistDone(r.id))}
                             >
                               Done
-                            </button>
+                            </Button>
                             {r.kind === "task" && r.taskObj && (
-                              <button
-                                onClick={() => setTaskToRevise(r.taskObj!)}
-                                className="px-3 py-1 border border-on-surface text-on-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors"
-                              >
+                              <Button size="sm" onClick={() => setTaskToRevise(r.taskObj!)}>
                                 Revise
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </td>
                       </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-
-
-          </div>
-        </main>
-      </div>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      </PageBody>
 
       {taskToRevise && (
         <ReviseTaskModal
@@ -471,44 +413,33 @@ function DashboardInner() {
       )}
 
       {showCreatePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm bg-surface-container-lowest border border-on-surface">
-            <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
-              <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
-                Create Task
-              </h3>
-              <button
-                onClick={() => setShowCreatePicker(false)}
-                className="text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm uppercase"
-              >
-                Close
-              </button>
-            </div>
-            <div className="p-stack-lg flex flex-col gap-stack-md">
-              <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                Add it to which system?
-              </p>
-              <button
-                onClick={() => {
-                  setShowCreatePicker(false);
-                  setCreateMode("task");
-                }}
-                className="px-4 py-3 border border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
-              >
-                Task List — one-time or recurring tasks
-              </button>
-              <button
-                onClick={() => {
-                  setShowCreatePicker(false);
-                  setCreateMode("checklist");
-                }}
-                className="px-4 py-3 border border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors text-left"
-              >
-                Checklist — repeating checklist item
-              </button>
-            </div>
+        <Modal title="Create Task" size="sm" onClose={() => setShowCreatePicker(false)}>
+          <div className="flex flex-col gap-3">
+            <p className="font-label-sm text-xs uppercase text-on-surface-variant">
+              Add it to which system?
+            </p>
+            <Button
+              fullWidth
+              className="justify-start text-left normal-case"
+              onClick={() => {
+                setShowCreatePicker(false);
+                setCreateMode("task");
+              }}
+            >
+              Task List — one-time or recurring tasks
+            </Button>
+            <Button
+              fullWidth
+              className="justify-start text-left normal-case"
+              onClick={() => {
+                setShowCreatePicker(false);
+                setCreateMode("checklist");
+              }}
+            >
+              Checklist — repeating checklist item
+            </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {createMode === "task" && (

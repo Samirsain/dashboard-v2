@@ -69,7 +69,7 @@ function CopyLinkButton({ link }: { link: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
       title={link}
-      className="flex items-center gap-1.5 border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+      className="flex items-center gap-1.5 inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
     >
       <span className="material-symbols-outlined text-base">content_copy</span>
       {copied ? "Copied!" : "Copy Form Link"}
@@ -120,12 +120,12 @@ function AddFormModal({
   }
 
   const field =
-    "mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none";
+    "mt-1 min-h-[40px] w-full border border-on-surface bg-surface px-3 py-2 text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface";
   const label = "font-label-sm text-label-sm uppercase text-on-surface-variant";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md bg-surface-container-lowest border-2 border-on-surface">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border border-on-surface bg-surface">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Add Form</h3>
           <button
@@ -204,7 +204,7 @@ function AddFormModal({
           </div>
 
           {error && (
-            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+            <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
           )}
@@ -213,14 +213,14 @@ function AddFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitting ? "Adding..." : "Add Form"}
             </button>
@@ -568,14 +568,14 @@ function FormsInner() {
       <SideNav active="forms" />
 
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="hidden md:flex bg-surface w-full border-b-2 border-on-surface justify-between items-center h-16 px-container-padding sticky top-0 z-30">
+        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Form Responses
           </div>
           {canManage && (
             <button
               onClick={() => setShowAdd(true)}
-              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer"
             >
               + Add Form
             </button>
@@ -598,7 +598,7 @@ function FormsInner() {
           </div>
 
           {error && (
-            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+            <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
           )}

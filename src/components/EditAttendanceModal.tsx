@@ -56,8 +56,8 @@ export default function EditAttendanceModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm bg-surface-container-lowest border-2 border-on-surface">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-sm flex-col overflow-y-auto border border-on-surface bg-surface">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Edit Attendance</h3>
           <button
@@ -74,7 +74,7 @@ export default function EditAttendanceModal({
           </p>
 
           {error && (
-            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
+            <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>
           )}
 
           <div className="flex flex-col gap-1">
@@ -83,7 +83,7 @@ export default function EditAttendanceModal({
               type="time"
               value={checkInTime}
               onChange={(e) => setCheckInTime(e.target.value)}
-              className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+              className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
             />
           </div>
 
@@ -93,7 +93,7 @@ export default function EditAttendanceModal({
               type="time"
               value={checkOutTime}
               onChange={(e) => setCheckOutTime(e.target.value)}
-              className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+              className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
             />
           </div>
 
@@ -136,7 +136,7 @@ export default function EditAttendanceModal({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? "Saving..." : "Save"}
             </button>

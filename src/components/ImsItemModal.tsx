@@ -62,11 +62,11 @@ export default function ImsItemModal({
   }
 
   const inputCls =
-    "border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none w-full";
+    "min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface w-full";
   const labelCls = "font-label-sm text-label-sm uppercase text-on-surface-variant";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
       <div className="w-full max-w-lg bg-surface-container-lowest border-2 border-on-surface max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md sticky top-0 bg-surface-container-lowest">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
@@ -82,7 +82,7 @@ export default function ImsItemModal({
 
         <div className="p-stack-lg grid grid-cols-2 gap-4">
           {error && (
-            <p className="col-span-2 font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+            <p className="col-span-2 font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
           )}
@@ -164,7 +164,7 @@ export default function ImsItemModal({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? "Saving..." : "Save"}
             </button>

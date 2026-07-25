@@ -48,7 +48,7 @@ function NewTicketInner() {
       <SideNav active="help-ticket" />
 
       <div className="md:ml-64 flex-1 flex flex-col min-h-screen bg-background">
-        <header className="hidden md:flex bg-surface w-full border-b-2 border-on-surface justify-between items-center h-16 px-container-padding sticky top-0 z-30">
+        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Create Help Ticket
           </div>
@@ -68,7 +68,7 @@ function NewTicketInner() {
           </div>
 
           {error && (
-            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+            <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
           )}

@@ -29,6 +29,66 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ── Range Filter Bar Component ───────────────────────────────────────────
+function RangeFilterBar({
+  range, onRange, from, onFrom, to, onTo,
+}: {
+  range: QuickRange; onRange: (r: QuickRange) => void;
+  from: string; onFrom: (v: string) => void;
+  to: string; onTo: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 bg-surface-container border-2 border-on-surface px-3 py-2">
+      <span className="font-label-sm text-xs uppercase text-on-surface-variant font-bold">Period:</span>
+
+      {/* Quick buttons */}
+      {(["week", "month"] as const).map((r) => (
+        <button
+          key={r}
+          onClick={() => onRange(r)}
+          className={`px-3 py-1 border-2 font-label-sm text-xs uppercase font-bold transition-colors cursor-pointer ${
+            (range as string) === r
+              ? "bg-on-surface text-surface border-on-surface"
+              : "border-on-surface text-on-surface hover:bg-surface-container-low"
+          }`}
+        >
+          {r === "week" ? "This Week (7d)" : "This Month (30d)"}
+        </button>
+      ))}
+
+      {/* Divider */}
+      <span className="text-on-surface-variant text-xs font-data-mono">|</span>
+
+      {/* Custom date range */}
+      <div className="flex items-center gap-1.5">
+        <span className="font-label-sm text-xs text-on-surface-variant uppercase">From:</span>
+        <input
+          type="date"
+          value={from}
+          onChange={(e) => { onFrom(e.target.value); onRange("custom"); }}
+          className={`border-2 px-2 py-1 font-data-mono text-xs text-on-surface bg-surface focus:outline-none cursor-pointer ${
+            range === "custom" ? "border-on-surface" : "border-on-surface/50"
+          }`}
+        />
+        <span className="font-label-sm text-xs text-on-surface-variant uppercase">To:</span>
+        <input
+          type="date"
+          value={to}
+          onChange={(e) => { onTo(e.target.value); onRange("custom"); }}
+          className={`border-2 px-2 py-1 font-data-mono text-xs text-on-surface bg-surface focus:outline-none cursor-pointer ${
+            range === "custom" ? "border-on-surface" : "border-on-surface/50"
+          }`}
+        />
+        {range === "custom" && (
+          <span className="text-[10px] font-label-sm uppercase bg-on-surface text-surface px-2 py-1 font-bold">
+            Custom Range Active
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ImsInner() {
   const [tab, setTab] = useState<Tab>("items");
   const [items, setItems] = useState<ImsItem[]>([]);
@@ -184,65 +244,6 @@ function ImsInner() {
     { key: "reorder", label: "Reorder Sheet", badge: needsReorderCount },
   ];
 
-  // ── Range Filter Bar Component ───────────────────────────────────────────
-  function RangeFilterBar({
-    range, onRange, from, onFrom, to, onTo,
-  }: {
-    range: QuickRange; onRange: (r: QuickRange) => void;
-    from: string; onFrom: (v: string) => void;
-    to: string; onTo: (v: string) => void;
-  }) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 bg-surface-container border-2 border-on-surface px-3 py-2">
-        <span className="font-label-sm text-xs uppercase text-on-surface-variant font-bold">Period:</span>
-
-        {/* Quick buttons */}
-        {(["week", "month"] as const).map((r) => (
-          <button
-            key={r}
-            onClick={() => onRange(r)}
-            className={`px-3 py-1 border-2 font-label-sm text-xs uppercase font-bold transition-colors cursor-pointer ${
-              (range as string) === r
-                ? "bg-on-surface text-surface border-on-surface"
-                : "border-on-surface text-on-surface hover:bg-surface-container-low"
-            }`}
-          >
-            {r === "week" ? "This Week (7d)" : "This Month (30d)"}
-          </button>
-        ))}
-
-        {/* Divider */}
-        <span className="text-on-surface-variant text-xs font-data-mono">|</span>
-
-        {/* Custom date range */}
-        <div className="flex items-center gap-1.5">
-          <span className="font-label-sm text-xs text-on-surface-variant uppercase">From:</span>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => { onFrom(e.target.value); onRange("custom"); }}
-            className={`border-2 px-2 py-1 font-data-mono text-xs text-on-surface bg-surface focus:outline-none cursor-pointer ${
-              range === "custom" ? "border-on-surface" : "border-on-surface/50"
-            }`}
-          />
-          <span className="font-label-sm text-xs text-on-surface-variant uppercase">To:</span>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => { onTo(e.target.value); onRange("custom"); }}
-            className={`border-2 px-2 py-1 font-data-mono text-xs text-on-surface bg-surface focus:outline-none cursor-pointer ${
-              range === "custom" ? "border-on-surface" : "border-on-surface/50"
-            }`}
-          />
-          {range === "custom" && (
-            <span className="text-[10px] font-label-sm uppercase bg-on-surface text-surface px-2 py-1 font-bold">
-              Custom Range Active
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -250,11 +251,11 @@ function ImsInner() {
       <SideNav active="ims" />
 
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="hidden md:flex bg-surface w-full border-b-2 border-on-surface justify-between items-center h-16 px-container-padding sticky top-0 z-30">
+        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1 font-black">
             📦 Inventory Management System
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {tab === "items" && (
               <button
                 onClick={() => { setEditingItem(null); setShowItemModal(true); }}
@@ -267,7 +268,7 @@ function ImsInner() {
               <button
                 onClick={() => setShowTxModal(true)}
                 disabled={items.length === 0}
-                className="border-2 border-on-surface bg-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-surface hover:bg-primary transition-colors disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 + Log Transaction
               </button>
@@ -293,7 +294,7 @@ function ImsInner() {
             )}
           </div>
 
-          {error && <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>}
+          {error && <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>}
 
           {!loading && items.length === 0 ? (
             <div className="bg-surface-container-lowest border-2 border-on-surface p-stack-lg flex flex-col items-center gap-4 text-center">
@@ -363,7 +364,7 @@ function ImsInner() {
                         value={itemSearch}
                         onChange={(e) => setItemSearch(e.target.value)}
                         placeholder="Search by SKU or item name..."
-                        className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none max-w-sm"
+                        className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-w-sm"
                       />
                       {/* Color Legend */}
                       <div className="flex items-center gap-0 border border-on-surface/30 bg-surface-container-lowest font-label-sm text-[10px] uppercase divide-x divide-on-surface/20 overflow-hidden">
@@ -492,7 +493,7 @@ function ImsInner() {
                       </div>
 
                       {/* Transaction summary mini cards */}
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <div className="border border-on-surface/30 bg-surface p-3">
                           <p className="font-label-sm text-[10px] uppercase text-on-surface-variant">Transactions</p>
                           <p className="font-data-mono text-xl font-bold text-on-surface">{txStats.count}</p>

@@ -31,8 +31,8 @@ export default function CreateListModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md bg-surface-container-lowest border-2 border-on-surface">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border border-on-surface bg-surface">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
             Create List
@@ -56,7 +56,7 @@ export default function CreateListModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Sahil Sir, Sales Team"
-              className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+              className="mt-1 min-h-[40px] w-full border border-on-surface bg-surface px-3 py-2 text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
             />
           </div>
 
@@ -67,7 +67,7 @@ export default function CreateListModal({
             <select
               value={type}
               onChange={(e) => setType(e.target.value as ListType)}
-              className="mt-1 w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
+              className="mt-1 min-h-[40px] w-full border border-on-surface bg-surface px-3 py-2 text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
             >
               <option value="task">Task List</option>
               <option value="checklist">Checklist</option>
@@ -75,7 +75,7 @@ export default function CreateListModal({
           </div>
 
           {error && (
-            <p className="font-body-sm text-body-sm text-error border-2 border-error px-3 py-2">
+            <p className="font-body-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
           )}
@@ -84,14 +84,14 @@ export default function CreateListModal({
             <button
               type="button"
               onClick={onClose}
-              className="border-2 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="border-2 border-on-surface bg-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitting ? "Creating..." : "Create List"}
             </button>

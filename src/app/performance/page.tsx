@@ -5,6 +5,22 @@ import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import Stat from "@/components/Stat";
+import {
+  Button,
+  Card,
+  ErrorNote,
+  PageBody,
+  PageHeader,
+  StateRow,
+  TableWrap,
+  Toolbar,
+  fieldInlineClass,
+  tableClass,
+  tdClass,
+  thClass,
+  theadClass,
+  trClass,
+} from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY, formatPct } from "@/lib/format";
 import { mondayOf, sundayOf, addDays, todayIso } from "@/lib/week";
@@ -86,39 +102,32 @@ function PerformanceInner() {
       <MobileHeader />
       <SideNav active="dashboard" />
 
-      <main className="flex-1 md:ml-64 p-4 md:p-container-padding flex flex-col gap-4 max-w-[1440px] mx-auto w-full">
-        <header className="border-b border-on-surface pb-3">
-          <h2 className="font-headline-md text-headline-md text-on-surface uppercase font-bold">
-            Performance
-          </h2>
-        </header>
+      <PageBody>
+        <PageHeader title="Performance" />
 
         {/* Week Selector */}
-        <div className="flex flex-wrap items-center gap-2 border border-on-surface/30 px-3 py-2">
-          <button onClick={() => goToWeek(-1)} className="px-3 py-1.5 border border-on-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors cursor-pointer">
-            ← Prev
-          </button>
-          <button onClick={() => setWeekStart(mondayOf())} className="px-3 py-1.5 border border-on-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors cursor-pointer">
-            This Week
-          </button>
-          <button onClick={() => goToWeek(1)} className="px-3 py-1.5 border border-on-surface font-label-sm text-xs uppercase hover:bg-surface-container transition-colors cursor-pointer">
-            Next →
-          </button>
+        <Toolbar>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => goToWeek(-1)} aria-label="Previous week">← Prev</Button>
+            <Button size="sm" onClick={() => setWeekStart(mondayOf())}>This Week</Button>
+            <Button size="sm" onClick={() => goToWeek(1)} aria-label="Next week">Next →</Button>
+          </div>
           <input
             type="date"
+            aria-label="Jump to week"
             value={weekStart}
             onChange={(e) => e.target.value && setWeekStart(mondayOf(e.target.value))}
-            className="border border-on-surface bg-surface px-2 py-1 font-data-mono text-xs text-on-surface focus:outline-none"
+            className={`${fieldInlineClass} font-data-mono text-xs`}
           />
-          <span className="font-data-mono text-sm text-on-surface">
+          <span className="font-data-mono text-xs text-on-surface sm:text-sm">
             {formatDMY(weekStart)} — {formatDMY(weekEnd)} <span className="text-on-surface-variant">(Mon–Sun)</span>
           </span>
-        </div>
+        </Toolbar>
 
-        {error && <p className="font-label-sm text-label-sm text-error border border-error px-3 py-2">{error}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
 
         {/* Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <Stat label="Team Score" value={formatPct(totals.negativeScore)} />
           <Stat label="Assigned" value={totals.assigned} />
           <Stat label="On Time" value={totals.green} />
@@ -127,68 +136,65 @@ function PerformanceInner() {
           <Stat label="Not Yet Due" value={totals.pending} />
         </div>
 
-        <p className="text-[11px] text-on-surface-variant font-data-mono border border-on-surface/25 px-3 py-2 leading-relaxed">
+        <p className="border border-on-surface/25 px-3 py-2 font-data-mono text-[11px] leading-relaxed text-on-surface-variant">
           Per Task % = 100 ÷ Assigned &nbsp;·&nbsp; Score = −((Not Done × Per Task %) + (Late Done × Per Task % × {dgmaxSummary?.lateDoneWeight ?? 60}%))
           <br />
           <span className="opacity-70">0% is a perfect week; the score only goes down from there. Tasks not yet due are excluded.</span>
         </p>
 
         {/* Employee Scoreboard */}
-        <section className="flex flex-col gap-2">
-          <h3 className="font-label-sm text-xs uppercase text-on-surface-variant">Employee Scores</h3>
-          <div className="border border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[720px]">
-              <thead className="font-label-sm text-[11px] uppercase text-on-surface-variant border-b border-on-surface">
+        <Card title="Employee Scores" bodyClassName="">
+          <TableWrap className="border-0">
+            <table className={`${tableClass} min-w-[640px]`}>
+              <thead className={theadClass}>
                 <tr>
-                  <th className="py-2 px-3 font-normal text-center w-12">#</th>
-                  <th className="py-2 px-3 font-normal">Employee</th>
-                  <th className="py-2 px-3 font-normal text-center">Assigned</th>
-                  <th className="py-2 px-3 font-normal text-center">On Time</th>
-                  <th className="py-2 px-3 font-normal text-center">Late Done</th>
-                  <th className="py-2 px-3 font-normal text-center">Not Done</th>
-                  <th className="py-2 px-3 font-normal text-right">Score</th>
+                  <th className={`${thClass} w-10 text-center`}>#</th>
+                  <th className={thClass}>Employee</th>
+                  <th className={`${thClass} text-center`}>Assigned</th>
+                  <th className={`${thClass} text-center`}>On Time</th>
+                  <th className={`${thClass} text-center`}>Late Done</th>
+                  <th className={`${thClass} text-center`}>Not Done</th>
+                  <th className={`${thClass} text-right`}>Score</th>
                 </tr>
               </thead>
-              <tbody className="font-body-md text-sm text-on-surface">
-                {loading && (
-                  <tr><td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">Loading…</td></tr>
-                )}
+              <tbody className="text-sm">
+                {loading && <StateRow colSpan={7}>Loading…</StateRow>}
                 {!loading && (dgmaxSummary?.summaries.length ?? 0) === 0 && (
-                  <tr><td colSpan={7} className="py-6 text-center font-data-mono text-on-surface-variant">No data for this week.</td></tr>
+                  <StateRow colSpan={7}>No data for this week.</StateRow>
                 )}
-                {dgmaxSummary?.summaries.map((row, i) => (
-                  <tr key={row.doerId} className="border-b border-on-surface/15 hover:bg-surface-container-low transition-colors">
-                    <td className="py-2 px-3 text-center font-data-mono text-on-surface-variant">{i + 1}</td>
-                    <td className="py-2 px-3">{row.doerName}</td>
-                    <td className="py-2 px-3 text-center font-data-mono">{row.assignedTasks}</td>
-                    <td className="py-2 px-3 text-center font-data-mono">{row.greenCount}</td>
-                    <td className="py-2 px-3 text-center font-data-mono">{row.yellowCount}</td>
-                    <td className="py-2 px-3 text-center font-data-mono">{row.redCount}</td>
-                    <td className="py-2 px-3 text-right font-data-mono font-bold">{formatPct(row.negativeScore)}</td>
+                {!loading && dgmaxSummary?.summaries.map((row, i) => (
+                  <tr key={row.doerId} className={trClass}>
+                    <td className={`${tdClass} text-center font-data-mono text-on-surface-variant`}>{i + 1}</td>
+                    <td className={tdClass}>{row.doerName}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{row.assignedTasks}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{row.greenCount}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{row.yellowCount}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{row.redCount}</td>
+                    <td className={`${tdClass} text-right font-data-mono font-bold`}>{formatPct(row.negativeScore)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </section>
+          </TableWrap>
+        </Card>
 
         {/* Task-level detail */}
-        <section className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-label-sm text-xs uppercase text-on-surface-variant">
-              Tasks This Week ({filteredTasks.length})
-            </h3>
-            <div className="flex flex-wrap items-center gap-2">
+        <Card
+          title={`Tasks This Week (${filteredTasks.length})`}
+          actions={
+            <>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search task or doer…"
-                className="border border-on-surface bg-surface px-2 py-1 font-data-mono text-xs text-on-surface focus:outline-none min-w-[200px]"
+                aria-label="Search tasks"
+                className={`${fieldInlineClass} min-w-0 flex-1 text-xs sm:w-56 sm:flex-none`}
               />
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="border border-on-surface bg-surface px-2 py-1 font-label-sm text-xs uppercase text-on-surface focus:outline-none"
+                aria-label="Filter by category"
+                className={`${fieldInlineClass} text-xs uppercase`}
               >
                 <option value="ALL">All</option>
                 <option value="Green">On Time</option>
@@ -196,41 +202,40 @@ function PerformanceInner() {
                 <option value="Red">Not Done</option>
                 <option value="Pending">Not Yet Due</option>
               </select>
-            </div>
-          </div>
-
-          <div className="border border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[720px]">
-              <thead className="font-label-sm text-[11px] uppercase text-on-surface-variant border-b border-on-surface">
+            </>
+          }
+          bodyClassName=""
+        >
+          <TableWrap className="border-0">
+            <table className={`${tableClass} min-w-[680px]`}>
+              <thead className={theadClass}>
                 <tr>
-                  <th className="py-2 px-3 font-normal">Task</th>
-                  <th className="py-2 px-3 font-normal w-40">Doer</th>
-                  <th className="py-2 px-3 font-normal w-28 text-center">Due Date</th>
-                  <th className="py-2 px-3 font-normal w-28 text-center">Status</th>
-                  <th className="py-2 px-3 font-normal w-32 text-right">Category</th>
+                  <th className={thClass}>Task</th>
+                  <th className={thClass}>Doer</th>
+                  <th className={`${thClass} text-center`}>Due Date</th>
+                  <th className={`${thClass} text-center`}>Status</th>
+                  <th className={`${thClass} text-right`}>Category</th>
                 </tr>
               </thead>
-              <tbody className="font-body-md text-sm text-on-surface">
-                {loading && (
-                  <tr><td colSpan={5} className="py-6 text-center font-data-mono text-on-surface-variant">Loading…</td></tr>
-                )}
+              <tbody className="text-sm">
+                {loading && <StateRow colSpan={5}>Loading…</StateRow>}
                 {!loading && filteredTasks.length === 0 && (
-                  <tr><td colSpan={5} className="py-6 text-center font-data-mono text-on-surface-variant">No tasks for this week.</td></tr>
+                  <StateRow colSpan={5}>No tasks for this week.</StateRow>
                 )}
-                {filteredTasks.map((t) => (
-                  <tr key={t.id} className="border-b border-on-surface/15 last:border-b-0 hover:bg-surface-container-low transition-colors">
-                    <td className="py-2 px-3">{t.title}</td>
-                    <td className="py-2 px-3 text-on-surface-variant">{t.doer?.name ?? "—"}</td>
-                    <td className="py-2 px-3 text-center font-data-mono">{formatDMY(t.dueDate)}</td>
-                    <td className="py-2 px-3 text-center font-data-mono text-on-surface-variant">{t.status}</td>
-                    <td className="py-2 px-3 text-right font-label-sm text-xs uppercase">{CATEGORY_LABEL[t.scoreCategory]}</td>
+                {!loading && filteredTasks.map((t) => (
+                  <tr key={t.id} className={trClass}>
+                    <td className={`${tdClass} min-w-[200px]`}>{t.title}</td>
+                    <td className={`${tdClass} text-on-surface-variant`}>{t.doer?.name ?? "—"}</td>
+                    <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs`}>{formatDMY(t.dueDate)}</td>
+                    <td className={`${tdClass} text-center font-data-mono text-xs text-on-surface-variant`}>{t.status}</td>
+                    <td className={`${tdClass} text-right font-label-sm text-xs uppercase`}>{CATEGORY_LABEL[t.scoreCategory]}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </section>
-      </main>
+          </TableWrap>
+        </Card>
+      </PageBody>
     </>
   );
 }

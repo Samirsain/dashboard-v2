@@ -124,8 +124,8 @@ function ChecklistInner() {
 
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
         {/* TopNavBar */}
-        <header className="hidden md:flex bg-surface w-full border-b-2 border-on-surface justify-between items-center h-16 px-container-padding sticky top-0 z-30">
-          <div className="flex items-center gap-gutter">
+        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 border-b-2 border-on-surface pb-1">
               <span className="material-symbols-outlined text-on-surface-variant">
                 search
@@ -133,14 +133,14 @@ function ChecklistInner() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-transparent border-none focus:ring-0 p-0 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant w-48"
+                className="bg-transparent border-none focus:ring-0 p-0 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant w-full md:w-48"
                 placeholder="SEARCH CHECKLIST"
                 type="text"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-stack-md">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="font-data-mono text-data-mono text-on-surface px-3 py-1 border-2 border-on-surface uppercase">
               {new Date().toISOString().split("T")[0]}
             </div>
@@ -171,13 +171,13 @@ function ChecklistInner() {
             <div className="flex gap-stack-sm">
               <button
                 onClick={loadData}
-                className="px-4 py-2 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
               >
                 Refresh
               </button>
               <button
                 onClick={() => setShowCreate(true)}
-                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer"
               >
                 + Create Checklist
               </button>
@@ -185,7 +185,7 @@ function ChecklistInner() {
           </div>
 
           {error && (
-            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">
+            <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
           )}

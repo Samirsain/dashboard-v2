@@ -94,7 +94,7 @@ function EmployeeView() {
   return (
     <div className="flex flex-col gap-stack-lg">
       {error && (
-        <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
+        <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>
       )}
 
       <div className="bg-surface-container-lowest border-2 border-on-surface p-stack-lg">
@@ -136,7 +136,7 @@ function EmployeeView() {
           value={rangeFrom}
           max={rangeTo || undefined}
           onChange={(e) => setRangeFrom(e.target.value)}
-          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
         />
         <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
         <input
@@ -144,7 +144,7 @@ function EmployeeView() {
           value={rangeTo}
           min={rangeFrom || undefined}
           onChange={(e) => setRangeTo(e.target.value)}
-          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
         />
         {(rangeFrom || rangeTo) && (
           <button
@@ -344,7 +344,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="flex flex-col gap-stack-lg">
       {error && (
-        <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
+        <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>
       )}
 
       {/* Filter bar */}
@@ -356,7 +356,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             value={date}
             max={isAdmin ? undefined : todayIso()}
             onChange={(e) => setDate(e.target.value)}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
           />
           {!editable && (
             <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">(view only)</span>
@@ -369,7 +369,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             value={rangeFrom}
             max={rangeTo || todayIso()}
             onChange={(e) => setRangeFrom(e.target.value)}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
           />
           <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
           <input
@@ -378,7 +378,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             min={rangeFrom || undefined}
             max={todayIso()}
             onChange={(e) => setRangeTo(e.target.value)}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
           />
           {(rangeFrom || rangeTo) && (
             <button
@@ -393,7 +393,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search employee..."
-          className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px] ml-auto"
+          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px] ml-auto"
         />
       </div>
 
@@ -494,7 +494,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
           <select
             value={reportDoer}
             onChange={(e) => setReportDoer(e.target.value)}
-            className="border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none min-w-[200px]"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px]"
           >
             <option value="">All Employees</option>
             {rangeRows.filter((r) => r.employee.role !== "Admin").map(({ employee }) => (
@@ -504,7 +504,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         {rangeError && (
-          <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{rangeError}</p>
+          <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{rangeError}</p>
         )}
 
         {/* Summary stat cards */}
@@ -603,7 +603,7 @@ function AttendanceInner() {
       <SideNav active="attendance" />
 
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="hidden md:flex bg-surface w-full border-b-2 border-on-surface justify-between items-center h-16 px-container-padding sticky top-0 z-30">
+        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Attendance
           </div>

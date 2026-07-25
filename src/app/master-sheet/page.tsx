@@ -199,7 +199,7 @@ function MasterSheetInner() {
       <SideNav active="master-sheet" />
 
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="hidden md:flex bg-surface w-full border-b-2 border-on-surface justify-between items-center h-16 px-container-padding sticky top-0 z-30">
+        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Master Sheet
           </div>
@@ -207,7 +207,7 @@ function MasterSheetInner() {
             <button
               onClick={startAdd}
               disabled={adding}
-              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               + Add Row
             </button>
@@ -232,7 +232,7 @@ function MasterSheetInner() {
           </p>
 
           {error && (
-            <p className="font-label-sm text-label-sm text-error border-2 border-error px-3 py-2">{error}</p>
+            <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>
           )}
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
