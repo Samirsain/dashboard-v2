@@ -71,6 +71,19 @@ export function addDaysIso(iso: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/**
+ * Monday (YYYY-MM-DD) of the week containing `iso`, defaulting to today.
+ * Weeks run Monday..Sunday. Uses UTC arithmetic on the date parts so it never
+ * shifts a day in timezones ahead of/behind UTC.
+ */
+export function mondayOfIso(iso: string = todayIso()): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  const day = dt.getUTCDay(); // 0 = Sunday .. 6 = Saturday
+  dt.setUTCDate(dt.getUTCDate() + (day === 0 ? -6 : 1 - day));
+  return dt.toISOString().slice(0, 10);
+}
+
 export function compareIsoDates(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }

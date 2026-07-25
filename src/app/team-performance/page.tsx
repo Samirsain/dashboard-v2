@@ -7,22 +7,8 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { mondayOf, sundayOf, addDays } from "@/lib/week";
 import type { DgmaxWeeklySummary, WeeklyArchive } from "@/lib/types";
-
-/** Monday (YYYY-MM-DD) of the week containing `dateStr` (or today, if omitted). */
-function mondayOf(dateStr?: string): string {
-  const base = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
-  const day = base.getDay(); // 0 = Sunday .. 6 = Saturday
-  const diff = day === 0 ? -6 : 1 - day;
-  base.setDate(base.getDate() + diff);
-  return base.toISOString().slice(0, 10);
-}
-
-function addDays(dateStr: string, n: number): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
 
 /** Archived rows store the 0-100 value; the final score is its negative form. */
 function toNegative(performanceScore: number): number {
@@ -47,7 +33,7 @@ function TeamPerformanceInner() {
 
   // Monday of the currently-selected week. Week always runs Monday -> Sunday.
   const [weekStart, setWeekStart] = useState(() => mondayOf());
-  const weekEnd = addDays(weekStart, 6);
+  const weekEnd = sundayOf(weekStart);
   const [lateWeight, setLateWeight] = useState(60);
   const [lateWeightDraft, setLateWeightDraft] = useState("60");
 

@@ -4,29 +4,17 @@ import { tasksService } from "../services/tasks.service";
 import { checklistService } from "../services/checklist.service";
 import { archiveService } from "../services/archive.service";
 import { buildDgmaxWeeklySummary, DEFAULT_LATE_DONE_WEIGHT } from "../utils/dgmaxScoring";
-import { todayIso } from "../utils/date";
-
-/** Monday (YYYY-MM-DD) of the week containing `dateStr` (or today, if omitted). */
-function mondayOf(dateStr?: string): string {
-  const base = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
-  const day = base.getDay(); // 0 = Sunday .. 6 = Saturday
-  const diff = day === 0 ? -6 : 1 - day;
-  base.setDate(base.getDate() + diff);
-  return base.toISOString().slice(0, 10);
-}
-
-function addDays(dateStr: string, n: number): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
+import { todayIso, mondayOfIso, addDaysIso, isValidIsoDate } from "../utils/date";
 
 /** Resolves the [from, to] week window from query params, defaulting to the current Mon-Sun week. */
 function resolveWeekRange(req: Request): { from: string; to: string } {
   const q = req.query as { from?: string; to?: string; week?: string };
-  if (q.from && q.to) return { from: q.from, to: q.to };
-  const from = mondayOf(q.week);
-  return { from, to: addDays(from, 6) };
+  if (q.from && q.to && isValidIsoDate(q.from) && isValidIsoDate(q.to)) {
+    return { from: q.from, to: q.to };
+  }
+  // Snap whatever date we were given (or today) back to its Monday.
+  const from = mondayOfIso(q.week && isValidIsoDate(q.week) ? q.week : undefined);
+  return { from, to: addDaysIso(from, 6) };
 }
 
 function resolveLateWeight(req: Request): number {
@@ -56,8 +44,8 @@ export const performanceController = {
   async archiveWeek(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const body = req.body as { from?: string; to?: string; weekLabel?: string; lateWeight?: number; remarks?: Record<string, string> };
-      const from = body.from || mondayOf();
-      const to = body.to || addDays(from, 6);
+      const from = body.from && isValidIsoDate(body.from) ? body.from : mondayOfIso();
+      const to = body.to && isValidIsoDate(body.to) ? body.to : addDaysIso(from, 6);
       const lateWeight = Number(body.lateWeight) || DEFAULT_LATE_DONE_WEIGHT;
       const weekLabel = body.weekLabel || `${from} to ${to}`;
       const remarks = body.remarks || {};
