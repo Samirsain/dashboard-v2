@@ -240,6 +240,7 @@ export const workflowService = {
       templateId: input.templateId,
       title: input.title,
       details: input.details ?? "",
+      link: input.link ?? "",
       startedAt: startedAt.toISOString(),
       status: "Active",
       requestedBy: input.requestedBy,
