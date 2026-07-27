@@ -19,7 +19,8 @@ export default function CreateChecklistModal({
   onCreated: () => void;
 }) {
   const [taskName, setTaskName] = useState("");
-  const [listId, setListId] = useState(defaultListId);
+  const officeList = lists.find(l => l.name.toUpperCase().startsWith("OFFICE"));
+  const [listId, setListId] = useState(defaultListId || officeList?.id || (lists[0]?.id ?? ""));
   const [frequency, setFrequency] = useState("Daily");
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
   const [calendarDate, setCalendarDate] = useState(""); // YYYY-MM-DD
@@ -144,7 +145,7 @@ export default function CreateChecklistModal({
               onChange={(e) => setListId(e.target.value)}
               className="mt-1 min-h-[40px] w-full border border-on-surface bg-surface px-3 py-2 text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
             >
-              <option value="">Office (Default)</option>
+
               {lists.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name}

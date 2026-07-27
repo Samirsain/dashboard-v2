@@ -39,7 +39,7 @@ export const listsService = {
         .map((u: User) => u.id)
         .filter((id: string) => id !== sahilId);
 
-      const officeTl = lists.find((l) => l.type === "task" && l.name.toUpperCase().startsWith("OFFICE"));
+      const officeTl = lists.find((l) => l.type === "task" && l.name.trim().toUpperCase().startsWith("OFFICE"));
       if (!officeTl) {
         await this.create({
           name: "OFFICE TL",
@@ -51,7 +51,7 @@ export const listsService = {
         await this.updateMembers(officeTl.id, updatedMembers);
       }
 
-      const officeCl = lists.find((l) => l.type === "checklist" && l.name.toUpperCase().startsWith("OFFICE"));
+      const officeCl = lists.find((l) => l.type === "checklist" && l.name.trim().toUpperCase().startsWith("OFFICE"));
       if (!officeCl) {
         await this.create({
           name: "OFFICE CL",

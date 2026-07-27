@@ -91,8 +91,8 @@ function SettingsInner() {
   // exists, we link its ID so the checkbox can toggle membership. Otherwise
   // they show as read-only (isOffice fallback).
   const buckets = useMemo<Bucket[]>(() => {
-    const officeTl = lists.find((l) => l.type === "task" && l.name.toUpperCase().startsWith("OFFICE"));
-    const officeCl = lists.find((l) => l.type === "checklist" && l.name.toUpperCase().startsWith("OFFICE"));
+    const officeTl = lists.find((l) => l.type === "task" && l.name.trim().toUpperCase().startsWith("OFFICE"));
+    const officeCl = lists.find((l) => l.type === "checklist" && l.name.trim().toUpperCase().startsWith("OFFICE"));
 
     const taskBuckets: Bucket[] = [
       { key: "office-task", label: "OFFICE TL", kind: "task", listId: officeTl?.id ?? "", isOffice: !officeTl },
@@ -102,7 +102,7 @@ function SettingsInner() {
     ];
 
     for (const l of lists) {
-      if (l.name.toUpperCase().startsWith("OFFICE")) continue; // already in fixed slots above
+      if (l.name.trim().toUpperCase().startsWith("OFFICE")) continue; // already in fixed slots above
       const short = listGroupKey(l.name);
       if (l.type === "task") {
         taskBuckets.push({ key: `t-${l.id}`, label: `${short} TL`, kind: "task", listId: l.id, isOffice: false });

@@ -24,7 +24,8 @@ export default function CreateTaskModal({
   onCreated: (task: Task) => void;
 }) {
   const [title, setTitle] = useState("");
-  const [listId, setListId] = useState(defaultListId);
+  const officeList = lists.find(l => l.name.toUpperCase().startsWith("OFFICE"));
+  const [listId, setListId] = useState(defaultListId || officeList?.id || (lists[0]?.id ?? ""));
   const [assignedDoerId, setAssignedDoerId] = useState(doers[0]?.id ?? "");
   const [priority, setPriority] = useState<TaskPriority>("Normal");
   const [dueDate, setDueDate] = useState("");
@@ -112,7 +113,7 @@ export default function CreateTaskModal({
               onChange={(e) => setListId(e.target.value)}
               className={field}
             >
-              <option value="">Office (Default)</option>
+
               {lists.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name}
