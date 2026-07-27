@@ -322,13 +322,26 @@ export interface DgmaxEmployeeSummary {
   doerId: string;
   doerName: string;
   department: string;
-  assignedTasks: number; // Green + Yellow + Red (Pending excluded — not yet scoreable)
+  // Task List Metrics & Score
+  assignedTasks: number; // Green + Yellow + Red (Pending excluded)
   completedTasks: number;
   greenCount: number; // On Time
   yellowCount: number; // Late Done
   redCount: number; // Not Done
-  pendingCount: number; // not yet due — informational only
-  negativeScore: number; // -(Not Done Penalty + Late Done Penalty), 0 to -100
+  pendingCount: number;
+  taskScore: number; // Task negative score (0 to -100)
+
+  // Checklist Metrics & Score
+  assignedChecklists: number;
+  completedChecklists: number;
+  checklistGreenCount: number;
+  checklistYellowCount: number;
+  checklistRedCount: number;
+  checklistPendingCount: number;
+  checklistScore: number; // Checklist negative score (0 to -100)
+
+  // Final Average Score across Task List & Checklist
+  negativeScore: number; // Average of taskScore & checklistScore (0 to -100)
   performanceScore: number; // 100 + negativeScore, clamped 0-100
 }
 

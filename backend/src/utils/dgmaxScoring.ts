@@ -1,36 +1,22 @@
-import type { Task, User, Revision, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
+import type { Task, User, Revision, ChecklistInstance, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
 import { calculatePerformance, DEFAULT_LATE_DONE_WEIGHT } from "./performanceScoring";
 
 export { DEFAULT_LATE_DONE_WEIGHT };
 
-/**
- * DGMAX Negative Performance Scoring System.
- *
- * Every employee starts a week at 100. Only delays and incomplete work pull
- * the score down — see DGMAX-negative-scoring.md for the original spec.
- *
- * Only Task List tasks are scored. Checklist items are recurring routine work
- * and are deliberately left out of the score entirely.
- *
- * Scoring always measures against the task's ORIGINAL due date — the deadline
- * first committed to — not the current one. Revising a task genuinely moves its
- * working deadline (it stops showing as overdue, the doer gets the new date),
- * but it cannot buy back a clean score: a task revised and then finished is
- * "Late Done", exactly as the spec describes it. Without this, extending a due
- * date and finishing before the new one scored as On Time, so a task could be
- * pushed indefinitely and still come out at a perfect 0%.
- *
- * Category for a single task, given today's date:
- *  - Green ("On Time")   — completed on or before its original due date.
- *  - Yellow ("Late Done") — completed after its original due date (this is the
- *                            revised-then-completed case).
- *  - Red ("Not Done")     — still incomplete and its original due date passed.
- *  - Pending              — still incomplete, not yet due. Excluded from
- *                            scoring entirely (hasn't had a chance to be late
- *                            or missed yet) — it simply isn't counted until
- *                            it resolves one way or the other.
- * Cancelled items, or items with no due date, return null (not counted at all).
- */
+/** Daily rate (33% per day late) and cap (max 80% penalty for late done checklist items) */
+export const CHECKLIST_DAILY_RATE = 33;
+export const CHECKLIST_MAX_CAP = 80;
+
+function getDaysLate(dateStr: string, completedAtStr: string): number {
+  if (!completedAtStr || !dateStr) return 1;
+  const completedDateStr = completedAtStr.slice(0, 10);
+  if (completedDateStr <= dateStr) return 0;
+  const d1 = new Date(dateStr + "T00:00:00Z").getTime();
+  const d2 = new Date(completedDateStr + "T00:00:00Z").getTime();
+  const diffDays = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays);
+}
+
 export function getTaskCategory(
   task: Task,
   todayIso: string,
@@ -45,11 +31,6 @@ export function getTaskCategory(
   return dueDate < todayIso ? "Red" : "Pending";
 }
 
-/**
- * taskId -> the due date the task originally carried, taken from the oldest
- * revision's "old due date". Tasks that were never revised are absent, and the
- * caller falls back to the task's own dueDate.
- */
 export function buildOriginalDueDates(revisions: Revision[]): Map<string, string> {
   const earliest = new Map<string, Revision>();
   for (const r of revisions) {
@@ -61,18 +42,18 @@ export function buildOriginalDueDates(revisions: Revision[]): Map<string, string
 }
 
 /**
- * Builds the DGMAX weekly summary for every active (non-Admin) doer, scoped to
- * Task List tasks whose due date falls within [fromDate, toDate] (inclusive,
- * both YYYY-MM-DD — normally a Monday..Sunday week). Checklist items are not
- * scored.
+ * Builds the DGMAX weekly summary for every active (non-Admin) doer, scoped to:
+ * 1. Task List tasks
+ * 2. Checklist items
  *
- * Assigned = Green + Yellow + Red (Pending excluded — not yet scoreable). The
- * arithmetic itself lives in calculatePerformance(), the single source of truth.
+ * Calculates Task Score, Checklist Score (with per-day late penalties), and
+ * final Average Score for each doer.
  */
 export function buildDgmaxWeeklySummary(
   users: User[],
   tasks: Task[],
   revisions: Revision[],
+  checklists: ChecklistInstance[] = [],
   todayIso: string,
   fromDate: string,
   toDate: string,
@@ -83,32 +64,41 @@ export function buildDgmaxWeeklySummary(
   const weight = Math.min(100, Math.max(0, lateDoneWeight));
 
   const summaryMap = new Map<string, DgmaxEmployeeSummary>();
+  const checklistItemsMap = new Map<string, ChecklistInstance[]>();
+
   for (const d of doers) {
     summaryMap.set(d.id, {
       doerId: d.id,
       doerName: d.name,
       department: d.department || "-",
+      // Task
       assignedTasks: 0,
       completedTasks: 0,
       greenCount: 0,
       yellowCount: 0,
       redCount: 0,
       pendingCount: 0,
+      taskScore: 0,
+      // Checklist
+      assignedChecklists: 0,
+      completedChecklists: 0,
+      checklistGreenCount: 0,
+      checklistYellowCount: 0,
+      checklistRedCount: 0,
+      checklistPendingCount: 0,
+      checklistScore: 0,
+      // Average
       negativeScore: 0,
       performanceScore: 100,
     });
+    checklistItemsMap.set(d.id, []);
   }
 
   const inWindow = (dateStr: string) => !!dateStr && dateStr >= fromDate && dateStr <= toDate;
 
+  // Process Tasks
   for (const t of tasks) {
-    // The week a task counts in follows its original deadline, so revising a
-    // due date cannot move a miss into a different week either.
     const dueDate = originalDueDates.get(t.id) || t.dueDate;
-    // A completed task belongs to the week it was completed in (updatedAt).
-    // An incomplete/overdue task belongs to the week its dueDate falls in.
-    // If the task was completed, check both: dueDate in window OR completedAt (updatedAt) in window.
-    // If not completed, only count if dueDate is in window.
     const completedAt = t.status === "Completed" && t.updatedAt ? t.updatedAt.slice(0, 10) : null;
     const belongsToWindow = completedAt ? inWindow(completedAt) || inWindow(dueDate) : inWindow(dueDate);
     if (!belongsToWindow) continue;
@@ -124,28 +114,102 @@ export function buildDgmaxWeeklySummary(
     else s.pendingCount++;
   }
 
+  // Process Checklists
+  for (const c of checklists) {
+    const completedAt = c.status === "Completed" && c.completedAt ? c.completedAt.slice(0, 10) : null;
+    const belongsToWindow = completedAt ? inWindow(completedAt) || inWindow(c.date) : inWindow(c.date);
+    if (!belongsToWindow) continue;
+
+    const s = summaryMap.get(c.assignedDoerId);
+    if (!s) continue;
+
+    const listForDoer = checklistItemsMap.get(c.assignedDoerId);
+    if (listForDoer) listForDoer.push(c);
+
+    if (c.status === "Completed") {
+      s.completedChecklists++;
+      if (completedAt && completedAt <= c.date) {
+        s.checklistGreenCount++;
+      } else {
+        s.checklistYellowCount++;
+      }
+    } else {
+      if (c.date < todayIso) {
+        s.checklistRedCount++;
+      } else {
+        s.checklistPendingCount++;
+      }
+    }
+  }
+
+  // Compute Scores per Doer
   const summaries = Array.from(summaryMap.values())
     .map((s) => {
+      // 1. Task Score
       s.assignedTasks = s.greenCount + s.yellowCount + s.redCount;
-      const result = calculatePerformance(
-        { assigned: s.assignedTasks, onTime: s.greenCount, lateDone: s.yellowCount, notDone: s.redCount },
-        weight
-      );
-      s.negativeScore = result.negativeScore;
-      s.performanceScore = result.performanceScore;
+      if (s.assignedTasks > 0) {
+        const taskResult = calculatePerformance(
+          { assigned: s.assignedTasks, onTime: s.greenCount, lateDone: s.yellowCount, notDone: s.redCount },
+          weight
+        );
+        s.taskScore = taskResult.negativeScore;
+      } else {
+        s.taskScore = 0;
+      }
+
+      // 2. Checklist Score (Per-day penalty model: 33% per day late, max cap 80%)
+      s.assignedChecklists = s.checklistGreenCount + s.checklistYellowCount + s.checklistRedCount;
+      if (s.assignedChecklists > 0) {
+        const itemSharePct = 100 / s.assignedChecklists;
+        let totalPenalty = 0;
+        const doerChecklists = checklistItemsMap.get(s.doerId) || [];
+
+        for (const c of doerChecklists) {
+          const completedAt = c.status === "Completed" && c.completedAt ? c.completedAt.slice(0, 10) : null;
+          if (c.status === "Completed") {
+            if (completedAt && completedAt > c.date) {
+              const daysLate = getDaysLate(c.date, c.completedAt);
+              const latePenaltyPct = Math.min(CHECKLIST_MAX_CAP, daysLate * CHECKLIST_DAILY_RATE);
+              totalPenalty += itemSharePct * (latePenaltyPct / 100);
+            }
+          } else if (c.date < todayIso) {
+            // Not Done -> full penalty
+            totalPenalty += itemSharePct * 1.0;
+          }
+        }
+        s.checklistScore = Math.round(-Math.min(100, Math.max(0, totalPenalty)) * 100) / 100;
+      } else {
+        s.checklistScore = 0;
+      }
+
+      // 3. Average Score of Task List & Checklist
+      const hasTaskWork = s.assignedTasks > 0;
+      const hasChecklistWork = s.assignedChecklists > 0;
+
+      if (hasTaskWork && hasChecklistWork) {
+        s.negativeScore = Math.round(((s.taskScore + s.checklistScore) / 2) * 100) / 100;
+      } else if (hasTaskWork) {
+        s.negativeScore = s.taskScore;
+      } else if (hasChecklistWork) {
+        s.negativeScore = s.checklistScore;
+      } else {
+        s.negativeScore = 0;
+      }
+
+      s.performanceScore = Math.round((100 + s.negativeScore) * 100) / 100;
       return s;
     })
-    // Least negative first (0 is a perfect week); tie -> more completed work ranks higher.
     .sort((a, b) => b.negativeScore - a.negativeScore || b.completedTasks - a.completedTasks);
 
+  // Totals across team
   const totals = { assigned: 0, completed: 0, green: 0, yellow: 0, red: 0, pending: 0, negativeScore: 0, performanceScore: 0 };
   for (const s of summaries) {
-    totals.assigned += s.assignedTasks;
-    totals.completed += s.completedTasks;
-    totals.green += s.greenCount;
-    totals.yellow += s.yellowCount;
-    totals.red += s.redCount;
-    totals.pending += s.pendingCount;
+    totals.assigned += s.assignedTasks + s.assignedChecklists;
+    totals.completed += s.completedTasks + s.completedChecklists;
+    totals.green += s.greenCount + s.checklistGreenCount;
+    totals.yellow += s.yellowCount + s.checklistYellowCount;
+    totals.red += s.redCount + s.checklistRedCount;
+    totals.pending += s.pendingCount + s.checklistPendingCount;
   }
   if (summaries.length > 0) {
     totals.negativeScore = Math.round((summaries.reduce((sum, s) => sum + s.negativeScore, 0) / summaries.length) * 100) / 100;

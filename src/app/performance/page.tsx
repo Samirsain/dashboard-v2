@@ -128,8 +128,8 @@ function PerformanceInner() {
 
         {/* Summary */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Team Score" value={formatPct(totals.negativeScore)} />
-          <Stat label="Assigned" value={totals.assigned} />
+          <Stat label="Team Avg Score" value={formatPct(totals.negativeScore)} />
+          <Stat label="Total Work" value={totals.assigned} />
           <Stat label="On Time" value={totals.green} />
           <Stat label="Late Done" value={totals.yellow} />
           <Stat label="Not Done" value={totals.red} />
@@ -137,24 +137,26 @@ function PerformanceInner() {
         </div>
 
         <p className="border border-on-surface/25 px-3 py-2 font-data-mono text-[11px] leading-relaxed text-on-surface-variant">
-          Per Task % = 100 ÷ Assigned &nbsp;·&nbsp; Score = −((Not Done × Per Task %) + (Late Done × Per Task % × {dgmaxSummary?.lateDoneWeight ?? 60}%))
+          Task Score = −((Not Done × Per Task %) + (Late Done × Per Task % × {dgmaxSummary?.lateDoneWeight ?? 60}%))
+          &nbsp;·&nbsp;
+          Checklist Score = −Per-Day Late Penalty (33%/day late, capped at 80%)
           <br />
-          <span className="opacity-70">0% is a perfect week; the score only goes down from there. Tasks not yet due are excluded.</span>
+          <strong className="text-on-surface">Final Doer Score = Average(Task Score, Checklist Score)</strong>
         </p>
 
         {/* Employee Scoreboard */}
-        <Card title="Employee Scores" bodyClassName="">
+        <Card title="Employee Scores (Task + Checklist Average)" bodyClassName="">
           <TableWrap className="border-0">
-            <table className={`${tableClass} min-w-[640px]`}>
+            <table className={`${tableClass} min-w-[720px]`}>
               <thead className={theadClass}>
                 <tr>
                   <th className={`${thClass} w-10 text-center`}>#</th>
                   <th className={thClass}>Employee</th>
-                  <th className={`${thClass} text-center`}>Assigned</th>
-                  <th className={`${thClass} text-center`}>On Time</th>
-                  <th className={`${thClass} text-center`}>Late Done</th>
-                  <th className={`${thClass} text-center`}>Not Done</th>
-                  <th className={`${thClass} text-right`}>Score</th>
+                  <th className={`${thClass} text-center`}>Tasks (Done/Assigned)</th>
+                  <th className={`${thClass} text-center`}>Task Score</th>
+                  <th className={`${thClass} text-center`}>Checklists (Done/Assigned)</th>
+                  <th className={`${thClass} text-center`}>Checklist Score</th>
+                  <th className={`${thClass} text-right`}>Avg Score</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
@@ -166,10 +168,10 @@ function PerformanceInner() {
                   <tr key={row.doerId} className={trClass}>
                     <td className={`${tdClass} text-center font-data-mono text-on-surface-variant`}>{i + 1}</td>
                     <td className={tdClass}>{row.doerName}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{row.assignedTasks}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{row.greenCount}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{row.yellowCount}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{row.redCount}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{row.completedTasks}/{row.assignedTasks}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{formatPct(row.taskScore ?? 0)}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{row.completedChecklists ?? 0}/{row.assignedChecklists ?? 0}</td>
+                    <td className={`${tdClass} text-center font-data-mono`}>{formatPct(row.checklistScore ?? 0)}</td>
                     <td className={`${tdClass} text-right font-data-mono font-bold`}>{formatPct(row.negativeScore)}</td>
                   </tr>
                 ))}

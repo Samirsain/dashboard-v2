@@ -362,6 +362,16 @@ export interface DgmaxEmployeeSummary {
   yellowCount: number;
   redCount: number;
   pendingCount: number;
+  taskScore: number;
+
+  assignedChecklists: number;
+  completedChecklists: number;
+  checklistGreenCount: number;
+  checklistYellowCount: number;
+  checklistRedCount: number;
+  checklistPendingCount: number;
+  checklistScore: number;
+
   negativeScore: number;
   performanceScore: number;
 }
