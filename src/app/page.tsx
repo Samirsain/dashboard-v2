@@ -373,11 +373,6 @@ function DashboardInner() {
                         <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs`}>
                           {formatDMY(r.dueDate)}
                           {overdue && <span className="ml-1 text-error">(overdue)</span>}
-                          {urgent && (
-                            <span className="ml-1 text-on-surface-variant">
-                              ({r.taskObj?.priority?.toLowerCase()})
-                            </span>
-                          )}
                         </td>
                         <td className={tdClass}>
                           <div className="flex items-center justify-center gap-2">
