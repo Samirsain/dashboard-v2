@@ -23,7 +23,7 @@ import {
 } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY, formatPct } from "@/lib/format";
-import { mondayOf, sundayOf, addDays, todayIso } from "@/lib/week";
+import { mondayOf, sundayOf, addDays, todayIso, getWeekNumber } from "@/lib/week";
 import { getTaskCategory, CATEGORY_LABEL } from "@/lib/scoring";
 import type { DgmaxWeeklySummary, List, Task, Doer } from "@/lib/types";
 
@@ -186,23 +186,13 @@ function TeamPerformanceInner() {
             onChange={(e) => e.target.value && setWeekStart(mondayOf(e.target.value))}
             className={`${fieldInlineClass} font-data-mono text-xs`}
           />
-          <span className="font-data-mono text-xs text-on-surface sm:text-sm">
-            {formatDMY(weekStart)} — {formatDMY(weekEnd)}{" "}
-            <span className="text-on-surface-variant">(Mon–Sun)</span>
+          <span className="font-data-mono text-xs font-bold text-on-surface sm:text-sm">
+            Week {getWeekNumber(weekStart)} &bull; {formatDMY(weekStart)} — {formatDMY(weekEnd)}{" "}
+            <span className="text-on-surface-variant font-normal">(Mon–Sun)</span>
           </span>
         </Toolbar>
 
         {error && <ErrorNote>{error}</ErrorNote>}
-
-        {/* Summary */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Team Avg Score" value={formatPct(totals.negativeScore)} />
-          <Stat label="Total Work" value={totals.assigned} />
-          <Stat label="On Time" value={totals.green} />
-          <Stat label="Late Done" value={totals.yellow} />
-          <Stat label="Not Done" value={totals.red} />
-          <Stat label="Not Yet Due" value={totals.pending} />
-        </div>
 
         {/* Formula */}
         <p className="border border-on-surface/25 px-3 py-2 font-data-mono text-[11px] leading-relaxed text-on-surface-variant">

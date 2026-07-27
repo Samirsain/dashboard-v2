@@ -36,3 +36,15 @@ export function mondayOf(iso: string = todayIso()): string {
 export function sundayOf(monday: string): string {
   return addDays(monday, 6);
 }
+
+/** Returns the ISO week number (1..53) for the week containing `iso`. */
+export function getWeekNumber(iso: string = todayIso()): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  const target = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  const dayNr = (target.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - dayNr + 3);
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const dayNrFirst = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - dayNrFirst + 3);
+  return 1 + Math.round((target.getTime() - firstThursday.getTime()) / (7 * 86400000));
+}

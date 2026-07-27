@@ -312,7 +312,7 @@ function AllTasksInner() {
                 {tab === "checklist" ? `All ${checklistStatus}` : "All Completed"}
               </h2>
               <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
-                {rows} {tab === "tasks" ? "tasks" : "checklist items"} &bull; Admin View
+                {rows} {tab === "tasks" ? "task list items" : "checklist items"} &bull; Admin View
               </p>
             </div>
             {tab === "checklist" && (
@@ -355,15 +355,15 @@ function AllTasksInner() {
                     : "border-2 border-on-surface px-4 py-1.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors focus:outline-none cursor-pointer"
                 }
               >
-                <option value="ALL">Tasks (All TL)</option>
-                <option value="OFFICE">Tasks (Office TL)</option>
+                <option value="ALL">Task List (All TL)</option>
+                <option value="OFFICE">Task List (Office TL)</option>
                 {lists
                   .filter((l) => l.type === "task")
                   .map((l) => {
                     const first = l.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
                     return (
                       <option key={l.id} value={l.id}>
-                        Tasks ({first} TL)
+                        Task List ({first} TL)
                       </option>
                     );
                   })}

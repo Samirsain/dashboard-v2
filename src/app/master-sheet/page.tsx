@@ -226,10 +226,11 @@ function MasterSheetInner() {
             )}
           </div>
 
-          <p className="font-data-mono text-data-mono text-on-surface-variant uppercase">
-            {rows.length} {rows.length === 1 ? "entry" : "entries"}
-            {!canEdit && " • Read Only"}
-          </p>
+          {!canEdit && (
+            <p className="font-data-mono text-data-mono text-on-surface-variant uppercase">
+              Read Only
+            </p>
+          )}
 
           {error && (
             <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>

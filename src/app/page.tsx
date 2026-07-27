@@ -290,9 +290,9 @@ function DashboardInner() {
           </div>
         )}
 
-        {/* Pending Tasks — all open items (tasks + checklist), All / Today */}
+        {/* Pending Tasks & Checklists — all open items (tasks + checklist), All / Today */}
         <Card
-          title={`Pending Tasks (${pendingRows.length})`}
+          title={`Pending Tasks & Checklists (${pendingRows.length})`}
           bodyClassName=""
           actions={
             <>

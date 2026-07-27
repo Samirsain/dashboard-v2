@@ -87,9 +87,23 @@ export default function MobileHeader() {
               <Link href="/" className={rowFor("/")}>
                 Dashboard
               </Link>
+              <Link href="/forms" className={rowFor("/forms")}>
+                Google Forms
+              </Link>
+              <Link href="/master-sheet" className={rowFor("/master-sheet")}>
+                Master Sheet
+              </Link>
+              {isAdmin && (
+                <Link href="/ims" className={rowFor("/ims")}>
+                  Inventory
+                </Link>
+              )}
+              <Link href="/workflow" className={rowFor("/workflow")}>
+                Workflow
+              </Link>
 
               {/* Task List + Checklist: hidden for plain doers (they use the
-                  dashboard's Pending Tasks instead). */}
+                  dashboard's Pending Tasks & Checklists instead). */}
               {user?.role !== "Doer" && (
                 <>
                   <button
@@ -138,24 +152,14 @@ export default function MobileHeader() {
                 </>
               )}
 
-              <Link href="/workflow" className={rowFor("/workflow")}>
-                Workflow
-              </Link>
-              <Link href="/master-sheet" className={rowFor("/master-sheet")}>
-                Master Sheet
-              </Link>
-              <Link href="/forms" className={rowFor("/forms")}>
-                Google Forms
-              </Link>
-              <Link href="/attendance" className={rowFor("/attendance")}>
-                Attendance
-              </Link>
-
               {canAccessAllTasks(user) && (
                 <Link href="/all-tasks" className={rowFor("/all-tasks")}>
                   All Tasks
                 </Link>
               )}
+              <Link href="/attendance" className={rowFor("/attendance")}>
+                Attendance
+              </Link>
               {isAdmin && (
                 <>
                   <Link href="/team-performance" className={rowFor("/team-performance")}>
@@ -163,9 +167,6 @@ export default function MobileHeader() {
                   </Link>
                   <Link href="/settings" className={rowFor("/settings")}>
                     Settings
-                  </Link>
-                  <Link href="/ims" className={rowFor("/ims")}>
-                    Inventory
                   </Link>
                 </>
               )}

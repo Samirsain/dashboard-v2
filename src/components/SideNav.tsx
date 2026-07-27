@@ -48,12 +48,10 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Dashboard</span>
         </Link>
 
-        {/* Workflow */}
-        <Link href="/workflow" className={active === "workflow" ? linkActive : linkBase}>
-          <span className="material-symbols-outlined" data-icon="account_tree">
-            account_tree
-          </span>
-          <span className={labelCls}>Workflow</span>
+        {/* Google Forms */}
+        <Link href="/forms" className={active === "forms" ? linkActive : linkBase}>
+          <GoogleFormsIcon className="w-6 h-6 shrink-0" />
+          <span className={labelCls}>Google Forms</span>
         </Link>
 
         {/* Master Sheet */}
@@ -64,21 +62,25 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Master Sheet</span>
         </Link>
 
-        {/* Form Responses */}
-        <Link href="/forms" className={active === "forms" ? linkActive : linkBase}>
-          <GoogleFormsIcon className="w-6 h-6 shrink-0" />
-          <span className={labelCls}>Google Forms</span>
-        </Link>
+        {/* Inventory (Admin only) */}
+        {user?.role === "Admin" && (
+          <Link href="/ims" className={active === "ims" ? linkActive : linkBase}>
+            <span className="material-symbols-outlined" data-icon="inventory_2">
+              inventory_2
+            </span>
+            <span className={labelCls}>Inventory</span>
+          </Link>
+        )}
 
-        {/* Attendance */}
-        <Link href="/attendance" className={active === "attendance" ? linkActive : linkBase}>
-          <span className="material-symbols-outlined" data-icon="badge">
-            badge
+        {/* Workflow */}
+        <Link href="/workflow" className={active === "workflow" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="account_tree">
+            account_tree
           </span>
-          <span className={labelCls}>Attendance</span>
+          <span className={labelCls}>Workflow</span>
         </Link>
 
-        {/* All Tasks: Admin, plus hardcoded full-task-access codes. */}
+        {/* All Tasks */}
         {canAccessAllTasks(user) && (
           <Link href="/all-tasks" className={active === "all-tasks" ? linkActive : linkBase}>
             <span className="material-symbols-outlined" data-icon="fact_check">
@@ -88,25 +90,25 @@ export default function SideNav({ active }: { active: NavKey }) {
           </Link>
         )}
 
-        {/* Admin-only */}
+        {/* Attendance */}
+        <Link href="/attendance" className={active === "attendance" ? linkActive : linkBase}>
+          <span className="material-symbols-outlined" data-icon="badge">
+            badge
+          </span>
+          <span className={labelCls}>Attendance</span>
+        </Link>
+
+        {/* Team Performance (Admin only) */}
         {user?.role === "Admin" && (
-          <>
-            <Link
-              href="/team-performance"
-              className={active === "team-performance" ? linkActive : linkBase}
-            >
-              <span className="material-symbols-outlined" data-icon="insights">
-                insights
-              </span>
-              <span className={labelCls}>Team Performance</span>
-            </Link>
-            <Link href="/ims" className={active === "ims" ? linkActive : linkBase}>
-              <span className="material-symbols-outlined" data-icon="inventory_2">
-                inventory_2
-              </span>
-              <span className={labelCls}>Inventory</span>
-            </Link>
-          </>
+          <Link
+            href="/team-performance"
+            className={active === "team-performance" ? linkActive : linkBase}
+          >
+            <span className="material-symbols-outlined" data-icon="insights">
+              insights
+            </span>
+            <span className={labelCls}>Team Performance</span>
+          </Link>
         )}
       </div>
 

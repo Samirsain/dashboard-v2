@@ -375,8 +375,8 @@ function ImsInner() {
                           <span className="text-on-surface-variant hidden sm:inline">— Stock critically low (order ≥ MOQ)</span>
                         </span>
                         <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
-                          <span className="inline-block w-2.5 h-2.5 bg-purple-200 border border-purple-500 flex-shrink-0"></span>
-                          <span className="text-purple-700 font-bold">Purple</span>
+                          <span className="inline-block w-2.5 h-2.5 bg-amber-200 border border-amber-500 flex-shrink-0"></span>
+                          <span className="text-amber-700 font-bold">Yellow</span>
                           <span className="text-on-surface-variant hidden sm:inline">— Stock slightly low (min. MOQ order)</span>
                         </span>
                         <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
@@ -418,7 +418,7 @@ function ImsInner() {
                               const rowStyle = isBigShortage
                                 ? { backgroundColor: "rgba(254,226,226,0.6)" }
                                 : isSmallShortage
-                                ? { backgroundColor: "rgba(216,180,254,0.35)", borderLeft: "3px solid #9333ea" }
+                                ? { backgroundColor: "rgba(254,240,138,0.45)", borderLeft: "3px solid #eab308" }
                                 : { backgroundColor: "rgba(209,250,229,0.5)" };
                               return (
                               <tr key={i.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0 transition-colors">
@@ -634,8 +634,8 @@ function ImsInner() {
                           <span className="text-on-surface-variant hidden sm:inline">— Stock critically low (order ≥ MOQ)</span>
                         </span>
                         <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
-                          <span className="inline-block w-2.5 h-2.5 bg-purple-200 border border-purple-500 flex-shrink-0"></span>
-                          <span className="text-purple-700 font-bold">Purple</span>
+                          <span className="inline-block w-2.5 h-2.5 bg-amber-200 border border-amber-500 flex-shrink-0"></span>
+                          <span className="text-amber-700 font-bold">Yellow</span>
                           <span className="text-on-surface-variant hidden sm:inline">— Stock slightly low (min. MOQ order)</span>
                         </span>
                         <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
@@ -675,12 +675,12 @@ function ImsInner() {
                               const rowStyle = isBigShortage
                                 ? { backgroundColor: "rgba(254,226,226,0.6)" }
                                 : isSmallShortage
-                                ? { backgroundColor: "rgba(216,180,254,0.35)", borderLeft: "3px solid #9333ea" }
+                                ? { backgroundColor: "rgba(254,240,138,0.45)", borderLeft: "3px solid #eab308" }
                                 : { backgroundColor: "rgba(209,250,229,0.5)" };
                               const qtyColor = isBigShortage
                                 ? "text-error"
                                 : isSmallShortage
-                                ? "text-purple-700"
+                                ? "text-amber-700"
                                 : "text-emerald-700";
                               return (
                               <tr key={r.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0">
