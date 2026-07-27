@@ -8,6 +8,7 @@ const tatSchema = z.string().refine((v) => {
 
 export const createWorkflowTemplateSchema = z.object({
   name: z.string().min(1),
+  link: z.string().url("Must be a valid URL").or(z.literal("")).default(""),
   steps: z
     .array(
       z.object({

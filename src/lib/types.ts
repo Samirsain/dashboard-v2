@@ -226,6 +226,7 @@ export interface WorkflowStep {
 export interface WorkflowTemplate {
   id: string;
   name: string;
+  link?: string;
   createdAt: string;
   steps: WorkflowStep[];
 }

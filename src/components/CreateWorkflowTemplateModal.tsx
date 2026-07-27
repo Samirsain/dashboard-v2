@@ -20,6 +20,7 @@ export default function CreateWorkflowTemplateModal({
   onCreated: (template: WorkflowTemplate) => void;
 }) {
   const [name, setName] = useState("");
+  const [link, setLink] = useState("");
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep(doers[0]?.id ?? "")]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -43,6 +44,7 @@ export default function CreateWorkflowTemplateModal({
     try {
       const template = await api.post<WorkflowTemplate>("/workflow/templates", {
         name,
+        link,
         steps: steps.map((s) => ({
           what: s.what,
           doerId: s.doerId,
@@ -65,7 +67,7 @@ export default function CreateWorkflowTemplateModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
       <div className="w-full max-w-2xl bg-surface-container-lowest border-2 border-on-surface max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md sticky top-0 bg-surface-container-lowest">
+        <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md sticky top-0 bg-surface-container-lowest z-10">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
             Create Workflow Template
           </h3>
@@ -88,6 +90,20 @@ export default function CreateWorkflowTemplateModal({
               placeholder="e.g. Video Production Pipeline"
               className={field}
             />
+          </div>
+
+          <div>
+            <label className={label}>Google Sheet / Connected Link (Optional)</label>
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              className={field}
+            />
+            <p className="mt-1 font-data-mono text-[10px] text-on-surface-variant uppercase">
+              Attach a Google Sheet link so users can open it directly from the workflow.
+            </p>
           </div>
 
           <div className="flex flex-col gap-stack-md">

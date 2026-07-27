@@ -16,9 +16,17 @@ export default function StartWorkflowInstanceModal({
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
-  const [link, setLink] = useState("");
+  const [link, setLink] = useState(templates[0]?.link ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function handleTemplateSelect(id: string) {
+    setTemplateId(id);
+    const selected = templates.find((t) => t.id === id);
+    if (selected?.link) {
+      setLink(selected.link);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -63,7 +71,7 @@ export default function StartWorkflowInstanceModal({
             <select
               required
               value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
+              onChange={(e) => handleTemplateSelect(e.target.value)}
               className={field}
             >
               {templates.map((t) => (

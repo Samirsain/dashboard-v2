@@ -210,25 +210,40 @@ function WorkflowInner() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {templates.map((t) => (
-                  <div key={t.id} className="border-2 border-on-surface p-stack-md">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-body-md text-body-md text-on-surface">{t.name}</span>
-                      {isAdmin && (
-                        <button
-                          onClick={() => handleDeleteTemplate(t.id)}
-                          className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                        >
-                          Delete
-                        </button>
-                      )}
+                  <div key={t.id} className="border-2 border-on-surface p-stack-md flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-body-md text-body-md text-on-surface font-semibold">{t.name}</span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteTemplate(t.id)}
+                            className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                      <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
+                        {t.steps.map((s) => (
+                          <li key={s.id}>
+                            {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
+                          </li>
+                        ))}
+                      </ol>
                     </div>
-                    <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
-                      {t.steps.map((s) => (
-                        <li key={s.id}>
-                          {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
-                        </li>
-                      ))}
-                    </ol>
+                    {t.link && (
+                      <div className="mt-3 pt-2 border-t border-outline-variant">
+                        <a
+                          href={t.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-label-sm uppercase text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded transition-colors"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>description</span>
+                          Open Google Sheet
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -261,6 +276,7 @@ function WorkflowInner() {
                 <thead>
                   <tr className="bg-surface-container-low border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface">
                     <th className="py-3 px-4">Title</th>
+                    <th className="py-3 px-4">Google Sheet</th>
                     <th className="py-3 px-4">Started</th>
                     <th className="py-3 px-4 text-right">Status</th>
                   </tr>
@@ -268,7 +284,7 @@ function WorkflowInner() {
                 <tbody className="font-body-md text-body-md text-on-surface">
                   {!loading && instances.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         No {statusFilter.toLowerCase()} runs.
                       </td>
                     </tr>
@@ -284,23 +300,28 @@ function WorkflowInner() {
                       <td className="py-4 px-4 font-medium">
                         <div className="flex items-center gap-2">
                           {inst.title}
-                          {inst.link && (
-                            <a
-                              href={inst.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-on-surface-variant hover:text-on-surface"
-                              title="Open Reference Link"
-                            >
-                              <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>open_in_new</span>
-                            </a>
-                          )}
                         </div>
                         {inst.details && (
                           <div className="font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5 truncate max-w-xs">
                             {inst.details}
                           </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-4">
+                        {inst.link ? (
+                          <a
+                            href={inst.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-xs font-label-sm uppercase text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-1 rounded transition-colors"
+                            title="Open Google Sheet"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>open_in_new</span>
+                            Open Sheet
+                          </a>
+                        ) : (
+                          <span className="text-on-surface-variant text-xs font-data-mono">—</span>
                         )}
                       </td>
                       <td className="py-4 px-4 font-data-mono text-data-mono text-on-surface-variant">
@@ -327,10 +348,10 @@ function WorkflowInner() {
                       href={selectedInstance.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors whitespace-nowrap"
+                      className="inline-flex items-center gap-1.5 border-2 border-emerald-600 bg-emerald-600 text-white px-4 py-1.5 font-label-sm text-label-sm uppercase hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
                     >
-                      <span className="material-symbols-outlined text-base" style={{ fontSize: "16px" }}>open_in_new</span>
-                      Open Link
+                      <span className="material-symbols-outlined text-base" style={{ fontSize: "18px" }}>description</span>
+                      Open Connected Google Sheet
                     </a>
                   )}
                 </div>

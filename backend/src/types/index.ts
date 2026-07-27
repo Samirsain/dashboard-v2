@@ -262,6 +262,7 @@ export interface DepartmentWiseTaskStat {
 export interface WorkflowTemplate {
   id: string;
   name: string;
+  link?: string;
   createdAt: string;
 }
 
