@@ -352,7 +352,10 @@ function DashboardInner() {
                       r.kind === "task" &&
                       (r.taskObj?.priority === "Urgent" || r.taskObj?.priority === "Critical");
                     return (
-                      <tr key={`${r.kind}-${r.id}`} className={trClass}>
+                      <tr
+                        key={`${r.kind}-${r.id}`}
+                        className={`${trClass} ${urgent ? "!bg-[#fef08a] hover:!bg-[#fde047] !text-black" : ""}`}
+                      >
                         <td className={`${tdClass} min-w-[200px]`}>{r.task}</td>
                         <td className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
                           {r.systemName}
