@@ -26,7 +26,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import { canAccessAllTasks } from "@/lib/access";
+import { canAccessAllTasks, canManageDoers } from "@/lib/access";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
@@ -267,7 +267,7 @@ function DashboardInner() {
               >
                 Help Ticket
               </Link>
-              {isAdmin && (
+              {canManageDoers(user) && (
                 <Link href="/settings" className={buttonClass("secondary")}>
                   Settings
                 </Link>

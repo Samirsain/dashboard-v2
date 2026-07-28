@@ -6,7 +6,8 @@ import type { Doer } from "./types";
  * MD has everything. PC is a deputy: full access EXCEPT four things that stay
  * with the MD alone —
  *   1. deleting a task
- *   2. deleting a doer
+ *   2. Doer Management (Settings) — adding, renaming, deleting doers,
+ *      resetting passwords, and managing list access, all of it
  *   3. Team Performance (the scoreboard)
  *   4. editing attendance records
  *
@@ -38,16 +39,6 @@ export function canMarkAttendance(user: Doer | null | undefined): boolean {
   return user.isAttendanceManager === true;
 }
 
-/** Add or rename doers, reset their passwords, manage their list access. */
-export function canManageDoers(user: Doer | null | undefined): boolean {
-  return isManager(user);
-}
-
-/** Create, rename and delete lists. */
-export function canManageLists(user: Doer | null | undefined): boolean {
-  return isManager(user);
-}
-
 // ---- MD-only ---------------------------------------------------------------
 
 /** Delete a task. Blocked for PC. */
@@ -55,8 +46,22 @@ export function canDeleteTask(user: Doer | null | undefined): boolean {
   return isMd(user);
 }
 
-/** Delete a doer. Blocked for PC. */
+/**
+ * Open Settings / Doer Management at all — add, rename, delete a doer, reset
+ * passwords, toggle list access. A PC gets none of it, not even a read-only
+ * peek; the whole page (and its nav link) is gated on this.
+ */
+export function canManageDoers(user: Doer | null | undefined): boolean {
+  return isMd(user);
+}
+
+/** Delete a doer specifically — kept separate for the delete button's own guard. */
 export function canDeleteDoer(user: Doer | null | undefined): boolean {
+  return isMd(user);
+}
+
+/** Create, rename and delete lists. Part of Doer Management — MD only. */
+export function canManageLists(user: Doer | null | undefined): boolean {
   return isMd(user);
 }
 

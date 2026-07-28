@@ -14,17 +14,20 @@ const router = Router();
 
 router.use(requireAuth);
 
+// Doer Management (create/update/delete/reset-password) is MD-only — a PC
+// doesn't get this at all, not even create/rename. GET stays open to everyone
+// so the rest of the app can still resolve names/roles.
 router.get("/", usersController.list);
 router.get("/:id", validate({ params: idParamSchema }), usersController.getById);
 router.post(
   "/",
-  requireRole("MD", "PC"),
+  requireRole("MD"),
   validate({ body: createUserSchema }),
   usersController.create
 );
 router.patch(
   "/:id",
-  requireRole("MD", "PC"),
+  requireRole("MD"),
   validate({ params: idParamSchema, body: updateUserSchema }),
   usersController.update
 );
@@ -37,7 +40,7 @@ router.delete(
 );
 router.post(
   "/:id/reset-password",
-  requireRole("MD", "PC"),
+  requireRole("MD"),
   validate({ params: idParamSchema, body: resetPasswordSchema }),
   usersController.resetPassword
 );

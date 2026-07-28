@@ -224,7 +224,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
 
   /** Filtered range rows based on doer selection */
   const filteredRangeRows = useMemo(() => {
-    const nonAdmins = rangeRows.filter((r) => r.employee.role !== "MD" && r.employee.role !== "PC");
+    const nonAdmins = rangeRows.filter((r) => r.employee.role !== "MD");
     if (!reportDoer) return nonAdmins;
     return nonAdmins.filter((r) => r.employee.id === reportDoer);
   }, [rangeRows, reportDoer]);
@@ -267,7 +267,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
   }, [date]);
 
   const filteredRows = useMemo(() => {
-    const nonAdmins = rows.filter((r) => r.employee.role !== "MD" && r.employee.role !== "PC");
+    const nonAdmins = rows.filter((r) => r.employee.role !== "MD");
     if (!search) return nonAdmins;
     const q = search.toLowerCase();
     return nonAdmins.filter((r) => r.employee.name.toLowerCase().includes(q) || r.employee.department.toLowerCase().includes(q));
@@ -502,7 +502,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
             className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px]"
           >
             <option value="">All Employees</option>
-            {rangeRows.filter((r) => r.employee.role !== "MD" && r.employee.role !== "PC").map(({ employee }) => (
+            {rangeRows.filter((r) => r.employee.role !== "MD").map(({ employee }) => (
               <option key={employee.id} value={employee.id}>{employee.name}</option>
             ))}
           </select>

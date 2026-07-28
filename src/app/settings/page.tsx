@@ -10,7 +10,7 @@ import CreateListModal from "@/components/CreateListModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { canDeleteDoer } from "@/lib/access";
+import { canDeleteDoer, canManageDoers } from "@/lib/access";
 import type { Doer, List } from "@/lib/types";
 
 /** First word of a list's name, uppercased — "SAHIL SIR TASKLIST" -> "SAHIL". */
@@ -535,12 +535,13 @@ function SettingsInner() {
 export default function SettingsPage() {
   const { user } = useAuth();
 
-  if (user && user.role !== "MD" && user.role !== "PC") {
+  // Doer Management is MD-only — a PC gets everything else, but not this.
+  if (user && !canManageDoers(user)) {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <p className="font-data-mono text-data-mono text-error uppercase border-2 border-error p-4">
-            Access Denied. MD or PC Only.
+            Access Denied. MD Only.
           </p>
         </div>
       </AuthGuard>
