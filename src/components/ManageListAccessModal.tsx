@@ -72,7 +72,7 @@ export default function ManageListAccessModal({
 
         <div className="p-stack-lg flex flex-col gap-stack-md">
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Select which employees can access this list. Admins always can.
+            Select which employees can access this list. MDs always can.
           </p>
           <div className="flex flex-col gap-1 max-h-72 overflow-y-auto border-2 border-on-surface">
             {doers.map((d) => (

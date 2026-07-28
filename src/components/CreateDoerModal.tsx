@@ -29,7 +29,7 @@ export default function CreateDoerModal({
   const [submitting, setSubmitting] = useState(false);
 
   // Auto-fill the password from the employee code (EM07 -> EM@07) until the
-  // admin edits it by hand.
+  // MD edits it by hand.
   const effectivePassword = passwordTouched ? password : passwordFromCode(employeeCode);
 
   async function handleSubmit(e: FormEvent) {

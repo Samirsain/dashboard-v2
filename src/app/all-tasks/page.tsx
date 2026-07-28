@@ -312,7 +312,7 @@ function AllTasksInner() {
                 {tab === "checklist" ? `All ${checklistStatus}` : "All Completed"}
               </h2>
               <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
-                {rows} {tab === "tasks" ? "task list items" : "checklist items"} &bull; Admin View
+                {rows} {tab === "tasks" ? "task list items" : "checklist items"} &bull; MD View
               </p>
             </div>
             {tab === "checklist" && (

@@ -622,7 +622,7 @@ function FormsInner() {
               </button>
               {showFormAccess && (
                 <p className="font-data-mono text-xs text-on-surface-variant uppercase">
-                  Which doers can see each form&apos;s responses. Admin always sees everything.
+                  Which doers can see each form&apos;s responses. MD always sees everything.
                 </p>
               )}
             </div>
@@ -649,7 +649,7 @@ function FormsInner() {
                           >
                             <span className="truncate">
                               {f.memberIds.length === 0
-                                ? "Admin only"
+                                ? "MD only"
                                 : `${f.memberIds.length} doer${f.memberIds.length === 1 ? "" : "s"}`}
                             </span>
                             <span className="material-symbols-outlined text-base">

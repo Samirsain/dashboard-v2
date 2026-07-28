@@ -98,7 +98,7 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Attendance</span>
         </Link>
 
-        {/* Team Performance (Admin only) */}
+        {/* Team Performance (MD only) */}
         {user?.role === "MD" && (
           <Link
             href="/team-performance"

@@ -26,11 +26,13 @@ async function run() {
 
       await dataService.updateById(sheetsConfig.users, id, {
         PasswordHash: passwordHash,
+        "Employee Code": "MD01",
+        Name: "MD",
       });
 
-      console.log(`\n✅ Reset password for MD User:`);
-      console.log(`Name: ${name}`);
-      console.log(`Login ID (Employee Code): ${code || "No code found!"}`);
+      console.log(`\n✅ Reset password and updated ID for MD User:`);
+      console.log(`Name: MD`);
+      console.log(`Login ID (Employee Code): MD01`);
       console.log(`New Password: ${newPassword}`);
     }
   } catch (err) {

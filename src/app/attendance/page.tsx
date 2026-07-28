@@ -125,7 +125,7 @@ function EmployeeView() {
           <p className="mt-4 font-data-mono text-xs text-on-surface-variant">Remarks: {today.remarks}</p>
         )}
         <p className="mt-4 font-data-mono text-xs text-on-surface-variant">
-          Attendance is marked by your Attendance Manager or Admin — you can&apos;t edit it here.
+          Attendance is marked by your Attendance Manager or MD — you can&apos;t edit it here.
         </p>
       </div>
 
@@ -194,7 +194,7 @@ function EmployeeView() {
   );
 }
 
-/** Attendance Manager / Admin dashboard: mark attendance for every employee. */
+/** Attendance Manager / MD dashboard: mark attendance for every employee. */
 function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   const [date, setDate] = useState(todayIso());
   const [rows, setRows] = useState<AttendanceDayRow[]>([]);

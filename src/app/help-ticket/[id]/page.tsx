@@ -170,7 +170,7 @@ function TicketDetailsInner() {
               {/* Solution Section */}
               {ticket.solution && (
                 <div className="border-2 border-primary bg-primary/5 p-6 flex flex-col gap-4">
-                  <h4 className="font-headline-md text-headline-md text-primary uppercase">Admin Solution</h4>
+                  <h4 className="font-headline-md text-headline-md text-primary uppercase">MD Solution</h4>
                   <div className="bg-surface p-4 border border-primary/20 text-on-surface whitespace-pre-wrap font-body-lg text-body-lg">
                     {ticket.solution}
                   </div>
@@ -197,7 +197,7 @@ function TicketDetailsInner() {
                 </div>
               )}
 
-              {/* Admin Input Form */}
+              {/* MD Input Form */}
               {isAdmin && (ticket.status === "Pending" || ticket.status === "Reopened") && (
                 <div className="border-2 border-on-surface bg-surface p-6 flex flex-col gap-6">
                   <h4 className="font-headline-md text-headline-md text-on-surface uppercase">Provide Solution</h4>
