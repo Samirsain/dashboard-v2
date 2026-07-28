@@ -85,7 +85,7 @@ function listGroupKey(name: string): string {
 
 function DashboardInner() {
   const { user, logout } = useAuth();
-  const isAdmin = user?.role === "Admin";
+  const isAdmin = user?.role === "MD";
   const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [pendingChecklist, setPendingChecklist] = useState<ChecklistInstance[]>([]);
@@ -163,9 +163,9 @@ function DashboardInner() {
     }
   }
 
-  const isPrivileged = user?.role === "Admin";
+  const isPrivileged = user?.role === "MD";
   const canCreateTasks = canAccessAllTasks(user);
-  const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "Admin");
+  const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "MD" || d.role === "PC");
   const taskLists = lists.filter((l) => l.type === "task");
   const checklistLists = lists.filter((l) => l.type === "checklist");
   const showDoerColumn = canAccessAllTasks(user);

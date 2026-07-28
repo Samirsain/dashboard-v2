@@ -732,12 +732,12 @@ function ImsInner() {
 export default function ImsPage() {
   const { user } = useAuth();
 
-  if (user && user.role !== "Admin") {
+  if (user && user.role !== "MD" && user.role !== "PC") {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <p className="font-data-mono text-data-mono text-error uppercase border-2 border-error p-4">
-            Access Denied. Admins Only.
+          Access Denied. MD / PC Only.
           </p>
         </div>
       </AuthGuard>

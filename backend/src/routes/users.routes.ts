@@ -18,26 +18,26 @@ router.get("/", usersController.list);
 router.get("/:id", validate({ params: idParamSchema }), usersController.getById);
 router.post(
   "/",
-  requireRole("Admin"),
+  requireRole("MD"),
   validate({ body: createUserSchema }),
   usersController.create
 );
 router.patch(
   "/:id",
-  requireRole("Admin"),
+  requireRole("MD"),
   validate({ params: idParamSchema, body: updateUserSchema }),
   usersController.update
 );
 router.delete(
   "/:id",
-  requireRole("Admin"),
+  requireRole("MD"),
   forbidAssistant,
   validate({ params: idParamSchema }),
   usersController.remove
 );
 router.post(
   "/:id/reset-password",
-  requireRole("Admin"),
+  requireRole("MD"),
   validate({ params: idParamSchema, body: resetPasswordSchema }),
   usersController.resetPassword
 );

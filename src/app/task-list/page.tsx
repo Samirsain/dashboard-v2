@@ -11,11 +11,19 @@ import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import { canAccessAllTasks } from "@/lib/access";
+import { canAccessAllTasks, canDeleteTask } from "@/lib/access";
 import type { Doer, List, Task } from "@/lib/types";
 
 function isUrgentPriority(priority: Task["priority"]): boolean {
   return priority === "Urgent" || priority === "Critical";
+}
+
+/** True if the task's due date is in the past and it is not yet done. */
+function isOverdue(task: Task): boolean {
+  if (!task.dueDate) return false;
+  if (task.status === "Completed" || task.status === "Cancelled") return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return task.dueDate < today;
 }
 
 function TaskListInner() {
@@ -30,6 +38,7 @@ function TaskListInner() {
   const [doerFilter, setDoerFilter] = useState("");
   const { user } = useAuth();
   const canCreateTasks = canAccessAllTasks(user);
+  const canDelete = canDeleteTask(user);
 
   async function loadData() {
     setLoading(true);
@@ -41,7 +50,7 @@ function TaskListInner() {
         api.get<List[]>("/lists?type=task").catch(() => [] as List[]),
       ]);
       setTasks(taskData);
-      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "Admin"));
+      setDoers(doerData.filter(d => d.role === "Doer" || d.role === "MD" || d.role === "PC"));
       setLists(listData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load tasks.");
@@ -265,7 +274,7 @@ function TaskListInner() {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
+                    <td className={`py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono${isOverdue(task) ? " text-error font-bold" : ""}`}>
                       {formatDMY(task.dueDate)}
                     </td>
                     <td className="py-3 px-4 text-center">

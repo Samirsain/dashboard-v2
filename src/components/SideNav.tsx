@@ -62,8 +62,8 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Master Sheet</span>
         </Link>
 
-        {/* Inventory (Admin only) */}
-        {user?.role === "Admin" && (
+        {/* Inventory (MD + PC only) */}
+        {(user?.role === "MD" || user?.role === "PC") && (
           <Link href="/ims" className={active === "ims" ? linkActive : linkBase}>
             <span className="material-symbols-outlined" data-icon="inventory_2">
               inventory_2
@@ -99,7 +99,7 @@ export default function SideNav({ active }: { active: NavKey }) {
         </Link>
 
         {/* Team Performance (Admin only) */}
-        {user?.role === "Admin" && (
+        {user?.role === "MD" && (
           <Link
             href="/team-performance"
             className={active === "team-performance" ? linkActive : linkBase}

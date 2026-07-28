@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: Ticket["status"] }) {
 
 function HelpTicketInner() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "Admin";
+  const isAdmin = user?.role === "MD" || user?.role === "PC";
   
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [stats, setStats] = useState<TicketDashboardStats | null>(null);

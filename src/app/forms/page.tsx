@@ -482,10 +482,10 @@ function FormResponsesSection({
 
 function FormsInner() {
   const { user } = useAuth();
-  const canManage = user?.role === "Admin";
-  const canDelete = user?.role === "Admin";
+  const canManage = user?.role === "MD" || user?.role === "PC";
+  const canDelete = user?.role === "MD";
 
-  const canManageAccess = user?.role === "Admin";
+  const canManageAccess = user?.role === "MD" || user?.role === "PC";
 
   const [forms, setForms] = useState<FormConfig[]>([]);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
@@ -523,7 +523,7 @@ function FormsInner() {
     if (canManageAccess) {
       api
         .get<Doer[]>("/users")
-        .then((all) => setDoers(all.filter((d) => d.role === "Doer" || d.role === "Admin")))
+        .then((all) => setDoers(all.filter((d) => d.role === "Doer" || d.role === "MD" || d.role === "PC")))
         .catch(() => setDoers([]));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

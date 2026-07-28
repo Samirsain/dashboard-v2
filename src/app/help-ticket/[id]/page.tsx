@@ -29,7 +29,7 @@ function TicketDetailsInner() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const { user } = useAuth();
-  const isAdmin = user?.role === "Admin";
+  const isAdmin = user?.role === "MD" || user?.role === "PC";
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);

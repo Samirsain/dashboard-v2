@@ -53,7 +53,7 @@ function formatTs(ts: string): string {
 
 function WorkflowInner() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "Admin";
+  const isAdmin = user?.role === "MD" || user?.role === "PC";
 
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
@@ -77,7 +77,7 @@ function WorkflowInner() {
         api.get<WorkflowInstance[]>(`/workflow/instances?status=${statusFilter}`),
       ]);
       setTemplates(templateData);
-      setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "Admin"));
+      setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "MD" || d.role === "PC"));
       setInstances(instanceData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load workflow data.");

@@ -16,7 +16,7 @@ import type {
 
 /** Attendance Managers (non-Admin) may only mark/edit today's attendance. */
 function assertEditableDate(req: Request, date: string): void {
-  if (req.user!.role === "Admin") return;
+  if (req.user!.role === "MD" || req.user!.role === "PC") return;
   if (date !== todayIso()) {
     throw AppError.forbidden("Only today's attendance can be marked.", "PAST_DATE_LOCKED");
   }
@@ -24,7 +24,7 @@ function assertEditableDate(req: Request, date: string): void {
 
 function requireMarker(req: Request): void {
   if (!canMarkAttendance(req.user)) {
-    throw AppError.forbidden("Only the Attendance Manager or Admin can mark attendance.", "NOT_ATTENDANCE_MANAGER");
+    throw AppError.forbidden("Only the Attendance Manager, MD, or PC can mark attendance.", "NOT_ATTENDANCE_MANAGER");
   }
 }
 

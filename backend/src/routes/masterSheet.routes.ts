@@ -17,19 +17,19 @@ router.use(requireAuth);
 router.get("/", masterSheetController.list);
 router.post(
   "/",
-  requireRole("Admin"),
+  requireRole("MD", "PC"),
   validate({ body: createMasterSheetSchema }),
   masterSheetController.create
 );
 router.patch(
   "/:id",
-  requireRole("Admin"),
+  requireRole("MD", "PC"),
   validate({ params: idParamSchema, body: updateMasterSheetSchema }),
   masterSheetController.update
 );
 router.delete(
   "/:id",
-  requireRole("Admin"),
+  requireRole("MD"),
   validate({ params: idParamSchema }),
   masterSheetController.remove
 );

@@ -17,7 +17,7 @@ import {
 const router = Router();
 
 router.use(requireAuth);
-router.use(requireRole("Admin"));
+router.use(requireRole("MD", "PC"));
 
 // Item List
 router.get("/items", imsController.listItems);

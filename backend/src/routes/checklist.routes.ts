@@ -24,13 +24,13 @@ router.post(
 // Any doer may create templates; changing or deleting them stays restricted.
 router.patch(
   "/templates/:id",
-  requireRole("Admin"),
+  requireRole("MD"),
   validate({ params: idParamSchema, body: updateChecklistTemplateSchema }),
   checklistController.updateTemplate
 );
 router.delete(
   "/templates/:id",
-  requireRole("Admin"),
+  requireRole("MD"),
   forbidAssistant,
   validate({ params: idParamSchema }),
   checklistController.removeTemplate
@@ -44,8 +44,8 @@ router.post(
   validate({ params: idParamSchema }),
   checklistController.completeInstance
 );
-// Irreversible — wipes every Completed checklist instance. Admin only (Team Performance reset).
-router.delete("/instances/completed", requireRole("Admin"), checklistController.removeCompletedInstances);
+// Irreversible — wipes every Completed checklist instance. MD only (Team Performance reset).
+router.delete("/instances/completed", requireRole("MD"), checklistController.removeCompletedInstances);
 router.post("/generate", checklistController.generateToday);
 
 export default router;

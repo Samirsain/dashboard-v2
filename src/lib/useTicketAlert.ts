@@ -25,7 +25,7 @@ export function useHelpTicketAlert(): boolean {
       .then((tickets) => {
         if (cancelled) return;
         const alert =
-          user.role === "Admin"
+          user.role === "MD" || user.role === "PC"
             ? tickets.some((t) => t.status === "Pending" || t.status === "Reopened")
             : tickets.some((t) => t.status === "Waiting for Employee");
         setHasAlert(alert);

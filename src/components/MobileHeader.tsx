@@ -41,7 +41,7 @@ export default function MobileHeader() {
 
   const taskLists = lists.filter((l) => l.type === "task");
   const checklists = lists.filter((l) => l.type === "checklist");
-  const isAdmin = user?.role === "Admin";
+  const isAdmin = user?.role === "MD";
 
   const rowBase =
     "block px-4 py-3 font-headline-md text-base uppercase tracking-tight border-l-4 transition-colors";

@@ -60,7 +60,7 @@ export function buildDgmaxWeeklySummary(
   lateDoneWeight: number = DEFAULT_LATE_DONE_WEIGHT
 ): DgmaxWeeklySummary {
   const originalDueDates = buildOriginalDueDates(revisions);
-  const doers = users.filter((u) => u.status === "Active" && u.role !== "Admin");
+  const doers = users.filter((u) => u.status === "Active" && u.role !== "MD" && u.role !== "PC");
   const weight = Math.min(100, Math.max(0, lateDoneWeight));
 
   const summaryMap = new Map<string, DgmaxEmployeeSummary>();

@@ -18,7 +18,7 @@ export class TicketController {
 
   async getTickets(req: Request, res: Response, next: NextFunction) {
     try {
-      if (req.user!.role === "Admin") {
+      if (req.user!.role === "MD" || req.user!.role === "PC") {
         const tickets = await ticketService.getAllTickets();
         res.json(tickets);
       } else {
@@ -51,7 +51,7 @@ export class TicketController {
 
   async provideSolution(req: Request, res: Response, next: NextFunction) {
     try {
-      if (req.user!.role !== "Admin") {
+      if (req.user!.role !== "MD" && req.user!.role !== "PC") {
         return res.status(403).json({ error: "Only admins can provide solutions" });
       }
       const { solution, solutionType } = req.body;
@@ -64,7 +64,7 @@ export class TicketController {
 
   async getDashboardStats(req: Request, res: Response, next: NextFunction) {
     try {
-      if (req.user!.role !== "Admin") {
+      if (req.user!.role !== "MD" && req.user!.role !== "PC") {
         return res.status(403).json({ error: "Only admins can view stats" });
       }
       const stats = await ticketService.getDashboardStats();

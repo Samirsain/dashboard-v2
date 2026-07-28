@@ -7,7 +7,7 @@ import type { JwtClaims } from "../types";
  * Settings isn't reliable — grants the specific capability directly off the
  * JWT's employeeCode instead of a DB lookup.
  */
-const HARDCODED_FULL_TASK_ACCESS_CODES = ["TM03"];
+const HARDCODED_FULL_TASK_ACCESS_CODES: string[] = [];
 
 function hasHardcodedFullTaskAccess(user: JwtClaims | undefined): boolean {
   if (!user?.employeeCode) return false;
@@ -24,7 +24,7 @@ function hasHardcodedFullTaskAccess(user: JwtClaims | undefined): boolean {
  */
 export function canViewAllData(user: JwtClaims | undefined): boolean {
   if (!user) return false;
-  if (user.role === "Admin") return true;
+  if (user.role === "MD" || user.role === "PC") return true;
   if (hasHardcodedFullTaskAccess(user)) return true;
   return user.canViewAll === true;
 }
@@ -36,7 +36,7 @@ export function canViewAllData(user: JwtClaims | undefined): boolean {
  */
 export function canCreateTask(user: JwtClaims | undefined): boolean {
   if (!user) return false;
-  if (user.role === "Admin") return true;
+  if (user.role === "MD" || user.role === "PC") return true;
   return hasHardcodedFullTaskAccess(user);
 }
 
@@ -50,7 +50,7 @@ export function canCreateTask(user: JwtClaims | undefined): boolean {
  */
 export function canMarkAttendance(user: JwtClaims | undefined): boolean {
   if (!user) return false;
-  if (user.role === "Admin") return true;
+  if (user.role === "MD" || user.role === "PC") return true;
   if (hasHardcodedFullTaskAccess(user)) return true;
   return user.isAttendanceManager === true;
 }

@@ -27,11 +27,11 @@ router.post("/mark", validate({ body: markStatusSchema }), attendanceController.
 router.post("/check-in", validate({ body: checkInOutSchema }), attendanceController.checkIn);
 router.post("/check-out", validate({ body: checkInOutSchema }), attendanceController.checkOut);
 router.patch("/remarks", validate({ body: remarksSchema }), attendanceController.setRemarks);
-// Irreversible — wipes every attendance record for every employee/date. Admin only.
-router.delete("/all", requireRole("Admin"), attendanceController.clearAll);
-// Re-applies the current policy to already-marked rows (fixes old statuses). Admin only.
-router.post("/recompute", requireRole("Admin"), attendanceController.recompute);
-// Directly edit check-in/check-out time and/or status for any date. Admin only.
-router.patch("/edit", requireRole("Admin"), validate({ body: editAttendanceSchema }), attendanceController.editRecord);
+// Irreversible — wipes every attendance record for every employee/date. MD only.
+router.delete("/all", requireRole("MD"), attendanceController.clearAll);
+// Re-applies the current policy to already-marked rows (fixes old statuses). MD only.
+router.post("/recompute", requireRole("MD"), attendanceController.recompute);
+// Directly edit check-in/check-out time and/or status for any date. MD only.
+router.patch("/edit", requireRole("MD"), validate({ body: editAttendanceSchema }), attendanceController.editRecord);
 
 export default router;

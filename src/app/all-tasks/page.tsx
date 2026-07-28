@@ -103,7 +103,7 @@ function AllTasksInner() {
 
   // People who can be assigned work — shown in the doer filter dropdown.
   const doerOptions = useMemo(
-    () => users.filter((u) => u.role === "Doer" || u.role === "Admin"),
+    () => users.filter((u) => u.role === "Doer" || u.role === "MD" || u.role === "PC"),
     [users]
   );
 
@@ -544,7 +544,7 @@ function AllTasksInner() {
                             {t.frequency}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            {currentUser?.role === "Admin" && (
+                            {currentUser?.role === "MD" && (
                               <button
                                 onClick={() => handleDeleteChecklistTask(t)}
                                 className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
@@ -565,7 +565,7 @@ function AllTasksInner() {
                           <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(checklistCompletedOn(c))}</td>
                           <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
                           <td className="py-3 px-4 text-center">
-                            {currentUser?.role === "Admin" && (
+                            {currentUser?.role === "MD" && (
                               <button
                                 onClick={() => handleDeleteChecklistTask({ id: c.templateId, taskName: c.taskName })}
                                 className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
@@ -594,7 +594,7 @@ export default function AllTasksPage() {
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <p className="font-data-mono text-data-mono text-error uppercase border-2 border-error p-4">
-            Access Denied. Admins Only.
+            Access Denied. Privileged role required.
           </p>
         </div>
       </AuthGuard>

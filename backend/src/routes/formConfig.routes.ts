@@ -21,25 +21,25 @@ router.get("/:id/responses", validate({ params: idParamSchema }), formConfigCont
 router.get("/:id/statuses", validate({ params: idParamSchema }), formConfigController.statuses);
 router.patch(
   "/:id/statuses/:row",
-  requireRole("Admin"),
+  requireRole("MD", "PC"),
   validate({ params: rowParamSchema, body: setFormResponseStatusSchema }),
   formConfigController.setStatus
 );
 router.post(
   "/",
-  requireRole("Admin"),
+  requireRole("MD", "PC"),
   validate({ body: createFormConfigSchema }),
   formConfigController.create
 );
 router.patch(
   "/:id/members",
-  requireRole("Admin"),
+  requireRole("MD", "PC"),
   validate({ params: idParamSchema, body: updateFormMembersSchema }),
   formConfigController.updateMembers
 );
 router.delete(
   "/:id",
-  requireRole("Admin"),
+  requireRole("MD"),
   validate({ params: idParamSchema }),
   formConfigController.remove
 );

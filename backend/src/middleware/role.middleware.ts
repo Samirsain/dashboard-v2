@@ -25,7 +25,7 @@ export function requireTaskCreateAccess(req: Request, _res: Response, next: Next
     return;
   }
   if (!canCreateTask(req.user)) {
-    next(AppError.forbidden("Only Admin can create tasks."));
+    next(AppError.forbidden("Only MD/PC can create tasks."));
     return;
   }
   next();

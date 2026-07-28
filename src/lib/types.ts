@@ -1,4 +1,4 @@
-export type UserRole = "Admin" | "Doer";
+export type UserRole = "MD" | "PC" | "Doer";
 export type UserStatus = "Active" | "Inactive";
 
 export interface Doer {

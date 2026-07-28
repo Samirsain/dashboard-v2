@@ -219,7 +219,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
 
   /** Filtered range rows based on doer selection */
   const filteredRangeRows = useMemo(() => {
-    const nonAdmins = rangeRows.filter((r) => r.employee.role !== "Admin");
+    const nonAdmins = rangeRows.filter((r) => r.employee.role !== "MD" && r.employee.role !== "PC");
     if (!reportDoer) return nonAdmins;
     return nonAdmins.filter((r) => r.employee.id === reportDoer);
   }, [rangeRows, reportDoer]);
@@ -262,7 +262,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
   }, [date]);
 
   const filteredRows = useMemo(() => {
-    const nonAdmins = rows.filter((r) => r.employee.role !== "Admin");
+    const nonAdmins = rows.filter((r) => r.employee.role !== "MD" && r.employee.role !== "PC");
     if (!search) return nonAdmins;
     const q = search.toLowerCase();
     return nonAdmins.filter((r) => r.employee.name.toLowerCase().includes(q) || r.employee.department.toLowerCase().includes(q));
@@ -497,7 +497,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
             className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px]"
           >
             <option value="">All Employees</option>
-            {rangeRows.filter((r) => r.employee.role !== "Admin").map(({ employee }) => (
+            {rangeRows.filter((r) => r.employee.role !== "MD" && r.employee.role !== "PC").map(({ employee }) => (
               <option key={employee.id} value={employee.id}>{employee.name}</option>
             ))}
           </select>
@@ -610,7 +610,7 @@ function AttendanceInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg max-w-full overflow-hidden">
-          {isMarker ? <ManagerView isAdmin={user?.role === "Admin"} /> : <EmployeeView />}
+          {isMarker ? <ManagerView isAdmin={user?.role === "MD" || user?.role === "PC"} /> : <EmployeeView />}
         </main>
       </div>
     </>

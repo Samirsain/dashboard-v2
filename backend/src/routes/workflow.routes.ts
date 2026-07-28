@@ -19,13 +19,13 @@ router.get("/templates", workflowController.listTemplates);
 router.get("/templates/:id", validate({ params: idParamSchema }), workflowController.getTemplate);
 router.post(
   "/templates",
-  requireRole("Admin"),
+  requireRole("MD", "PC"),
   validate({ body: createWorkflowTemplateSchema }),
   workflowController.createTemplate
 );
 router.delete(
   "/templates/:id",
-  requireRole("Admin"),
+  requireRole("MD", "PC"),
   validate({ params: idParamSchema }),
   workflowController.removeTemplate
 );

@@ -1,4 +1,4 @@
-export type UserRole = "Admin" | "Doer";
+export type UserRole = "MD" | "PC" | "Doer";
 export type UserStatus = "Active" | "Inactive";
 
 /** A row from DOERLIST — the master employee table. `id` is the Doer ID. */

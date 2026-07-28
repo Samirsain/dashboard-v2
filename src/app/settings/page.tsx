@@ -289,11 +289,12 @@ function SettingsInner() {
                       <select
                         value={d.role}
                         onChange={(e) => handleRoleChange(d, e.target.value as Doer["role"])}
-                        title="Admin gets full access (Settings, Team Performance, All Tasks)"
+                        title="MD gets full access (Settings, Team Performance, All Tasks); PC gets task/attendance/IMS access"
                         className="border-2 border-on-surface bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
                       >
                         <option value="Doer">Doer</option>
-                        <option value="Admin">Admin</option>
+                        <option value="PC">PC</option>
+                        <option value="MD">MD</option>
                       </select>
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant align-top">
@@ -495,12 +496,12 @@ function SettingsInner() {
 export default function SettingsPage() {
   const { user } = useAuth();
 
-  if (user && user.role !== "Admin") {
+  if (user && user.role !== "MD") {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <p className="font-data-mono text-data-mono text-error uppercase border-2 border-error p-4">
-            Access Denied. Admins Only.
+            Access Denied. MD Only.
           </p>
         </div>
       </AuthGuard>
