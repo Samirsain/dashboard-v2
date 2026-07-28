@@ -39,7 +39,7 @@ router.patch(
 );
 router.delete(
   "/:id",
-  requireRole("MD"),
+  requireRole("MD", "PC"),
   validate({ params: idParamSchema }),
   formConfigController.remove
 );

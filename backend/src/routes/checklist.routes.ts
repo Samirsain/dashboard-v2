@@ -24,13 +24,13 @@ router.post(
 // Any doer may create templates; changing or deleting them stays restricted.
 router.patch(
   "/templates/:id",
-  requireRole("MD"),
+  requireRole("MD", "PC"),
   validate({ params: idParamSchema, body: updateChecklistTemplateSchema }),
   checklistController.updateTemplate
 );
 router.delete(
   "/templates/:id",
-  requireRole("MD"),
+  requireRole("MD", "PC"),
   forbidAssistant,
   validate({ params: idParamSchema }),
   checklistController.removeTemplate
@@ -45,7 +45,7 @@ router.post(
   checklistController.completeInstance
 );
 // Irreversible — wipes every Completed checklist instance. MD only (Team Performance reset).
-router.delete("/instances/completed", requireRole("MD"), checklistController.removeCompletedInstances);
+router.delete("/instances/completed", requireRole("MD", "PC"), checklistController.removeCompletedInstances);
 router.post("/generate", checklistController.generateToday);
 
 export default router;

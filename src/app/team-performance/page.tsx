@@ -8,6 +8,7 @@ import Stat from "@/components/Stat";
 import {
   Button,
   Card,
+  EmptyState,
   ErrorNote,
   PageBody,
   PageHeader,
@@ -22,6 +23,8 @@ import {
   trClass,
 } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { canViewTeamPerformance } from "@/lib/access";
 import { formatDMY, formatPct } from "@/lib/format";
 import { mondayOf, sundayOf, addDays, todayIso, getWeekNumber } from "@/lib/week";
 import { getTaskCategory, CATEGORY_LABEL } from "@/lib/scoring";
@@ -245,10 +248,32 @@ function TeamPerformanceInner() {
   );
 }
 
+/**
+ * MD only. The nav hides this from a PC, but the route has to refuse them too —
+ * otherwise typing the URL still loads the page (the API would 403, leaving a
+ * broken-looking screen rather than an honest one).
+ */
+function TeamPerformanceGate() {
+  const { user } = useAuth();
+  if (!canViewTeamPerformance(user)) {
+    return (
+      <>
+        <MobileHeader />
+        <SideNav active="team-performance" />
+        <PageBody>
+          <PageHeader title="Team Performance" />
+          <EmptyState>This page is available to the MD only.</EmptyState>
+        </PageBody>
+      </>
+    );
+  }
+  return <TeamPerformanceInner />;
+}
+
 export default function TeamPerformancePage() {
   return (
     <AuthGuard>
-      <TeamPerformanceInner />
+      <TeamPerformanceGate />
     </AuthGuard>
   );
 }

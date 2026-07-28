@@ -10,6 +10,7 @@ import CreateListModal from "@/components/CreateListModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { canDeleteDoer } from "@/lib/access";
 import type { Doer, List } from "@/lib/types";
 
 /** First word of a list's name, uppercased — "SAHIL SIR TASKLIST" -> "SAHIL". */
@@ -363,8 +364,9 @@ function SettingsInner() {
                         >
                           Reset Password
                         </button>
-                        {/* Assistant admins can't delete doers. */}
-                        {!currentUser?.isAssistant && (
+                        {/* Deleting a doer is MD-only — a PC can add, rename
+                            and reset passwords but never remove someone. */}
+                        {canDeleteDoer(currentUser) && !currentUser?.isAssistant && (
                           <button
                             onClick={() => handleDelete(d)}
                             className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"

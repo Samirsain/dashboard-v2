@@ -18,13 +18,13 @@ router.get("/", usersController.list);
 router.get("/:id", validate({ params: idParamSchema }), usersController.getById);
 router.post(
   "/",
-  requireRole("MD"),
+  requireRole("MD", "PC"),
   validate({ body: createUserSchema }),
   usersController.create
 );
 router.patch(
   "/:id",
-  requireRole("MD"),
+  requireRole("MD", "PC"),
   validate({ params: idParamSchema, body: updateUserSchema }),
   usersController.update
 );
@@ -37,7 +37,7 @@ router.delete(
 );
 router.post(
   "/:id/reset-password",
-  requireRole("MD"),
+  requireRole("MD", "PC"),
   validate({ params: idParamSchema, body: resetPasswordSchema }),
   usersController.resetPassword
 );

@@ -9,7 +9,7 @@ import EditAttendanceModal from "@/components/EditAttendanceModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import { canMarkAttendance } from "@/lib/access";
+import { canEditAttendance, canMarkAttendance } from "@/lib/access";
 import type { Attendance, AttendanceDayRow, AttendanceRangeRow } from "@/lib/types";
 
 function todayIso(): string {
@@ -195,7 +195,12 @@ function EmployeeView() {
 }
 
 /** Attendance Manager / MD dashboard: mark attendance for every employee. */
-function ManagerView({ isAdmin }: { isAdmin: boolean }) {
+/**
+ * `isAdmin` covers the manager tier (MD + PC): marking any date, past or
+ * present. `canEdit` is narrower — only the MD may rewrite an existing
+ * record's times/status, so the Edit button hangs off that instead.
+ */
+function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean }) {
   const [date, setDate] = useState(todayIso());
   const [rows, setRows] = useState<AttendanceDayRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -464,7 +469,7 @@ function ManagerView({ isAdmin }: { isAdmin: boolean }) {
                       >
                         Leave
                       </button>
-                      {isAdmin && (
+                      {canEdit && (
                         <>
                           <span className="w-px h-5 bg-surface-variant mx-0.5" />
                           <button
@@ -610,7 +615,7 @@ function AttendanceInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg max-w-full overflow-hidden">
-          {isMarker ? <ManagerView isAdmin={user?.role === "MD" || user?.role === "PC"} /> : <EmployeeView />}
+          {isMarker ? <ManagerView isAdmin={user?.role === "MD" || user?.role === "PC"} canEdit={canEditAttendance(user)} /> : <EmployeeView />}
         </main>
       </div>
     </>

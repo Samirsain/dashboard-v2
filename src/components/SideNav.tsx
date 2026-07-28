@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { canAccessAllTasks } from "@/lib/access";
+import { canAccessAllTasks, canViewTeamPerformance } from "@/lib/access";
 import BrandLogo from "@/components/BrandLogo";
 import GoogleFormsIcon from "@/components/GoogleFormsIcon";
 
@@ -98,9 +98,8 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Attendance</span>
         </Link>
 
-        {/* Team Performance (MD only) */}
-        {/* Team Performance (MD + PC only) */}
-        {(user?.role === "MD" || user?.role === "PC") && (
+        {/* Team Performance — MD only, a PC never sees the scoreboard */}
+        {canViewTeamPerformance(user) && (
           <Link
             href="/team-performance"
             className={active === "team-performance" ? linkActive : linkBase}
