@@ -57,6 +57,11 @@ function SettingsInner() {
   const [showCreateList, setShowCreateList] = useState(false);
   const [doerToReset, setDoerToReset] = useState<Doer | null>(null);
   const [resetNotice, setResetNotice] = useState<string | null>(null);
+  // Role dropdown: picking a value only stages it here — nothing is sent
+  // until Save is clicked, so a stray click on the dropdown can't silently
+  // change someone's access. doerId -> the staged (unsaved) role.
+  const [pendingRoles, setPendingRoles] = useState<Record<string, Doer["role"]>>({});
+  const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   // Which doer's "Lists" dropdown is currently open.
   const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
   // "doerId:listId" currently being saved, so its checkbox disables briefly.
@@ -151,15 +156,26 @@ function SettingsInner() {
     }
   }
 
-  async function handleRoleChange(doer: Doer, nextRole: Doer["role"]) {
-    if (nextRole === doer.role) return;
-    const prevRole = doer.role;
-    setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, role: nextRole } : d)));
+  function handleRoleSelect(doerId: string, role: Doer["role"]) {
+    setPendingRoles((prev) => ({ ...prev, [doerId]: role }));
+  }
+
+  async function handleRoleSave(doer: Doer) {
+    const nextRole = pendingRoles[doer.id];
+    if (!nextRole || nextRole === doer.role) return;
+    setSavingRoleId(doer.id);
     try {
-      await api.patch<Doer>(`/users/${doer.id}`, { role: nextRole });
+      const updated = await api.patch<Doer>(`/users/${doer.id}`, { role: nextRole });
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? updated : d)));
+      setPendingRoles((prev) => {
+        const next = { ...prev };
+        delete next[doer.id];
+        return next;
+      });
     } catch (err) {
-      setDoers((prev) => prev.map((d) => (d.id === doer.id ? { ...d, role: prevRole } : d)));
       alert(err instanceof ApiError ? err.message : "Failed to update role.");
+    } finally {
+      setSavingRoleId(null);
     }
   }
 
@@ -287,16 +303,37 @@ function SettingsInner() {
                       {d.employeeCode || "—"}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      <select
-                        value={d.role}
-                        onChange={(e) => handleRoleChange(d, e.target.value as Doer["role"])}
-                        title="MD gets full access (Settings, Team Performance, All Tasks); PC gets task/attendance/IMS access"
-                        className="border-2 border-on-surface bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
-                      >
-                        <option value="Doer">Doer</option>
-                        <option value="PC">PC</option>
-                        <option value="MD">MD</option>
-                      </select>
+                      {(() => {
+                        const pending = pendingRoles[d.id];
+                        const isDirty = pending !== undefined && pending !== d.role;
+                        const isSaving = savingRoleId === d.id;
+                        return (
+                          <div className="flex items-center justify-center gap-2">
+                            <select
+                              value={pending ?? d.role}
+                              onChange={(e) => handleRoleSelect(d.id, e.target.value as Doer["role"])}
+                              disabled={isSaving}
+                              title="MD gets full access (Settings, Team Performance, All Tasks); PC gets everything except deleting a task, deleting a doer, Team Performance, and editing attendance"
+                              className={`border-2 bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none disabled:opacity-50 ${
+                                isDirty ? "border-amber-500" : "border-on-surface"
+                              }`}
+                            >
+                              <option value="Doer">Doer</option>
+                              <option value="PC">PC</option>
+                              <option value="MD">MD</option>
+                            </select>
+                            {isDirty && (
+                              <button
+                                onClick={() => handleRoleSave(d)}
+                                disabled={isSaving}
+                                className="px-2 py-1 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+                              >
+                                {isSaving ? "Saving…" : "Save"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant align-top">
                       {(() => {
