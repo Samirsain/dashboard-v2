@@ -354,7 +354,13 @@ function DashboardInner() {
                     return (
                       <tr
                         key={`${r.kind}-${r.id}`}
-                        className={`${trClass} ${urgent ? "!bg-[#fef08a] hover:!bg-[#fde047] !text-black" : ""}`}
+                        className={`${trClass} ${
+                          overdue
+                            ? "!bg-[#fecaca] hover:!bg-[#fca5a5] !text-black"
+                            : urgent
+                            ? "!bg-[#fef08a] hover:!bg-[#fde047] !text-black"
+                            : ""
+                        }`}
                       >
                         <td className={`${tdClass} min-w-[200px]`}>{r.task}</td>
                         <td className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
@@ -370,7 +376,7 @@ function DashboardInner() {
                               : doers.find((d) => d.id === r.assignedDoerId)?.name || r.assignedDoerId || "—"}
                           </td>
                         )}
-                        <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs ${overdue ? "text-error font-bold" : ""}`}>
+                        <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs ${overdue ? "font-bold" : ""}`}>
                           {formatDMY(r.dueDate)}
                         </td>
                         <td className={tdClass}>
