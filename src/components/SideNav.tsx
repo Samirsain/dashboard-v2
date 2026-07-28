@@ -99,7 +99,8 @@ export default function SideNav({ active }: { active: NavKey }) {
         </Link>
 
         {/* Team Performance (MD only) */}
-        {user?.role === "MD" && (
+        {/* Team Performance (MD + PC only) */}
+        {(user?.role === "MD" || user?.role === "PC") && (
           <Link
             href="/team-performance"
             className={active === "team-performance" ? linkActive : linkBase}

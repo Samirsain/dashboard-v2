@@ -496,12 +496,12 @@ function SettingsInner() {
 export default function SettingsPage() {
   const { user } = useAuth();
 
-  if (user && user.role !== "MD") {
+  if (user && user.role !== "MD" && user.role !== "PC") {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <p className="font-data-mono text-data-mono text-error uppercase border-2 border-error p-4">
-            Access Denied. MD Only.
+            Access Denied. MD or PC Only.
           </p>
         </div>
       </AuthGuard>

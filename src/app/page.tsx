@@ -85,7 +85,7 @@ function listGroupKey(name: string): string {
 
 function DashboardInner() {
   const { user, logout } = useAuth();
-  const isAdmin = user?.role === "MD";
+  const isAdmin = user?.role === "MD" || user?.role === "PC";
   const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [pendingChecklist, setPendingChecklist] = useState<ChecklistInstance[]>([]);
@@ -163,7 +163,7 @@ function DashboardInner() {
     }
   }
 
-  const isPrivileged = user?.role === "MD";
+  const isPrivileged = user?.role === "MD" || user?.role === "PC";
   const canCreateTasks = canAccessAllTasks(user);
   const assignableDoers = doers.filter((d) => d.role === "Doer" || d.role === "MD" || d.role === "PC");
   const taskLists = lists.filter((l) => l.type === "task");
@@ -370,9 +370,8 @@ function DashboardInner() {
                               : doers.find((d) => d.id === r.assignedDoerId)?.name || r.assignedDoerId || "—"}
                           </td>
                         )}
-                        <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs`}>
+                        <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs ${overdue ? "text-error font-bold" : ""}`}>
                           {formatDMY(r.dueDate)}
-                          {overdue && <span className="ml-1 text-error">(overdue)</span>}
                         </td>
                         <td className={tdClass}>
                           <div className="flex items-center justify-center gap-2">

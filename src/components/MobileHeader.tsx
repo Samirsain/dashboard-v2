@@ -41,7 +41,7 @@ export default function MobileHeader() {
 
   const taskLists = lists.filter((l) => l.type === "task");
   const checklists = lists.filter((l) => l.type === "checklist");
-  const isAdmin = user?.role === "MD";
+  const isAdmin = user?.role === "MD" || user?.role === "PC";
 
   const rowBase =
     "block px-4 py-3 font-headline-md text-base uppercase tracking-tight border-l-4 transition-colors";
@@ -93,7 +93,7 @@ export default function MobileHeader() {
               <Link href="/master-sheet" className={rowFor("/master-sheet")}>
                 Master Sheet
               </Link>
-              {isAdmin && (
+              {(user?.role === "MD" || user?.role === "PC") && (
                 <Link href="/ims" className={rowFor("/ims")}>
                   Inventory
                 </Link>
@@ -160,7 +160,7 @@ export default function MobileHeader() {
               <Link href="/attendance" className={rowFor("/attendance")}>
                 Attendance
               </Link>
-              {isAdmin && (
+              {(user?.role === "MD" || user?.role === "PC") && (
                 <>
                   <Link href="/team-performance" className={rowFor("/team-performance")}>
                     Team Performance
