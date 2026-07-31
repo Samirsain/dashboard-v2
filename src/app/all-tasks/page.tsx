@@ -125,12 +125,12 @@ function AllTasksInner() {
   }, [tasks, doerFilter, fromDate, toDate, search, scope]);
 
   /**
-   * Tasks whose assigned doer has been deleted. They keep their original
-   * due date and status but belong to nobody — so they're scored against
-   * nobody and drop out of every doer-filtered view until reassigned.
-   * Any status is included: a half-finished important task matters as much
-   * as an untouched one. Deliberately ignores the doer filter (an orphan has
-   * no doer to match) but still honours search and the date range.
+   * Unfinished tasks whose assigned doer has been deleted. They keep their
+   * original due date and status but belong to nobody — scored against nobody
+   * and absent from every doer-filtered view until reassigned. Completed and
+   * Cancelled ones are left out by isOrphanedTask: neither needs a new owner.
+   * Deliberately ignores the doer filter (an orphan has no doer to match) but
+   * still honours search and the date range.
    */
   const orphanedTasks = useMemo(() => {
     return tasks
@@ -496,8 +496,8 @@ function AllTasksInner() {
               }}
               className="w-full text-left border-2 border-error bg-error/5 px-3 py-2 font-label-sm text-sm text-error hover:bg-error/10 transition-colors cursor-pointer"
             >
-              {orphanCount} task{orphanCount === 1 ? "" : "s"} belong to a deleted doer and are
-              scored against nobody — click to reassign.
+              {orphanCount} unfinished task{orphanCount === 1 ? "" : "s"} belong to a deleted doer
+              and {orphanCount === 1 ? "is" : "are"} scored against nobody — click to reassign.
             </button>
           )}
 
@@ -561,7 +561,7 @@ function AllTasksInner() {
                     <tr>
                       <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         {orphanCount === 0
-                          ? "No orphaned tasks — every task has a doer."
+                          ? "No orphaned tasks — every unfinished task has a doer."
                           : "No orphaned tasks match the filters."}
                       </td>
                     </tr>

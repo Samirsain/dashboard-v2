@@ -159,11 +159,18 @@ export interface Task {
 }
 
 /**
- * A task whose assigned doer has been deleted. `assignedDoerId` still points
- * at the removed account, so nobody is scored for it and it falls out of every
- * doer-scoped view until it's reassigned.
+ * Unfinished work whose assigned doer has been deleted. `assignedDoerId` still
+ * points at the removed account, so nobody is scored for it and it falls out of
+ * every doer-scoped view until it's reassigned.
+ *
+ * Only ever true because a DOER was deleted. Deleting a task removes its row
+ * outright, so a deleted task can't surface here at all. Completed and
+ * Cancelled tasks are excluded too: finished work needs no new owner, and
+ * Cancelled is this app's soft-delete — neither should raise a "reassign me"
+ * flag.
  */
 export function isOrphanedTask(task: Task): boolean {
+  if (task.status === "Completed" || task.status === "Cancelled") return false;
   return !!task.assignedDoerId && task.doer === null;
 }
 
