@@ -30,6 +30,7 @@ import { canAccessAllTasks, canManageDoers } from "@/lib/access";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
+import { isOrphanedTask } from "@/lib/types";
 import type {
   ChecklistInstance,
   ChecklistTemplate,
@@ -371,9 +372,20 @@ function DashboardInner() {
                         </td>
                         {showDoerColumn && (
                           <td className={`${tdClass} text-on-surface-variant`}>
-                            {r.kind === "task" && r.taskObj?.doer?.name
-                              ? r.taskObj.doer.name
-                              : doers.find((d) => d.id === r.assignedDoerId)?.name || r.assignedDoerId || "—"}
+                            {r.kind === "task" && r.taskObj?.doer?.name ? (
+                              r.taskObj.doer.name
+                            ) : r.kind === "task" && r.taskObj && isOrphanedTask(r.taskObj) ? (
+                              // Doer deleted — fall back to the name stored on the
+                              // task rather than showing a raw ID.
+                              <>
+                                {r.taskObj.doerName || "—"}
+                                <span className="ml-1.5 border border-error px-1 py-0.5 font-label-sm text-[10px] uppercase text-error">
+                                  Unassigned
+                                </span>
+                              </>
+                            ) : (
+                              doers.find((d) => d.id === r.assignedDoerId)?.name || r.assignedDoerId || "—"
+                            )}
                           </td>
                         )}
                         <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs ${overdue ? "font-bold" : ""}`}>

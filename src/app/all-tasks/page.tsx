@@ -7,11 +7,13 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { nextChecklistDueDate } from "@/lib/checklistSchedule";
+import { todayIso } from "@/lib/week";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
+import { isOrphanedTask } from "@/lib/types";
 import type { ChecklistInstance, ChecklistTemplate, Doer, List, Task } from "@/lib/types";
 
-type Tab = "tasks" | "checklist";
+type Tab = "tasks" | "checklist" | "unassigned";
 
 /** Completion timestamp proxy: updatedAt is stamped when a task is marked Completed. */
 function taskCompletedOn(t: Task): string {
@@ -48,6 +50,8 @@ function AllTasksInner() {
   // Checklist tab only: Pending (still to do — what used to show on the
   // Dashboard) vs Completed (the history report this page started as).
   const [checklistStatus, setChecklistStatus] = useState<"Pending" | "Completed">("Pending");
+  // Task id currently being reassigned, so its row disables while in flight.
+  const [reassigningId, setReassigningId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -120,6 +124,29 @@ function AllTasksInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, doerFilter, fromDate, toDate, search, scope]);
 
+  /**
+   * Tasks whose assigned doer has been deleted. They keep their original
+   * due date and status but belong to nobody — so they're scored against
+   * nobody and drop out of every doer-filtered view until reassigned.
+   * Any status is included: a half-finished important task matters as much
+   * as an untouched one. Deliberately ignores the doer filter (an orphan has
+   * no doer to match) but still honours search and the date range.
+   */
+  const orphanedTasks = useMemo(() => {
+    return tasks
+      .filter(isOrphanedTask)
+      .filter((t) => inScope(t.listId))
+      .filter((t) => inRange(t.dueDate, fromDate, toDate))
+      .filter((t) =>
+        `${t.title} ${t.doerName}`.toLowerCase().includes(search.toLowerCase())
+      )
+      .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, fromDate, toDate, search, scope]);
+
+  /** Unfiltered count — drives the tab badge, so it never hides orphans behind a filter. */
+  const orphanCount = useMemo(() => tasks.filter(isOrphanedTask).length, [tasks]);
+
   // A template's next due date: prefer an already-generated Pending
   // instance's date (authoritative once it exists); otherwise compute the
   // next date its frequency is due from today. Recomputed live, so once a
@@ -165,7 +192,10 @@ function AllTasksInner() {
 
   const checklistRowCount =
     checklistStatus === "Pending" ? pendingChecklistTasks.length : completedChecklistInstances.length;
-  const rows = tab === "tasks" ? completedTasks.length : checklistRowCount;
+  const rows =
+    tab === "tasks" ? completedTasks.length
+    : tab === "unassigned" ? orphanedTasks.length
+    : checklistRowCount;
 
   // Deletes the recurring checklist task entirely (the template + every
   // instance it ever generated) — used when a daily/monthly checklist item
@@ -206,6 +236,28 @@ function AllTasksInner() {
     }
   }
 
+  /**
+   * Hand an orphaned task to a new doer. Responsibility moves with it: the
+   * scoring engine buckets tasks by assignedDoerId, so from this point the
+   * new doer is the one credited or penalised for it.
+   *
+   * Note the task keeps its original due date, so if it's already overdue the
+   * new doer inherits that. Revise the due date first if they should get a
+   * fresh deadline.
+   */
+  async function handleReassignTask(taskId: string, assignedDoerId: string) {
+    if (!assignedDoerId) return;
+    setReassigningId(taskId);
+    try {
+      const updated = await api.patch<Task>(`/tasks/${taskId}`, { assignedDoerId });
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to reassign task.");
+    } finally {
+      setReassigningId(null);
+    }
+  }
+
   function clearFilters() {
     setSearch("");
     setDoerFilter("");
@@ -218,7 +270,16 @@ function AllTasksInner() {
     const escape = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
     let headers: string[];
     let dataRows: string[][];
-    if (tab === "tasks") {
+    if (tab === "unassigned") {
+      headers = ["Task", "Was Assigned To", "Due Date", "Status", "Priority"];
+      dataRows = orphanedTasks.map((t) => [
+        t.title,
+        t.doerName || t.assignedDoerId,
+        formatDMY(t.dueDate),
+        t.status,
+        t.priority,
+      ]);
+    } else if (tab === "tasks") {
       headers = ["Task", "Doer", "Planned Date", "Actual Date", "Revisions", "Priority"];
       dataRows = completedTasks.map((t) => [
         t.title,
@@ -309,10 +370,16 @@ function AllTasksInner() {
           <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md">
             <div>
               <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
-                {tab === "checklist" ? `All ${checklistStatus}` : "All Completed"}
+                {tab === "checklist" ? `All ${checklistStatus}`
+                  : tab === "unassigned" ? "Unassigned"
+                  : "All Completed"}
               </h2>
               <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
-                {rows} {tab === "tasks" ? "task list items" : "checklist items"} &bull; MD View
+                {rows}{" "}
+                {tab === "tasks" ? "task list items"
+                  : tab === "unassigned" ? "orphaned tasks"
+                  : "checklist items"}{" "}
+                &bull; MD View
               </p>
             </div>
             {tab === "checklist" && (
@@ -400,8 +467,39 @@ function AllTasksInner() {
                     );
                   })}
               </select>
+
+              {/* Only worth showing once something is actually orphaned. */}
+              {orphanCount > 0 && (
+                <button
+                  onClick={() => {
+                    setTab("unassigned");
+                    setScope("ALL");
+                  }}
+                  className={
+                    tab === "unassigned"
+                      ? "border-2 border-error bg-error text-white px-4 py-1.5 font-label-sm text-label-sm uppercase cursor-pointer"
+                      : "border-2 border-error text-error px-4 py-1.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-white transition-colors cursor-pointer"
+                  }
+                >
+                  Unassigned ({orphanCount})
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Orphaned-task banner — surfaced on every tab so it can't be missed. */}
+          {orphanCount > 0 && tab !== "unassigned" && (
+            <button
+              onClick={() => {
+                setTab("unassigned");
+                setScope("ALL");
+              }}
+              className="w-full text-left border-2 border-error bg-error/5 px-3 py-2 font-label-sm text-sm text-error hover:bg-error/10 transition-colors cursor-pointer"
+            >
+              {orphanCount} task{orphanCount === 1 ? "" : "s"} belong to a deleted doer and are
+              scored against nobody — click to reassign.
+            </button>
+          )}
 
           {/* Filters */}
           <div className="bg-surface border-2 border-on-surface p-3 flex flex-wrap items-end gap-4">
@@ -440,7 +538,85 @@ function AllTasksInner() {
 
           {/* Table */}
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-            {tab === "tasks" ? (
+            {tab === "unassigned" ? (
+              <table className="w-full text-left border-collapse min-w-[900px]">
+                <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+                  <tr>
+                    <th className="py-3 px-4 border-r border-surface-variant">Task Description</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-40">Was Assigned To</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-32 text-center">Due Date</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Status</th>
+                    <th className="py-3 px-4 w-56 text-center">Reassign To</th>
+                  </tr>
+                </thead>
+                <tbody className="font-body-md text-body-md text-on-surface">
+                  {loading && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                        Loading...
+                      </td>
+                    </tr>
+                  )}
+                  {!loading && orphanedTasks.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                        {orphanCount === 0
+                          ? "No orphaned tasks — every task has a doer."
+                          : "No orphaned tasks match the filters."}
+                      </td>
+                    </tr>
+                  )}
+                  {orphanedTasks.map((t) => (
+                    <tr
+                      key={t.id}
+                      className="border-b border-surface-variant last:border-b-0 bg-error/5 border-l-4 border-l-error"
+                    >
+                      <td className="py-3 px-4 border-r border-surface-variant font-medium">
+                        {t.title}
+                        {(t.priority === "Urgent" || t.priority === "Critical") && (
+                          <span className="ml-2 inline-block border border-error text-error font-label-sm text-[10px] uppercase px-1.5 py-0.5 align-middle">
+                            {t.priority}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 border-r border-surface-variant">
+                        <span className="text-on-surface-variant">{t.doerName || "—"}</span>
+                        <span className="ml-2 inline-block border border-error text-error font-label-sm text-[10px] uppercase px-1.5 py-0.5 align-middle">
+                          Deleted
+                        </span>
+                      </td>
+                      <td
+                        className={`py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono whitespace-nowrap ${
+                          t.dueDate && t.dueDate < todayIso() ? "text-error font-bold" : ""
+                        }`}
+                      >
+                        {formatDMY(t.dueDate)}
+                      </td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase text-on-surface-variant">
+                        {t.status}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <select
+                          defaultValue=""
+                          disabled={reassigningId === t.id}
+                          onChange={(e) => handleReassignTask(t.id, e.target.value)}
+                          className="w-full border-2 border-on-surface bg-surface px-2 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none disabled:opacity-50 cursor-pointer"
+                        >
+                          <option value="">
+                            {reassigningId === t.id ? "Reassigning…" : "Pick a doer…"}
+                          </option>
+                          {doerOptions.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : tab === "tasks" ? (
               <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   <tr>

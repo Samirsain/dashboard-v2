@@ -2,7 +2,8 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { tasksService } from "../services/tasks.service";
-import { canViewAllData } from "../utils/access";
+import { canViewAllData, canCreateTask } from "../utils/access";
+import { AppError } from "../utils/AppError";
 import type { CreateTaskInput, RevisionInput, TaskFilterQuery, UpdateTaskInput } from "../validation/task.schema";
 
 export const tasksController = {
@@ -30,6 +31,13 @@ export const tasksController = {
 
   update: asyncHandler(async (req: Request, res: Response) => {
     const input = req.body as UpdateTaskInput;
+    // Marking a task done / editing its own fields stays open to the doer who
+    // holds it, but moving a task to somebody else is a management decision —
+    // otherwise anyone could hand their own overdue work to a colleague and
+    // shed the penalty with it.
+    if (input.assignedDoerId !== undefined && !canCreateTask(req.user)) {
+      throw AppError.forbidden("Only MD/PC can reassign a task to a different doer.");
+    }
     const task = await tasksService.update(req.params.id as string, input, req.user!.sub);
     ok(res, task);
   }),

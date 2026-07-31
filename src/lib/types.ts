@@ -138,6 +138,11 @@ export interface Task {
   title: string;
   description: string;
   assignedDoerId: string;
+  /**
+   * Name of the doer at assignment time, stored on the task. Outlives the
+   * doer's account, so an orphaned task can still say who used to own it.
+   */
+  doerName: string;
   priority: TaskPriority;
   dueDate: string;
   status: TaskStatus;
@@ -149,7 +154,17 @@ export interface Task {
   updatedAt: string;
   repeatType: RepeatType;
   repeatValue: string;
+  /** Null when the assigned doer's account no longer exists — an orphaned task. */
   doer: DoerSummary | null;
+}
+
+/**
+ * A task whose assigned doer has been deleted. `assignedDoerId` still points
+ * at the removed account, so nobody is scored for it and it falls out of every
+ * doer-scoped view until it's reassigned.
+ */
+export function isOrphanedTask(task: Task): boolean {
+  return !!task.assignedDoerId && task.doer === null;
 }
 
 export interface DashboardSummary {

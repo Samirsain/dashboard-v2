@@ -126,6 +126,12 @@ export interface Task {
   title: string;
   description: string;
   assignedDoerId: string;
+  /**
+   * Name of the doer at the time of assignment, stored on the task itself.
+   * Survives the doer being deleted, which is the only way an orphaned task
+   * can still say who used to own it — the DOERLIST row is gone by then.
+   */
+  doerName: string;
   priority: TaskPriority;
   dueDate: string; // ISO date (YYYY-MM-DD)
   status: TaskStatus;

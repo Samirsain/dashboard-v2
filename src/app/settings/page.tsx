@@ -11,7 +11,7 @@ import ResetPasswordModal from "@/components/ResetPasswordModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { canDeleteDoer, canManageDoers } from "@/lib/access";
-import type { Doer, List } from "@/lib/types";
+import type { Doer, List, Task } from "@/lib/types";
 
 /** First word of a list's name, uppercased — "SAHIL SIR TASKLIST" -> "SAHIL". */
 function listGroupKey(name: string): string {
@@ -51,6 +51,7 @@ function SettingsInner() {
   const { user: currentUser } = useAuth();
   const [doers, setDoers] = useState<Doer[]>([]);
   const [lists, setLists] = useState<List[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddDoer, setShowAddDoer] = useState(false);
@@ -71,12 +72,15 @@ function SettingsInner() {
     setLoading(true);
     setError(null);
     try {
-      const [doerData, listData] = await Promise.all([
+      const [doerData, listData, taskData] = await Promise.all([
         api.get<Doer[]>("/users"),
         api.get<List[]>("/lists").catch(() => [] as List[]),
+        // Only used to warn how much unfinished work a deletion would orphan.
+        api.get<Task[]>("/tasks").catch(() => [] as Task[]),
       ]);
       setDoers(doerData);
       setLists(listData);
+      setTasks(taskData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load doers.");
     } finally {
@@ -156,6 +160,13 @@ function SettingsInner() {
     }
   }
 
+  /** Unfinished tasks currently on this doer — what deleting them would orphan. */
+  function openTaskCountFor(doerId: string): number {
+    return tasks.filter(
+      (t) => t.assignedDoerId === doerId && t.status !== "Completed" && t.status !== "Cancelled"
+    ).length;
+  }
+
   function handleRoleSelect(doerId: string, role: Doer["role"]) {
     setPendingRoles((prev) => ({ ...prev, [doerId]: role }));
   }
@@ -197,7 +208,19 @@ function SettingsInner() {
       alert("You can't delete your own account.");
       return;
     }
-    if (!confirm(`Permanently delete ${doer.name} (${doer.employeeCode || doer.id})? This can't be undone.`))
+    // Their tasks survive the deletion — say so up front, with the count, so
+    // nobody assumes the work went away with the account.
+    const open = openTaskCountFor(doer.id);
+    const warning =
+      open > 0
+        ? `\n\n${open} unfinished task${open === 1 ? "" : "s"} will be left unassigned. ` +
+          `Find them under All Tasks → Unassigned and hand them to someone else.`
+        : "";
+    if (
+      !confirm(
+        `Permanently delete ${doer.name} (${doer.employeeCode || doer.id})? This can't be undone.${warning}`
+      )
+    )
       return;
     try {
       await api.delete(`/users/${doer.id}`);

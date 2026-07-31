@@ -17,6 +17,7 @@ function toTask(record: SheetRecord): Task {
     title: record["Title"] ?? "",
     description: record["Description"] ?? "",
     assignedDoerId: record["Assigned Doer ID"] ?? "",
+    doerName: record["Doer Name"] ?? "",
     priority: (record["Priority"] as TaskPriority) || "Normal",
     dueDate: record["Due Date"] ?? "",
     status: (record["Status"] as TaskStatus) || "Pending",
