@@ -51,5 +51,9 @@ router.get(
   validate({ params: idParamSchema }),
   tasksController.revisionHistory
 );
+// Bulk hand-off for someone on leave — moves every open task and active
+// checklist template from one doer to another. Same authority as reassigning
+// a single task (MD/PC), since that's exactly what this does at scale.
+router.post("/reassign-all-work", requireTaskCreateAccess, tasksController.reassignAllWork);
 
 export default router;

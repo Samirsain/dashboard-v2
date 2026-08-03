@@ -8,6 +8,7 @@ import InitialsAvatar from "@/components/InitialsAvatar";
 import CreateDoerModal from "@/components/CreateDoerModal";
 import CreateListModal from "@/components/CreateListModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
+import ReassignWorkModal from "@/components/ReassignWorkModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { canDeleteDoer, canManageDoers } from "@/lib/access";
@@ -50,6 +51,7 @@ function SettingsInner() {
   const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
   // "doerId:listId" currently being saved, so its checkbox disables briefly.
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [reassignFrom, setReassignFrom] = useState<Doer | null>(null);
   const [tab, setTab] = useState<"doers" | "pcs">("doers");
   // Whether "+ Add" creates a PC or a plain doer, driven by the active tab.
   const [addRole, setAddRole] = useState<Doer["role"] | undefined>(undefined);
@@ -311,6 +313,7 @@ function SettingsInner() {
               onResetPassword={setDoerToReset}
               onDemote={handleDemotePc}
               onDelete={handleDelete}
+              onReassignWork={setReassignFrom}
             />
           ) : (
             <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
@@ -449,6 +452,13 @@ function SettingsInner() {
                           >
                             Reset Password
                           </button>
+                          <button
+                            onClick={() => setReassignFrom(d)}
+                            title="Move every open task and active checklist to someone else — e.g. while they're on leave."
+                            className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                          >
+                            Reassign All Work
+                          </button>
                           {/* Deleting a doer is MD-only — a PC can add, rename
                               and reset passwords but never remove someone. */}
                           {canDeleteDoer(currentUser) && !currentUser?.isAssistant && (
@@ -578,6 +588,24 @@ function SettingsInner() {
             setResetNotice(`Password reset for ${doerToReset.name}.`);
             setDoerToReset(null);
             setTimeout(() => setResetNotice(null), 4000);
+          }}
+        />
+      )}
+
+      {reassignFrom && (
+        <ReassignWorkModal
+          fromDoer={reassignFrom}
+          doers={doers}
+          onClose={() => setReassignFrom(null)}
+          onReassigned={({ tasksReassigned, checklistsReassigned }) => {
+            setReassignFrom(null);
+            setResetNotice(
+              `Moved ${tasksReassigned} task${tasksReassigned === 1 ? "" : "s"} and ` +
+                `${checklistsReassigned} checklist${checklistsReassigned === 1 ? "" : "s"} off ${reassignFrom.name}.`
+            );
+            setTimeout(() => setResetNotice(null), 6000);
+            // Their open-task count (used by the delete-warning) just changed.
+            loadData();
           }}
         />
       )}

@@ -22,6 +22,7 @@ export default function PcManagement({
   onResetPassword,
   onDemote,
   onDelete,
+  onReassignWork,
   demotingId,
 }: {
   pcs: Doer[];
@@ -35,6 +36,7 @@ export default function PcManagement({
   onResetPassword: (pc: Doer) => void;
   onDemote: (pc: Doer) => void;
   onDelete: (pc: Doer) => void;
+  onReassignWork: (pc: Doer) => void;
   demotingId: string | null;
 }) {
   if (loading) {
@@ -94,6 +96,13 @@ export default function PcManagement({
                 className="inline-flex items-center justify-center min-h-[36px] px-3 text-[11px] font-label-sm uppercase tracking-wide border border-on-surface bg-surface text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
               >
                 Reset Password
+              </button>
+              <button
+                onClick={() => onReassignWork(pc)}
+                title="Move every open task and active checklist to someone else — e.g. while they're on leave."
+                className="inline-flex items-center justify-center min-h-[36px] px-3 text-[11px] font-label-sm uppercase tracking-wide border border-on-surface bg-surface text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                Reassign All Work
               </button>
               <button
                 onClick={() => onDemote(pc)}

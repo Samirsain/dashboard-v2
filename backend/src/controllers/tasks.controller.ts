@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { tasksService } from "../services/tasks.service";
+import { checklistService } from "../services/checklist.service";
+import { usersService } from "../services/users.service";
 import { canViewAllData, canCreateTask } from "../utils/access";
 import { buildListVisibility } from "../utils/listAccess";
 import { listsService } from "../services/lists.service";
@@ -76,5 +78,55 @@ export const tasksController = {
   removeCompleted: asyncHandler(async (_req: Request, res: Response) => {
     const deleted = await tasksService.removeCompleted();
     ok(res, { deleted });
+  }),
+
+  /**
+   * "Someone's on long leave, hand off everything they're on the hook for" —
+   * moves every OPEN task and active checklist template from one doer to
+   * another in one action, e.g. from Settings. Only unfinished work moves:
+   * Completed/Cancelled tasks and Inactive templates stay put, since there's
+   * nothing left to do on them.
+   *
+   * Reassigning a checklist template already carries onto its still-Pending
+   * generated instances (checklistService.updateTemplate does this), so
+   * today's/this-week's occurrences move immediately too, not just future ones.
+   */
+  reassignAllWork: asyncHandler(async (req: Request, res: Response) => {
+    const { fromDoerId, toDoerId } = req.body as { fromDoerId: string; toDoerId: string };
+    if (!fromDoerId || !toDoerId) {
+      throw AppError.badRequest("fromDoerId and toDoerId are required");
+    }
+    if (fromDoerId === toDoerId) {
+      throw AppError.badRequest("Pick a different doer to reassign to");
+    }
+    // Fail fast with a clear message rather than letting a bad id surface as
+    // a confusing per-item error partway through the loop below.
+    await usersService.getById(toDoerId);
+
+    const [openTasks, templates] = await Promise.all([
+      tasksService.listRaw({ assignedDoerId: fromDoerId }),
+      checklistService.listTemplates(),
+    ]);
+
+    const tasksToMove = openTasks.filter(
+      (t) => t.status !== "Completed" && t.status !== "Cancelled"
+    );
+    const templatesToMove = templates.filter(
+      (t) => t.assignedDoerId === fromDoerId && t.status === "Active"
+    );
+
+    await Promise.all([
+      ...tasksToMove.map((t) =>
+        tasksService.update(t.id, { assignedDoerId: toDoerId }, req.user!.sub)
+      ),
+      ...templatesToMove.map((t) =>
+        checklistService.updateTemplate(t.id, { assignedDoerId: toDoerId })
+      ),
+    ]);
+
+    ok(res, {
+      tasksReassigned: tasksToMove.length,
+      checklistsReassigned: templatesToMove.length,
+    });
   }),
 };
