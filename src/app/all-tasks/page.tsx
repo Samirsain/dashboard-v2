@@ -11,6 +11,7 @@ import { todayIso } from "@/lib/week";
 import { useAuth } from "@/lib/auth-context";
 import { canAccessAllTasks } from "@/lib/access";
 import { isOrphanedTask } from "@/lib/types";
+import ReassignWorkModal from "@/components/ReassignWorkModal";
 import type { ChecklistInstance, ChecklistTemplate, Doer, List, Task } from "@/lib/types";
 
 type Tab = "tasks" | "checklist" | "unassigned";
@@ -52,6 +53,8 @@ function AllTasksInner() {
   const [checklistStatus, setChecklistStatus] = useState<"Pending" | "Completed">("Pending");
   // Task id currently being reassigned, so its row disables while in flight.
   const [reassigningId, setReassigningId] = useState<string | null>(null);
+  // Bulk hand-off modal — e.g. someone's on leave, move all their work at once.
+  const [showReassignAll, setShowReassignAll] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -340,13 +343,22 @@ function AllTasksInner() {
               type="text"
             />
           </div>
-          <button
-            onClick={exportCSV}
-            disabled={rows === 0}
-            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Export CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowReassignAll(true)}
+              title="Move every open task and active checklist off one doer onto someone else — e.g. while they're on leave."
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+            >
+              Reassign All Work
+            </button>
+            <button
+              onClick={exportCSV}
+              disabled={rows === 0}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Export CSV
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-md">
@@ -358,6 +370,12 @@ function AllTasksInner() {
               placeholder="SEARCH TASK / DOER..."
               className="w-full border-2 border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant focus:outline-none"
             />
+            <button
+              onClick={() => setShowReassignAll(true)}
+              className="w-full px-4 py-2 bg-surface text-on-surface border-2 border-on-surface font-label-sm text-label-sm uppercase"
+            >
+              Reassign All Work
+            </button>
             <button
               onClick={exportCSV}
               disabled={rows === 0}
@@ -758,6 +776,20 @@ function AllTasksInner() {
           </div>
         </main>
       </div>
+
+      {showReassignAll && (
+        <ReassignWorkModal
+          doers={doerOptions}
+          onClose={() => setShowReassignAll(false)}
+          onReassigned={({ tasksReassigned, checklistsReassigned }) => {
+            setShowReassignAll(false);
+            alert(
+              `Reassigned ${tasksReassigned} task(s) and ${checklistsReassigned} checklist(s).`
+            );
+            window.location.reload();
+          }}
+        />
+      )}
     </>
   );
 }

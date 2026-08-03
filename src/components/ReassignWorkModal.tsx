@@ -11,24 +11,36 @@ import type { Doer } from "@/lib/types";
  * are left alone: there's nothing left to do on them.
  */
 export default function ReassignWorkModal({
-  fromDoer,
+  fromDoer: fixedFromDoer,
   doers,
   onClose,
   onReassigned,
 }: {
-  fromDoer: Doer;
-  /** Everyone else who can receive the work. */
+  /**
+   * Pre-selected source doer (e.g. Settings, opened from that doer's row).
+   * Omit to let the user pick who they're moving work off of — e.g. from All
+   * Tasks, where there's no row context to pre-select from.
+   */
+  fromDoer?: Doer;
+  /** Everyone who can be the source and/or receive the work. */
   doers: Doer[];
   onClose: () => void;
   onReassigned: (result: { tasksReassigned: number; checklistsReassigned: number }) => void;
 }) {
+  const [fromDoerId, setFromDoerId] = useState(fixedFromDoer?.id ?? "");
   const [toDoerId, setToDoerId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const targets = doers.filter((d) => d.id !== fromDoer.id && d.status === "Active");
+  const sources = doers.filter((d) => d.status === "Active");
+  const fromDoer = fixedFromDoer ?? doers.find((d) => d.id === fromDoerId);
+  const targets = doers.filter((d) => d.id !== fromDoerId && d.status === "Active");
 
   async function handleSubmit() {
+    if (!fromDoerId) {
+      setError("Pick whose work is moving.");
+      return;
+    }
     if (!toDoerId) {
       setError("Pick who this work should go to.");
       return;
@@ -38,7 +50,7 @@ export default function ReassignWorkModal({
     try {
       const result = await api.post<{ tasksReassigned: number; checklistsReassigned: number }>(
         "/tasks/reassign-all-work",
-        { fromDoerId: fromDoer.id, toDoerId }
+        { fromDoerId, toDoerId }
       );
       onReassigned(result);
     } catch (err) {
@@ -71,10 +83,38 @@ export default function ReassignWorkModal({
 
         <div className="flex flex-col gap-stack-md p-stack-lg">
           <p className="font-body-md text-body-md text-on-surface">
-            Moves every unfinished task and active checklist from{" "}
-            <strong>{fromDoer.name}</strong> to whoever you pick below — for example while
-            they&apos;re on leave. Already-completed or cancelled work stays exactly where it is.
+            {fixedFromDoer ? (
+              <>
+                Moves every unfinished task and active checklist from{" "}
+                <strong>{fixedFromDoer.name}</strong> to whoever you pick below — for example
+                while they&apos;re on leave.
+              </>
+            ) : (
+              "Moves every unfinished task and active checklist from one doer to another — for example while they're on leave."
+            )}{" "}
+            Already-completed or cancelled work stays exactly where it is.
           </p>
+
+          {!fixedFromDoer && (
+            <div>
+              <label className={label}>Reassign work from</label>
+              <select
+                value={fromDoerId}
+                onChange={(e) => {
+                  setFromDoerId(e.target.value);
+                  setToDoerId("");
+                }}
+                className={field}
+              >
+                <option value="">Select a doer…</option>
+                {sources.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} {d.employeeCode ? `(${d.employeeCode})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className={label}>Reassign to</label>
@@ -97,7 +137,7 @@ export default function ReassignWorkModal({
             )}
           </div>
 
-          {toDoer && (
+          {toDoer && fromDoer && (
             <p className="border border-on-surface/30 px-3 py-2 font-data-mono text-[11px] text-on-surface-variant">
               Every open task and active checklist currently on {fromDoer.name} will move to{" "}
               {toDoer.name}. From then on, {toDoer.name} is the one scored for it — including
@@ -122,7 +162,7 @@ export default function ReassignWorkModal({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={submitting || !toDoerId}
+              disabled={submitting || !toDoerId || !fromDoerId}
               className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitting ? "Reassigning…" : "Reassign All Work"}
