@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
-import Stat from "@/components/Stat";
 import {
   Button,
   Card,
@@ -26,51 +25,26 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { canViewTeamPerformance } from "@/lib/access";
 import { formatDMY, formatPct } from "@/lib/format";
-import { mondayOf, sundayOf, addDays, todayIso, getWeekNumber } from "@/lib/week";
-import { getTaskCategory, CATEGORY_LABEL } from "@/lib/scoring";
-import type { DgmaxWeeklySummary, List, Task, Doer } from "@/lib/types";
-
-/** Neutral outline badge — readable on the light surface, no filled colour blocks. */
-function Badge({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "muted" | "alert" }) {
-  const tones = {
-    default: "border-on-surface text-on-surface",
-    muted: "border-on-surface/40 text-on-surface-variant",
-    alert: "border-error text-error",
-  };
-  return (
-    <span className={`inline-block whitespace-nowrap border px-1.5 py-0.5 font-label-sm text-[10px] uppercase ${tones[tone]}`}>
-      {children}
-    </span>
-  );
-}
+import { mondayOf, sundayOf, addDays, getWeekNumber } from "@/lib/week";
+import type { DgmaxWeeklySummary } from "@/lib/types";
 
 function TeamPerformanceInner() {
   const [dgmaxSummary, setDgmaxSummary] = useState<DgmaxWeeklySummary | null>(null);
-  const [allTasks, setAllTasks] = useState<Task[]>([]);
-  const [lists, setLists] = useState<List[]>([]);
-  const [doers, setDoers] = useState<Doer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Monday of the currently-selected week. Week always runs Monday -> Sunday.
   const [weekStart, setWeekStart] = useState(() => mondayOf());
   const weekEnd = sundayOf(weekStart);
-  const today = todayIso();
 
   async function loadData(from: string, to: string) {
     setLoading(true);
     setError(null);
     try {
-      const [summaryData, tasksData, listsData, doerData] = await Promise.all([
-        api.get<DgmaxWeeklySummary>(`/performance/dgmax?from=${from}&to=${to}`),
-        api.get<Task[]>("/tasks").catch(() => [] as Task[]),
-        api.get<List[]>("/lists").catch(() => [] as List[]),
-        api.get<Doer[]>("/users").catch(() => [] as Doer[]),
-      ]);
+      const summaryData = await api.get<DgmaxWeeklySummary>(
+        `/performance/dgmax?from=${from}&to=${to}`
+      );
       setDgmaxSummary(summaryData);
-      setAllTasks(tasksData);
-      setLists(listsData);
-      setDoers(doerData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load performance data.");
     } finally {
@@ -91,53 +65,6 @@ function TeamPerformanceInner() {
 
   const weekLabel = dgmaxSummary?.weekLabel || `${formatDMY(weekStart)} to ${formatDMY(weekEnd)}`;
   const lateWeight = dgmaxSummary?.lateDoneWeight ?? 60;
-
-  const totals = dgmaxSummary?.totals ?? {
-    assigned: 0,
-    completed: 0,
-    green: 0,
-    yellow: 0,
-    red: 0,
-    pending: 0,
-    negativeScore: 0,
-    performanceScore: 100,
-  };
-
-  const isOverdue = (dueDate: string) => !!dueDate && dueDate < today;
-
-  const listLabelFor = (listId: string) => {
-    if (!listId) return "Office";
-    const list = lists.find((l) => l.id === listId);
-    return list ? list.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST" : "Office";
-  };
-
-  const weeklyTasks = useMemo(() => {
-    return allTasks
-      .filter((t) => {
-        if (t.status === "Cancelled" || !t.dueDate) return false;
-        const completedAt = t.status === "Completed" && t.updatedAt ? t.updatedAt.slice(0, 10) : null;
-        if (completedAt) {
-          return (
-            (completedAt >= weekStart && completedAt <= weekEnd) ||
-            (t.dueDate >= weekStart && t.dueDate <= weekEnd)
-          );
-        }
-        return t.dueDate >= weekStart && t.dueDate <= weekEnd;
-      })
-      .sort((a, b) => {
-        const aCompleted = a.status === "Completed";
-        const bCompleted = b.status === "Completed";
-        if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
-        const aOverdue = isOverdue(a.dueDate);
-        const bOverdue = isOverdue(b.dueDate);
-        if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
-        const aToday = a.dueDate === today;
-        const bToday = b.dueDate === today;
-        if (aToday !== bToday) return aToday ? -1 : 1;
-        return a.dueDate.localeCompare(b.dueDate);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allTasks, weekStart, weekEnd, today]);
 
   function exportCSV() {
     const headers = ["Week", "Rank", "Employee Name", "Assigned Tasks", "Assigned Checklists", "Task Score", "Checklist Score", "Average Score"];

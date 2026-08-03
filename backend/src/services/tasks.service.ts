@@ -3,6 +3,7 @@ import { dataService, type SheetRecord } from "./data.service";
 import { activityService } from "./activity.service";
 import { revisionsService } from "./revisions.service";
 import { usersService } from "./users.service";
+import { buildOriginalDueDates } from "../utils/dueDates";
 import { generateUuid } from "../utils/id";
 import { formatTimestamp, isBeforeToday, isToday, isWithinNextDays, todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
@@ -20,6 +21,9 @@ function toTask(record: SheetRecord): Task {
     doerName: record["Doer Name"] ?? "",
     priority: (record["Priority"] as TaskPriority) || "Normal",
     dueDate: record["Due Date"] ?? "",
+    // Overwritten by list()/getById() once revisions are joined; a task that
+    // was never revised keeps its own due date as the original.
+    originalDueDate: record["Due Date"] ?? "",
     status: (record["Status"] as TaskStatus) || "Pending",
     revisionDate: record["Revision Date"] ?? "",
     revisionCount: Number(record["Revision Count"] || 0),
@@ -82,11 +86,20 @@ export const tasksService = {
     priority?: TaskPriority;
     department?: string;
   }): Promise<TaskWithDoer[]> {
-    const [tasks, doers] = await Promise.all([this.listRaw(filters), usersService.list()]);
+    const [tasks, doers, revisions] = await Promise.all([
+      this.listRaw(filters),
+      usersService.list(),
+      // Revisions overwrite a task's Due Date in place, so the original
+      // deadline only survives in this history — joined here so every consumer
+      // sees the same "planned" date the scoring engine uses.
+      revisionsService.listAll().catch(() => []),
+    ]);
     const doerMap = new Map(doers.map((d) => [d.id, d]));
+    const originalDueDates = buildOriginalDueDates(revisions);
 
     return tasks.map((task) => ({
       ...task,
+      originalDueDate: originalDueDates.get(task.id) || task.dueDate,
       doer: doerMap.has(task.assignedDoerId) ? toDoerSummary(doerMap.get(task.assignedDoerId)!) : null,
     }));
   },
@@ -102,7 +115,10 @@ export const tasksService = {
       doer = user ? toDoerSummary(user) : null;
     }
 
-    return { ...task, doer };
+    const history = await revisionsService.listByTaskId(id).catch(() => []);
+    const originalDueDate = buildOriginalDueDates(history).get(id) || task.dueDate;
+
+    return { ...task, originalDueDate, doer };
   },
 
   async create(input: {

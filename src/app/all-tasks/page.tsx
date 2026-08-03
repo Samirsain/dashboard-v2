@@ -284,7 +284,7 @@ function AllTasksInner() {
       dataRows = completedTasks.map((t) => [
         t.title,
         t.doer?.name ?? t.assignedDoerId,
-        formatDMY(t.dueDate),
+        formatDMY(t.originalDueDate),
         formatDMY(taskCompletedOn(t)),
         String(t.revisionCount),
         t.priority,
@@ -647,7 +647,7 @@ function AllTasksInner() {
                     <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                       <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.title}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{t.doer?.name ?? "—"}</td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.dueDate)}</td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.originalDueDate)}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(taskCompletedOn(t))}</td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                         {t.revisionCount > 0 ? <span className="text-error font-bold">{t.revisionCount}×</span> : "0"}

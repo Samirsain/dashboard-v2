@@ -1,5 +1,6 @@
 import type { Task, User, Revision, ChecklistInstance, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
 import { calculatePerformance, DEFAULT_LATE_DONE_WEIGHT } from "./performanceScoring";
+import { buildOriginalDueDates } from "./dueDates";
 
 export { DEFAULT_LATE_DONE_WEIGHT };
 
@@ -29,16 +30,6 @@ export function getTaskCategory(
     return completedDate > dueDate ? "Yellow" : "Green";
   }
   return dueDate < todayIso ? "Red" : "Pending";
-}
-
-export function buildOriginalDueDates(revisions: Revision[]): Map<string, string> {
-  const earliest = new Map<string, Revision>();
-  for (const r of revisions) {
-    if (!r.taskId || !r.oldDueDate) continue;
-    const current = earliest.get(r.taskId);
-    if (!current || r.revisedAt < current.revisedAt) earliest.set(r.taskId, r);
-  }
-  return new Map(Array.from(earliest, ([taskId, r]) => [taskId, r.oldDueDate]));
 }
 
 /**

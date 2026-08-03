@@ -144,7 +144,14 @@ export interface Task {
    */
   doerName: string;
   priority: TaskPriority;
+  /** The CURRENT deadline — rewritten in place by every revision. */
   dueDate: string;
+  /**
+   * The deadline the task was first committed to, recovered from its oldest
+   * revision. Equals `dueDate` when never revised. Shown as "Planned Date" and
+   * used by scoring, so a task revised five times can't read as on time.
+   */
+  originalDueDate: string;
   status: TaskStatus;
   revisionDate: string;
   revisionCount: number;
