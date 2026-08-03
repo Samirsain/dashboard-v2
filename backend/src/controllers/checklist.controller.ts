@@ -3,14 +3,49 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { checklistService } from "../services/checklist.service";
 import { canViewAllData } from "../utils/access";
+import { buildListVisibility } from "../utils/listAccess";
+import { listsService } from "../services/lists.service";
 import type {
   CreateChecklistTemplateInput,
   UpdateChecklistTemplateInput,
 } from "../validation/checklist.schema";
 
+/**
+ * Checklist instances carry no list of their own — they inherit it from the
+ * template that generated them, so scoping by sheet has to go through that.
+ * Returns the instances the user is allowed to see.
+ */
+async function scopeInstancesToLists<T extends { templateId: string }>(
+  user: Request["user"],
+  instances: T[]
+): Promise<T[]> {
+  if (user?.role === "MD") return instances;
+  const [templates, lists] = await Promise.all([
+    checklistService.listTemplates(),
+    listsService.list(),
+  ]);
+  const listIdByTemplate = new Map(templates.map((t) => [t.id, t.listId]));
+  const canSee = buildListVisibility(user, lists);
+  return instances.filter((i) => canSee(listIdByTemplate.get(i.templateId) ?? "", "checklist"));
+}
+
 export const checklistController = {
-  listTemplates: asyncHandler(async (_req: Request, res: Response) => {
-    ok(res, await checklistService.listTemplates());
+  listTemplates: asyncHandler(async (req: Request, res: Response) => {
+    const templates = await checklistService.listTemplates();
+
+    // A plain doer only needs their own recurring items.
+    if (!canViewAllData(req.user)) {
+      ok(res, templates.filter((t) => t.assignedDoerId === req.user!.sub));
+      return;
+    }
+    // View-all users other than the MD are held to their sheet membership.
+    if (req.user?.role !== "MD") {
+      const lists = await listsService.list();
+      const canSee = buildListVisibility(req.user, lists);
+      ok(res, templates.filter((t) => canSee(t.listId, "checklist")));
+      return;
+    }
+    ok(res, templates);
   }),
 
   getTemplate: asyncHandler(async (req: Request, res: Response) => {
@@ -43,22 +78,27 @@ export const checklistController = {
     const { date, status, assignedDoerId } = req.query as Record<string, string | undefined>;
     // Normal doers are scoped to their own checklist items; view-all users see everyone's.
     const scopedDoerId = canViewAllData(req.user) ? assignedDoerId : req.user!.sub;
-    ok(
-      res,
-      await checklistService.listInstances({
-        date,
-        status: status as never,
-        assignedDoerId: scopedDoerId,
-      })
-    );
+    const instances = await checklistService.listInstances({
+      date,
+      status: status as never,
+      assignedDoerId: scopedDoerId,
+    });
+    // A doer keeps their own items whatever sheet those live in; view-all
+    // users are held to their sheet membership.
+    if (!canViewAllData(req.user)) {
+      ok(res, instances);
+      return;
+    }
+    ok(res, await scopeInstancesToLists(req.user, instances));
   }),
 
   listToday: asyncHandler(async (req: Request, res: Response) => {
     const all = await checklistService.listToday();
-    const scoped = canViewAllData(req.user)
-      ? all
-      : all.filter((i) => i.assignedDoerId === req.user!.sub);
-    ok(res, scoped);
+    if (!canViewAllData(req.user)) {
+      ok(res, all.filter((i) => i.assignedDoerId === req.user!.sub));
+      return;
+    }
+    ok(res, await scopeInstancesToLists(req.user, all));
   }),
 
   completeInstance: asyncHandler(async (req: Request, res: Response) => {

@@ -3,7 +3,6 @@ import { dataService, type SheetRecord } from "./data.service";
 import { generateId } from "../utils/id";
 import { todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
-import { canViewAllData } from "../utils/access";
 import { usersService } from "./users.service";
 import type { JwtClaims, List, ListType, User } from "../types";
 
@@ -77,7 +76,10 @@ export const listsService = {
     const records = await dataService.findAll(entity);
     let lists = records.map(toList);
     if (opts.type) lists = lists.filter((l) => l.type === opts.type);
-    if (opts.user && !canViewAllData(opts.user)) {
+    // Only the MD sees every sheet. Everyone else — PC included — is held to
+    // the membership ticked in Settings; previously a PC bypassed this because
+    // canViewAllData() is true for them, so unticking a sheet did nothing.
+    if (opts.user && opts.user.role !== "MD") {
       lists = lists.filter((l) => l.memberIds.includes(opts.user!.sub));
     }
     return lists.sort((a, b) => a.name.localeCompare(b.name));
