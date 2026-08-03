@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { usersService } from "../services/users.service";
+import { listsService } from "../services/lists.service";
+import { logger } from "../utils/logger";
 import type { CreateUserInput, ResetPasswordInput, UpdateUserInput } from "../validation/user.schema";
 
 export const usersController = {
@@ -18,6 +20,22 @@ export const usersController = {
   create: asyncHandler(async (req: Request, res: Response) => {
     const input = req.body as CreateUserInput;
     const user = await usersService.create(input);
+
+    // Seed the new account into the default OFFICE sheets. Sheet access is now
+    // genuinely enforced, so without this a brand-new person (a PC especially)
+    // would log in able to see nothing at all until the MD ticked boxes by
+    // hand. Best-effort: a failure here must not undo a successful signup.
+    try {
+      const lists = await listsService.list();
+      const offices = lists.filter((l) => l.name.trim().toUpperCase().startsWith("OFFICE"));
+      for (const office of offices) {
+        if (office.memberIds.includes(user.id)) continue;
+        await listsService.updateMembers(office.id, [...office.memberIds, user.id]);
+      }
+    } catch (err) {
+      logger.error({ err, userId: user.id }, "Could not add new user to the default OFFICE lists");
+    }
+
     created(res, user);
   }),
 

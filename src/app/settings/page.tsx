@@ -11,26 +11,9 @@ import ResetPasswordModal from "@/components/ResetPasswordModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { canDeleteDoer, canManageDoers } from "@/lib/access";
+import { buildBuckets, hasListAccess, type Bucket } from "@/lib/listBuckets";
+import PcManagement from "@/components/PcManagement";
 import type { Doer, List, Task } from "@/lib/types";
-
-/** First word of a list's name, uppercased — "SAHIL SIR TASKLIST" -> "SAHIL". */
-function listGroupKey(name: string): string {
-  return name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
-}
-
-/**
- * One access row in a doer's Lists dropdown. `isOffice` buckets are the
- * implicit default (no list record — everyone has them), so they're shown
- * checked and can't be toggled. Named buckets map to a real list whose
- * member set the admin grants/revokes.
- */
-type Bucket = {
-  key: string;
-  label: string;
-  kind: "task" | "checklist";
-  listId: string;
-  isOffice: boolean;
-};
 
 function StatusPill({ status }: { status: Doer["status"] }) {
   if (status === "Inactive") {
@@ -67,6 +50,10 @@ function SettingsInner() {
   const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
   // "doerId:listId" currently being saved, so its checkbox disables briefly.
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [tab, setTab] = useState<"doers" | "pcs">("doers");
+  // Whether "+ Add" creates a PC or a plain doer, driven by the active tab.
+  const [addRole, setAddRole] = useState<Doer["role"] | undefined>(undefined);
+  const [demotingId, setDemotingId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -100,35 +87,10 @@ function SettingsInner() {
   // OFFICE TL/CL always appear first. If a real list starting with "OFFICE"
   // exists, we link its ID so the checkbox can toggle membership. Otherwise
   // they show as read-only (isOffice fallback).
-  const buckets = useMemo<Bucket[]>(() => {
-    const officeTl = lists.find((l) => l.type === "task" && l.name.trim().toUpperCase().startsWith("OFFICE"));
-    const officeCl = lists.find((l) => l.type === "checklist" && l.name.trim().toUpperCase().startsWith("OFFICE"));
+  const buckets = useMemo(() => buildBuckets(lists), [lists]);
 
-    const taskBuckets: Bucket[] = [
-      { key: "office-task", label: "OFFICE TL", kind: "task", listId: officeTl?.id ?? "", isOffice: !officeTl },
-    ];
-    const checklistBuckets: Bucket[] = [
-      { key: "office-checklist", label: "OFFICE CL", kind: "checklist", listId: officeCl?.id ?? "", isOffice: !officeCl },
-    ];
-
-    for (const l of lists) {
-      if (l.name.trim().toUpperCase().startsWith("OFFICE")) continue; // already in fixed slots above
-      const short = listGroupKey(l.name);
-      if (l.type === "task") {
-        taskBuckets.push({ key: `t-${l.id}`, label: `${short} TL`, kind: "task", listId: l.id, isOffice: false });
-      } else {
-        checklistBuckets.push({ key: `c-${l.id}`, label: `${short} CL`, kind: "checklist", listId: l.id, isOffice: false });
-      }
-    }
-    return [...taskBuckets, ...checklistBuckets];
-  }, [lists]);
-
-  // Whether a doer currently has access to a bucket.
-  // Office buckets also have a real listId — check membership like any other list.
   function hasAccess(doerId: string, bucket: Bucket): boolean {
-    const list = lists.find((l) => l.id === bucket.listId);
-    if (!list) return bucket.isOffice; // fallback: office = yes if list not found
-    return list.memberIds.includes(doerId);
+    return hasListAccess(lists, doerId, bucket);
   }
 
   // Grant/revoke a doer's access to a list by rewriting its member set.
@@ -157,6 +119,27 @@ function SettingsInner() {
       setLists((prev) => prev.filter((l) => l.id !== bucket.listId));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to delete list.");
+    }
+  }
+
+  const pcs = useMemo(() => doers.filter((d) => d.role === "PC"), [doers]);
+
+  /**
+   * Drop a PC back to a plain Doer. Their account, tasks and sheet membership
+   * all stay put — only the extra reach goes away, so this is reversible and
+   * far safer than deleting them.
+   */
+  async function handleDemotePc(pc: Doer) {
+    if (!confirm(`Remove PC access from ${pc.name}? They stay on as a Doer, keeping their tasks.`))
+      return;
+    setDemotingId(pc.id);
+    try {
+      const updated = await api.patch<Doer>(`/users/${pc.id}`, { role: "Doer" });
+      setDoers((prev) => prev.map((d) => (d.id === pc.id ? updated : d)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to remove PC access.");
+    } finally {
+      setDemotingId(null);
     }
   }
 
@@ -238,7 +221,7 @@ function SettingsInner() {
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
         <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
-            Settings — Doer Management
+            Settings — {tab === "pcs" ? "PC Management" : "Doer Management"}
           </div>
           <div className="flex items-center gap-4">
             <button
@@ -248,10 +231,13 @@ function SettingsInner() {
               + Create List
             </button>
             <button
-              onClick={() => setShowAddDoer(true)}
+              onClick={() => {
+                setAddRole(tab === "pcs" ? "PC" : undefined);
+                setShowAddDoer(true);
+              }}
               className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer"
             >
-              + Add Doer
+              {tab === "pcs" ? "+ Add PC" : "+ Add Doer"}
             </button>
           </div>
         </header>
@@ -259,7 +245,7 @@ function SettingsInner() {
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
           <div className="border-b-2 border-on-surface pb-stack-md flex justify-between items-end md:hidden">
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              Doer Management
+              {tab === "pcs" ? "PC Management" : "Doer Management"}
             </h2>
             <div className="flex items-center gap-2">
               <button
@@ -269,12 +255,36 @@ function SettingsInner() {
                 + List
               </button>
               <button
-                onClick={() => setShowAddDoer(true)}
+                onClick={() => {
+                  setAddRole(tab === "pcs" ? "PC" : undefined);
+                  setShowAddDoer(true);
+                }}
                 className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
               >
-                + Doer
+                {tab === "pcs" ? "+ PC" : "+ Doer"}
               </button>
             </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 border-b-2 border-on-surface pb-stack-md">
+            {([
+              { key: "doers", label: `Doer Management (${doers.length})` },
+              { key: "pcs", label: `PC Management (${pcs.length})` },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                aria-pressed={tab === t.key}
+                className={`inline-flex items-center justify-center min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border-2 border-on-surface transition-colors cursor-pointer ${
+                  tab === t.key
+                    ? "bg-on-surface text-surface"
+                    : "bg-surface text-on-surface hover:bg-surface-container"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
           {resetNotice && (
@@ -288,159 +298,175 @@ function SettingsInner() {
             </p>
           )}
 
-          <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
-              <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
-                <tr>
-                  <th className="py-3 px-4 border-r border-surface-variant">Name</th>
-                  <th className="py-3 px-4 border-r border-surface-variant w-32">User ID</th>
-                  <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
-                  <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
-                  <th className="py-3 px-4 w-64 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="font-body-md text-body-md text-on-surface">
-                {loading && (
+          {tab === "pcs" ? (
+            <PcManagement
+              pcs={pcs}
+              lists={lists}
+              buckets={buckets}
+              loading={loading}
+              savingKey={savingKey}
+              demotingId={demotingId}
+              onToggleAccess={toggleAccess}
+              onRename={handleRename}
+              onResetPassword={setDoerToReset}
+              onDemote={handleDemotePc}
+              onDelete={handleDelete}
+            />
+          ) : (
+            <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[900px]">
+                <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   <tr>
-                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                      Loading...
-                    </td>
+                    <th className="py-3 px-4 border-r border-surface-variant">Name</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-32">User ID</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
+                    <th className="py-3 px-4 w-64 text-center">Action</th>
                   </tr>
-                )}
-                {!loading && doers.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                      No doers found.
-                    </td>
-                  </tr>
-                )}
-                {doers.map((d) => (
-                  <tr key={d.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
-                    <td className="py-3 px-4 border-r border-surface-variant">
-                      <div className="flex items-center gap-2">
-                        <InitialsAvatar name={d.name} className="w-6 h-6 border border-on-surface" />
-                        <span className="font-medium">{d.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
-                      {d.employeeCode || "—"}
-                    </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
-                      {(() => {
-                        const pending = pendingRoles[d.id];
-                        const isDirty = pending !== undefined && pending !== d.role;
-                        const isSaving = savingRoleId === d.id;
-                        return (
-                          <div className="flex items-center justify-center gap-2">
-                            <select
-                              value={pending ?? d.role}
-                              onChange={(e) => handleRoleSelect(d.id, e.target.value as Doer["role"])}
-                              disabled={isSaving}
-                              title="MD gets full access (Settings, Team Performance, All Tasks); PC gets everything except deleting a task, deleting a doer, Team Performance, and editing attendance"
-                              className={`border-2 bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none disabled:opacity-50 ${
-                                isDirty ? "border-amber-500" : "border-on-surface"
-                              }`}
-                            >
-                              <option value="Doer">Doer</option>
-                              <option value="PC">PC</option>
-                              <option value="MD">MD</option>
-                            </select>
-                            {isDirty && (
-                              <button
-                                onClick={() => handleRoleSave(d)}
+                </thead>
+                <tbody className="font-body-md text-body-md text-on-surface">
+                  {loading && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                        Loading...
+                      </td>
+                    </tr>
+                  )}
+                  {!loading && doers.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                        No doers found.
+                      </td>
+                    </tr>
+                  )}
+                  {doers.map((d) => (
+                    <tr key={d.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
+                      <td className="py-3 px-4 border-r border-surface-variant">
+                        <div className="flex items-center gap-2">
+                          <InitialsAvatar name={d.name} className="w-6 h-6 border border-on-surface" />
+                          <span className="font-medium">{d.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
+                        {d.employeeCode || "—"}
+                      </td>
+                      <td className="py-3 px-4 border-r border-surface-variant text-center">
+                        {(() => {
+                          const pending = pendingRoles[d.id];
+                          const isDirty = pending !== undefined && pending !== d.role;
+                          const isSaving = savingRoleId === d.id;
+                          return (
+                            <div className="flex items-center justify-center gap-2">
+                              <select
+                                value={pending ?? d.role}
+                                onChange={(e) => handleRoleSelect(d.id, e.target.value as Doer["role"])}
                                 disabled={isSaving}
-                                className="px-2 py-1 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+                                title="MD gets full access (Settings, Team Performance, All Tasks); PC gets everything except deleting a task, deleting a doer, Team Performance, and editing attendance"
+                                className={`border-2 bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none disabled:opacity-50 ${
+                                  isDirty ? "border-amber-500" : "border-on-surface"
+                                }`}
                               >
-                                {isSaving ? "Saving…" : "Save"}
+                                <option value="Doer">Doer</option>
+                                <option value="PC">PC</option>
+                                <option value="MD">MD</option>
+                              </select>
+                              {isDirty && (
+                                <button
+                                  onClick={() => handleRoleSave(d)}
+                                  disabled={isSaving}
+                                  className="px-2 py-1 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+                                >
+                                  {isSaving ? "Saving…" : "Save"}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="py-3 px-4 border-r border-surface-variant align-top">
+                        {(() => {
+                          const accessCount = buckets.filter((b) => hasAccess(d.id, b)).length;
+                          return (
+                            <div className="relative">
+                              <button
+                                onClick={() =>
+                                  setOpenListsDoerId((prev) => (prev === d.id ? null : d.id))
+                                }
+                                className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                              >
+                                <span className="truncate">
+                                  {accessCount} list{accessCount === 1 ? "" : "s"}
+                                </span>
+                                <span className="material-symbols-outlined text-base">
+                                  {openListsDoerId === d.id ? "expand_less" : "expand_more"}
+                                </span>
                               </button>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-3 px-4 border-r border-surface-variant align-top">
-                      {(() => {
-                        const accessCount = buckets.filter((b) => hasAccess(d.id, b)).length;
-                        return (
-                          <div className="relative">
-                            <button
-                              onClick={() =>
-                                setOpenListsDoerId((prev) => (prev === d.id ? null : d.id))
-                              }
-                              className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                            >
-                              <span className="truncate">
-                                {accessCount} list{accessCount === 1 ? "" : "s"}
-                              </span>
-                              <span className="material-symbols-outlined text-base">
-                                {openListsDoerId === d.id ? "expand_less" : "expand_more"}
-                              </span>
-                            </button>
 
-                            {openListsDoerId === d.id && (
-                              <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
-                                {buckets.map((b) => {
-                                  const checked = hasAccess(d.id, b);
-                                  const busy = savingKey === `${d.id}:${b.listId}`;
-                                  return (
-                                    <label
-                                      key={b.key}
-                                      className="flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container cursor-pointer"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        disabled={busy}
-                                        onChange={(e) => toggleAccess(d.id, b, e.target.checked)}
-                                      />
-                                      <span className="font-label-sm text-label-sm uppercase text-on-surface">
-                                        {b.label}
-                                      </span>
-                                      {b.isOffice && (
-                                        <span className="ml-auto font-label-sm text-[10px] uppercase text-on-surface-variant">
-                                          Default
+                              {openListsDoerId === d.id && (
+                                <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
+                                  {buckets.map((b) => {
+                                    const checked = hasAccess(d.id, b);
+                                    const busy = savingKey === `${d.id}:${b.listId}`;
+                                    return (
+                                      <label
+                                        key={b.key}
+                                        className="flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container cursor-pointer"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          disabled={busy}
+                                          onChange={(e) => toggleAccess(d.id, b, e.target.checked)}
+                                        />
+                                        <span className="font-label-sm text-label-sm uppercase text-on-surface">
+                                          {b.label}
                                         </span>
-                                      )}
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleRename(d)}
-                          className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          onClick={() => setDoerToReset(d)}
-                          className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
-                        >
-                          Reset Password
-                        </button>
-                        {/* Deleting a doer is MD-only — a PC can add, rename
-                            and reset passwords but never remove someone. */}
-                        {canDeleteDoer(currentUser) && !currentUser?.isAssistant && (
+                                        {b.isOffice && (
+                                          <span className="ml-auto font-label-sm text-[10px] uppercase text-on-surface-variant">
+                                            Default
+                                          </span>
+                                        )}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => handleDelete(d)}
-                            className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                            onClick={() => handleRename(d)}
+                            className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
                           >
-                            Delete
+                            Rename
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          <button
+                            onClick={() => setDoerToReset(d)}
+                            className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                          >
+                            Reset Password
+                          </button>
+                          {/* Deleting a doer is MD-only — a PC can add, rename
+                              and reset passwords but never remove someone. */}
+                          {canDeleteDoer(currentUser) && !currentUser?.isAssistant && (
+                            <button
+                              onClick={() => handleDelete(d)}
+                              className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="border-b-2 border-on-surface pb-stack-md">
             <h2 className="font-headline-lg-mobile md:font-headline-md text-headline-lg-mobile md:text-headline-md text-on-surface uppercase tracking-tighter">
@@ -522,10 +548,14 @@ function SettingsInner() {
 
       {showAddDoer && (
         <CreateDoerModal
+          lockedRole={addRole}
           onClose={() => setShowAddDoer(false)}
           onCreated={(doer) => {
             setDoers((prev) => [...prev, doer]);
             setShowAddDoer(false);
+            // A brand-new account starts in whichever lists ensureDefaultLists
+            // seeded it into, so pull the fresh membership rather than guessing.
+            loadData();
           }}
         />
       )}
