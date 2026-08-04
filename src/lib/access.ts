@@ -3,17 +3,22 @@ import type { Doer } from "./types";
 /**
  * Who can do what.
  *
- * MD has everything. PC is a deputy: full access EXCEPT four things that stay
- * with the MD alone —
+ * MD has everything, always. PC is a deputy: full access, plus four
+ * capabilities the MD grants (or doesn't) individually per PC from the "PC
+ * Management" column in Settings —
  *   1. deleting a task
- *   2. Doer Management (Settings) — adding, renaming, deleting doers,
- *      resetting passwords, and managing list access, all of it
+ *   2. Doer Management (Settings) — adding, renaming, resetting passwords,
+ *      and managing list access
  *   3. Team Performance (the scoreboard)
  *   4. editing attendance records
+ * Each defaults to false, so a freshly promoted PC starts with none of them.
+ * Deleting a doer specifically stays MD-only and isn't toggleable, even with
+ * Doer Management access — see canDeleteDoer below.
  *
  * A plain Doer only ever sees and acts on their own work. Every check below
- * reads the current role and nothing is stored per user, so demoting someone
- * from PC back to Doer drops them straight back to plain Doer access.
+ * reads the current role/flags and nothing else is stored per user, so
+ * demoting someone from PC back to Doer drops them straight back to plain
+ * Doer access.
  *
  * Mirrors backend/src/utils/access.ts — keep the two in sync.
  */
@@ -39,38 +44,42 @@ export function canMarkAttendance(user: Doer | null | undefined): boolean {
   return user.isAttendanceManager === true;
 }
 
-// ---- MD-only ---------------------------------------------------------------
+// ---- MD-always, PC-if-granted ----------------------------------------------
 
-/** Delete a task. Blocked for PC. */
+/** Delete a task. MD always; PC only if granted in PC Management. */
 export function canDeleteTask(user: Doer | null | undefined): boolean {
-  return isMd(user);
+  return isMd(user) || (user?.role === "PC" && user.canDeleteTask === true);
 }
 
 /**
- * Open Settings / Doer Management at all — add, rename, delete a doer, reset
- * passwords, toggle list access. A PC gets none of it, not even a read-only
- * peek; the whole page (and its nav link) is gated on this.
+ * Open Settings / Doer Management at all — add, rename, reset passwords,
+ * toggle list access. MD always; PC only if granted in PC Management. Note
+ * this does NOT cover deleting a doer — see canDeleteDoer.
  */
 export function canManageDoers(user: Doer | null | undefined): boolean {
-  return isMd(user);
+  return isMd(user) || (user?.role === "PC" && user.canManageDoers === true);
 }
 
-/** Delete a doer specifically — kept separate for the delete button's own guard. */
+/**
+ * Delete a doer specifically — always MD-only, not toggleable even with
+ * Doer Management access. Too destructive to hand off, and it keeps a PC
+ * from ever being able to remove the MD's own account.
+ */
 export function canDeleteDoer(user: Doer | null | undefined): boolean {
   return isMd(user);
 }
 
-/** Create, rename and delete lists. Part of Doer Management — MD only. */
+/** Create, rename and delete lists. Part of Doer Management. */
 export function canManageLists(user: Doer | null | undefined): boolean {
-  return isMd(user);
+  return canManageDoers(user);
 }
 
-/** Open the Team Performance scoreboard. Blocked for PC. */
+/** Open the Team Performance scoreboard. MD always; PC only if granted in PC Management. */
 export function canViewTeamPerformance(user: Doer | null | undefined): boolean {
-  return isMd(user);
+  return isMd(user) || (user?.role === "PC" && user.canViewTeamPerformance === true);
 }
 
-/** Edit an attendance record's times/status, or clear/recompute attendance. */
+/** Edit an attendance record's times/status. MD always; PC only if granted in PC Management. */
 export function canEditAttendance(user: Doer | null | undefined): boolean {
-  return isMd(user);
+  return isMd(user) || (user?.role === "PC" && user.canEditAttendance === true);
 }

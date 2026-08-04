@@ -2,7 +2,8 @@ import { Router } from "express";
 import { tasksController } from "../controllers/tasks.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole, requireTaskCreateAccess, forbidAssistant } from "../middleware/role.middleware";
+import { requireTaskCreateAccess, requirePermission, forbidAssistant } from "../middleware/role.middleware";
+import { canDeleteTask, canViewTeamPerformance } from "../utils/access";
 import { idParamSchema } from "../validation/user.schema";
 import {
   createTaskSchema,
@@ -32,11 +33,16 @@ router.patch(
   tasksController.update
 );
 // Must be registered before "/:id" so "completed" isn't swallowed as an id param.
-// Irreversible — wipes every Completed task. Admin only (Team Performance reset).
-router.delete("/completed", requireRole("MD"), tasksController.removeCompleted);
+// Irreversible — wipes every Completed task. Team Performance reset, so gated
+// the same way as that scoreboard: MD always, PC only if granted.
+router.delete(
+  "/completed",
+  requirePermission(canViewTeamPerformance),
+  tasksController.removeCompleted
+);
 router.delete(
   "/:id",
-  requireRole("MD"),
+  requirePermission(canDeleteTask, "Only MD/PC with Delete Task access can delete a task."),
   forbidAssistant,
   validate({ params: idParamSchema }),
   tasksController.remove

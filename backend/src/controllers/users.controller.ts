@@ -4,7 +4,23 @@ import { ok, created } from "../utils/response";
 import { usersService } from "../services/users.service";
 import { listsService } from "../services/lists.service";
 import { logger } from "../utils/logger";
+import { AppError } from "../utils/AppError";
 import type { CreateUserInput, ResetPasswordInput, UpdateUserInput } from "../validation/user.schema";
+
+/**
+ * Fields that change WHAT a user can do, not just their profile info. A PC
+ * with Doer Management access can rename people, reset passwords, and manage
+ * sheet access — but never touch these, or they could grant themselves (or
+ * anyone) more power. MD-only, enforced here rather than just on the route so
+ * it can't be missed on a future field addition to updateUserSchema.
+ */
+const PRIVILEGED_FIELDS = [
+  "role",
+  "canDeleteTask",
+  "canManageDoers",
+  "canViewTeamPerformance",
+  "canEditAttendance",
+] as const;
 
 export const usersController = {
   list: asyncHandler(async (_req: Request, res: Response) => {
@@ -41,6 +57,12 @@ export const usersController = {
 
   update: asyncHandler(async (req: Request, res: Response) => {
     const input = req.body as UpdateUserInput;
+    const touchesPrivileged = PRIVILEGED_FIELDS.some(
+      (field) => input[field] !== undefined
+    );
+    if (touchesPrivileged && req.user?.role !== "MD") {
+      throw AppError.forbidden("Only MD can change a role or permission toggle.");
+    }
     const user = await usersService.update(req.params.id as string, input);
     ok(res, user);
   }),

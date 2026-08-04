@@ -23,6 +23,17 @@ export interface User {
    * primary admin only.
    */
   isAssistant: boolean;
+  /**
+   * Per-PC permission toggles for the four capabilities that otherwise stay
+   * MD-only: deleting a task, Doer Management (Settings), Team Performance,
+   * and editing attendance. Meaningless for MD (already has everything) and
+   * for a plain Doer (never gets these regardless). Defaults false so a PC
+   * gains nothing until the MD explicitly flips it on in Settings.
+   */
+  canDeleteTask: boolean;
+  canManageDoers: boolean;
+  canViewTeamPerformance: boolean;
+  canEditAttendance: boolean;
   createdAt: string;
 }
 
@@ -238,6 +249,11 @@ export interface JwtClaims {
   isAttendanceManager?: boolean;
   /** Mirrors User.isAssistant so delete guards can check without a DB lookup. */
   isAssistant?: boolean;
+  /** Mirror the same-named User fields so permission checks don't need a DB lookup. */
+  canDeleteTask?: boolean;
+  canManageDoers?: boolean;
+  canViewTeamPerformance?: boolean;
+  canEditAttendance?: boolean;
 }
 
 export interface DashboardSummary {

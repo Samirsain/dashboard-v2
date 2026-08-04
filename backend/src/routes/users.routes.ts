@@ -2,7 +2,8 @@ import { Router } from "express";
 import { usersController } from "../controllers/users.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole, forbidAssistant } from "../middleware/role.middleware";
+import { requireRole, requirePermission, forbidAssistant } from "../middleware/role.middleware";
+import { canManageDoers } from "../utils/access";
 import {
   createUserSchema,
   idParamSchema,
@@ -14,20 +15,23 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Doer Management (create/update/delete/reset-password) is MD-only — a PC
-// doesn't get this at all, not even create/rename. GET stays open to everyone
-// so the rest of the app can still resolve names/roles.
+// Doer Management (create/update/reset-password) is MD-only by default, but
+// a PC can be granted it individually — see canManageDoers. Role and
+// permission-flag changes stay MD-only regardless (enforced in the
+// controller, since PATCH also carries plain profile edits a permitted PC
+// can make). Deleting a doer never delegates. GET stays open to everyone so
+// the rest of the app can still resolve names/roles.
 router.get("/", usersController.list);
 router.get("/:id", validate({ params: idParamSchema }), usersController.getById);
 router.post(
   "/",
-  requireRole("MD"),
+  requirePermission(canManageDoers),
   validate({ body: createUserSchema }),
   usersController.create
 );
 router.patch(
   "/:id",
-  requireRole("MD"),
+  requirePermission(canManageDoers),
   validate({ params: idParamSchema, body: updateUserSchema }),
   usersController.update
 );
@@ -40,7 +44,7 @@ router.delete(
 );
 router.post(
   "/:id/reset-password",
-  requireRole("MD"),
+  requirePermission(canManageDoers),
   validate({ params: idParamSchema, body: resetPasswordSchema }),
   usersController.resetPassword
 );

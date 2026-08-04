@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/AppError";
 import { canCreateTask } from "../utils/access";
-import type { UserRole } from "../types";
+import type { JwtClaims, UserRole } from "../types";
 
 /** Restricts a route to one or more roles. Must run after requireAuth. */
 export function requireRole(...roles: UserRole[]) {
@@ -12,6 +12,28 @@ export function requireRole(...roles: UserRole[]) {
     }
     if (!roles.includes(req.user.role)) {
       next(AppError.forbidden(`Requires one of roles: ${roles.join(", ")}`));
+      return;
+    }
+    next();
+  };
+}
+
+/**
+ * Restricts a route to whoever the given check function allows — e.g.
+ * requirePermission(canDeleteTask). Unlike requireRole this can pass a PC who
+ * has that specific capability granted, not just MD.
+ */
+export function requirePermission(
+  check: (user: JwtClaims | undefined) => boolean,
+  message = "You don't have access to this."
+) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      next(AppError.unauthorized());
+      return;
+    }
+    if (!check(req.user)) {
+      next(AppError.forbidden(message));
       return;
     }
     next();

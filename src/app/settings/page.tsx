@@ -50,7 +50,12 @@ function SettingsInner() {
   const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
   // "doerId:listId" currently being saved, so its checkbox disables briefly.
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  // Which doer's "PC Management" dropdown is currently open.
+  const [openPermsDoerId, setOpenPermsDoerId] = useState<string | null>(null);
+  // "doerId:field" currently being saved, so its checkbox disables briefly.
+  const [savingPermKey, setSavingPermKey] = useState<string | null>(null);
   const [reassignFrom, setReassignFrom] = useState<Doer | null>(null);
+  const isMdViewer = currentUser?.role === "MD";
 
   async function loadData() {
     setLoading(true);
@@ -105,6 +110,30 @@ function SettingsInner() {
       alert(err instanceof ApiError ? err.message : "Failed to update access.");
     } finally {
       setSavingKey(null);
+    }
+  }
+
+  const PC_PERMISSIONS = [
+    { field: "canDeleteTask", label: "Delete Task" },
+    { field: "canManageDoers", label: "Doer Management" },
+    { field: "canViewTeamPerformance", label: "Team Performance" },
+    { field: "canEditAttendance", label: "Attendance Edit" },
+  ] as const;
+
+  // Grant/revoke one of the four MD-exclusive capabilities for a single PC.
+  async function togglePermission(
+    doer: Doer,
+    field: (typeof PC_PERMISSIONS)[number]["field"],
+    next: boolean
+  ) {
+    setSavingPermKey(`${doer.id}:${field}`);
+    try {
+      const updated = await api.patch<Doer>(`/users/${doer.id}`, { [field]: next });
+      setDoers((prev) => prev.map((d) => (d.id === doer.id ? updated : d)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to update access.");
+    } finally {
+      setSavingPermKey(null);
     }
   }
 
@@ -270,20 +299,21 @@ function SettingsInner() {
                     <th className="py-3 px-4 border-r border-surface-variant w-32">User ID</th>
                     <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
                     <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
+                    <th className="py-3 px-4 border-r border-surface-variant w-56">PC Management</th>
                     <th className="py-3 px-4 w-64 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-md text-on-surface">
                   {loading && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         Loading...
                       </td>
                     </tr>
                   )}
                   {!loading && doers.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         No doers found.
                       </td>
                     </tr>
@@ -305,37 +335,43 @@ function SettingsInner() {
                         {d.employeeCode || "—"}
                       </td>
                       <td className="py-3 px-4 border-r border-surface-variant text-center">
-                        {(() => {
-                          const pending = pendingRoles[d.id];
-                          const isDirty = pending !== undefined && pending !== d.role;
-                          const isSaving = savingRoleId === d.id;
-                          return (
-                            <div className="flex items-center justify-center gap-2">
-                              <select
-                                value={pending ?? d.role}
-                                onChange={(e) => handleRoleSelect(d.id, e.target.value as Doer["role"])}
-                                disabled={isSaving}
-                                title="MD gets full access (Settings, Team Performance, All Tasks); PC gets everything except deleting a task, deleting a doer, Team Performance, and editing attendance"
-                                className={`border-2 bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none disabled:opacity-50 ${
-                                  isDirty ? "border-amber-500" : "border-on-surface"
-                                }`}
-                              >
-                                <option value="Doer">Doer</option>
-                                <option value="PC">PC</option>
-                                <option value="MD">MD</option>
-                              </select>
-                              {isDirty && (
-                                <button
-                                  onClick={() => handleRoleSave(d)}
+                        {!isMdViewer ? (
+                          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                            {d.role}
+                          </span>
+                        ) : (
+                          (() => {
+                            const pending = pendingRoles[d.id];
+                            const isDirty = pending !== undefined && pending !== d.role;
+                            const isSaving = savingRoleId === d.id;
+                            return (
+                              <div className="flex items-center justify-center gap-2">
+                                <select
+                                  value={pending ?? d.role}
+                                  onChange={(e) => handleRoleSelect(d.id, e.target.value as Doer["role"])}
                                   disabled={isSaving}
-                                  className="px-2 py-1 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+                                  title="MD gets everything, always. PC gets everything plus whatever's granted in PC Management (Delete Task, Doer Management, Team Performance, Attendance Edit)."
+                                  className={`border-2 bg-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none disabled:opacity-50 ${
+                                    isDirty ? "border-amber-500" : "border-on-surface"
+                                  }`}
                                 >
-                                  {isSaving ? "Saving…" : "Save"}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })()}
+                                  <option value="Doer">Doer</option>
+                                  <option value="PC">PC</option>
+                                  <option value="MD">MD</option>
+                                </select>
+                                {isDirty && (
+                                  <button
+                                    onClick={() => handleRoleSave(d)}
+                                    disabled={isSaving}
+                                    className="px-2 py-1 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50"
+                                  >
+                                    {isSaving ? "Saving…" : "Save"}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()
+                        )}
                       </td>
                       <td className="py-3 px-4 border-r border-surface-variant align-top">
                         {(() => {
@@ -388,6 +424,66 @@ function SettingsInner() {
                             </div>
                           );
                         })()}
+                      </td>
+                      <td className="py-3 px-4 border-r border-surface-variant align-top">
+                        {d.role !== "PC" ? (
+                          <span className="font-data-mono text-data-mono text-on-surface-variant">—</span>
+                        ) : (
+                          (() => {
+                            const grantedCount = PC_PERMISSIONS.filter(
+                              (p) => d[p.field] === true
+                            ).length;
+                            return (
+                              <div className="relative">
+                                <button
+                                  onClick={() =>
+                                    setOpenPermsDoerId((prev) => (prev === d.id ? null : d.id))
+                                  }
+                                  className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                                >
+                                  <span className="truncate">
+                                    {grantedCount} granted
+                                  </span>
+                                  <span className="material-symbols-outlined text-base">
+                                    {openPermsDoerId === d.id ? "expand_less" : "expand_more"}
+                                  </span>
+                                </button>
+
+                                {openPermsDoerId === d.id && (
+                                  <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
+                                    {PC_PERMISSIONS.map((p) => {
+                                      const checked = d[p.field] === true;
+                                      const busy = savingPermKey === `${d.id}:${p.field}`;
+                                      return (
+                                        <label
+                                          key={p.field}
+                                          className={`flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container ${
+                                            isMdViewer ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                                          }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            disabled={busy || !isMdViewer}
+                                            onChange={(e) => togglePermission(d, p.field, e.target.checked)}
+                                          />
+                                          <span className="font-label-sm text-label-sm uppercase text-on-surface">
+                                            {p.label}
+                                          </span>
+                                          {busy && (
+                                            <span className="ml-auto font-label-sm text-[10px] uppercase text-on-surface-variant">
+                                              Saving…
+                                            </span>
+                                          )}
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()
+                        )}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -565,13 +661,14 @@ function SettingsInner() {
 export default function SettingsPage() {
   const { user } = useAuth();
 
-  // Doer Management is MD-only — a PC gets everything else, but not this.
+  // Doer Management is MD-only by default — a PC only gets in if the MD has
+  // granted it from the PC Management column.
   if (user && !canManageDoers(user)) {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <p className="font-data-mono text-data-mono text-error uppercase border-2 border-error p-4">
-            Access Denied. MD Only.
+            Access Denied. Doer Management not granted to this account.
           </p>
         </div>
       </AuthGuard>

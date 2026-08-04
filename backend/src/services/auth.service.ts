@@ -25,6 +25,10 @@ export const authService = {
       canViewAll: user.canViewAll,
       isAttendanceManager: user.isAttendanceManager,
       isAssistant: user.isAssistant,
+      canDeleteTask: user.canDeleteTask,
+      canManageDoers: user.canManageDoers,
+      canViewTeamPerformance: user.canViewTeamPerformance,
+      canEditAttendance: user.canEditAttendance,
     });
     return { token, user: publicUser };
   },
@@ -49,6 +53,10 @@ export const authService = {
       canViewAll: user.canViewAll,
       isAttendanceManager: user.isAttendanceManager,
       isAssistant: user.isAssistant,
+      canDeleteTask: user.canDeleteTask,
+      canManageDoers: user.canManageDoers,
+      canViewTeamPerformance: user.canViewTeamPerformance,
+      canEditAttendance: user.canEditAttendance,
     });
     return { token, user };
   },

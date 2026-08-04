@@ -22,6 +22,10 @@ export const updateUserSchema = z.object({
   status: z.enum(["Active", "Inactive"]).optional(),
   isAttendanceManager: z.boolean().optional(),
   isAssistant: z.boolean().optional(),
+  canDeleteTask: z.boolean().optional(),
+  canManageDoers: z.boolean().optional(),
+  canViewTeamPerformance: z.boolean().optional(),
+  canEditAttendance: z.boolean().optional(),
 });
 
 export const idParamSchema = z.object({

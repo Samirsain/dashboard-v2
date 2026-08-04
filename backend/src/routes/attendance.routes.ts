@@ -2,7 +2,8 @@ import { Router } from "express";
 import { attendanceController } from "../controllers/attendance.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/role.middleware";
+import { requireRole, requirePermission } from "../middleware/role.middleware";
+import { canEditAttendance } from "../utils/access";
 import {
   attendanceDateQuerySchema,
   attendanceRangeQuerySchema,
@@ -31,7 +32,13 @@ router.patch("/remarks", validate({ body: remarksSchema }), attendanceController
 router.delete("/all", requireRole("MD"), attendanceController.clearAll);
 // Re-applies the current policy to already-marked rows (fixes old statuses). MD only.
 router.post("/recompute", requireRole("MD"), attendanceController.recompute);
-// Directly edit check-in/check-out time and/or status for any date. MD only.
-router.patch("/edit", requireRole("MD"), validate({ body: editAttendanceSchema }), attendanceController.editRecord);
+// Directly edit check-in/check-out time and/or status for any date. MD
+// always; a PC only if granted "Edit Attendance" in PC Management.
+router.patch(
+  "/edit",
+  requirePermission(canEditAttendance),
+  validate({ body: editAttendanceSchema }),
+  attendanceController.editRecord
+);
 
 export default router;

@@ -1,14 +1,15 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/role.middleware";
+import { requirePermission } from "../middleware/role.middleware";
+import { canViewTeamPerformance } from "../utils/access";
 import { performanceController } from "../controllers/performance.controller";
 
 const router = Router();
 
 router.use(requireAuth);
 
-// Team Performance is the MD's scoreboard — a PC does not get to see how the
-// team is scored, so this stays MD-only rather than the usual MD + PC.
-router.get("/dgmax", requireRole("MD"), performanceController.getDgmaxSummary);
+// Team Performance is the MD's scoreboard — MD always, a PC only if granted
+// it in PC Management.
+router.get("/dgmax", requirePermission(canViewTeamPerformance), performanceController.getDgmaxSummary);
 
 export default router;

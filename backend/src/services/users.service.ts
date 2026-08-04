@@ -22,6 +22,10 @@ function toUser(record: SheetRecord): User {
     canViewAll: (record["Can View All"] ?? "").toLowerCase() === "true",
     isAttendanceManager: (record["Is Attendance Manager"] ?? "").toLowerCase() === "true",
     isAssistant: (record["Is Assistant"] ?? "").toLowerCase() === "true",
+    canDeleteTask: (record["Can Delete Task"] ?? "").toLowerCase() === "true",
+    canManageDoers: (record["Can Manage Doers"] ?? "").toLowerCase() === "true",
+    canViewTeamPerformance: (record["Can View Team Performance"] ?? "").toLowerCase() === "true",
+    canEditAttendance: (record["Can Edit Attendance"] ?? "").toLowerCase() === "true",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -94,6 +98,10 @@ export const usersService = {
       "Can View All": "false",
       "Is Attendance Manager": "false",
       "Is Assistant": "false",
+      "Can Delete Task": "false",
+      "Can Manage Doers": "false",
+      "Can View Team Performance": "false",
+      "Can Edit Attendance": "false",
       PasswordHash: passwordHash,
       CreatedAt: todayIso(),
     };
@@ -116,6 +124,10 @@ export const usersService = {
         | "employeeCode"
         | "isAttendanceManager"
         | "isAssistant"
+        | "canDeleteTask"
+        | "canManageDoers"
+        | "canViewTeamPerformance"
+        | "canEditAttendance"
       >
     >
   ): Promise<User> {
@@ -131,6 +143,14 @@ export const usersService = {
       patch["Is Attendance Manager"] = String(updates.isAttendanceManager);
     if (updates.isAssistant !== undefined)
       patch["Is Assistant"] = String(updates.isAssistant);
+    if (updates.canDeleteTask !== undefined)
+      patch["Can Delete Task"] = String(updates.canDeleteTask);
+    if (updates.canManageDoers !== undefined)
+      patch["Can Manage Doers"] = String(updates.canManageDoers);
+    if (updates.canViewTeamPerformance !== undefined)
+      patch["Can View Team Performance"] = String(updates.canViewTeamPerformance);
+    if (updates.canEditAttendance !== undefined)
+      patch["Can Edit Attendance"] = String(updates.canEditAttendance);
 
     const saved = await dataService.updateById(entity, id, patch);
     return toUser(saved);

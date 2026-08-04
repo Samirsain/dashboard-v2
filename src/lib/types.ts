@@ -13,6 +13,15 @@ export interface Doer {
   isAttendanceManager: boolean;
   /** Assistant admin: full admin access except deleting doers or tasks. */
   isAssistant: boolean;
+  /**
+   * Per-PC permission toggles for the four capabilities that otherwise stay
+   * MD-only — set from the "PC Management" column in Settings. Meaningless
+   * for MD (already has everything) and for a plain Doer.
+   */
+  canDeleteTask: boolean;
+  canManageDoers: boolean;
+  canViewTeamPerformance: boolean;
+  canEditAttendance: boolean;
   createdAt: string;
 }
 
