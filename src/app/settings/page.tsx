@@ -50,8 +50,8 @@ function SettingsInner() {
   const [openListsDoerId, setOpenListsDoerId] = useState<string | null>(null);
   // "doerId:listId" currently being saved, so its checkbox disables briefly.
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  // Which doer's "PC Management" dropdown is currently open.
-  const [openPermsDoerId, setOpenPermsDoerId] = useState<string | null>(null);
+  // Which doer's "Actions" menu is currently open.
+  const [openActionsDoerId, setOpenActionsDoerId] = useState<string | null>(null);
   // "doerId:field" currently being saved, so its checkbox disables briefly.
   const [savingPermKey, setSavingPermKey] = useState<string | null>(null);
   const [reassignFrom, setReassignFrom] = useState<Doer | null>(null);
@@ -114,16 +114,16 @@ function SettingsInner() {
   }
 
   const PC_PERMISSIONS = [
-    { field: "canAccessAllTasks", label: "Add Task / All Tasks" },
-    { field: "canDeleteTask", label: "Delete Task" },
-    { field: "canAccessInventory", label: "Inventory" },
-    { field: "canManageWorkflow", label: "Workflow" },
-    { field: "canManageDoers", label: "Doer Management" },
-    { field: "canViewTeamPerformance", label: "Team Performance" },
-    { field: "canEditAttendance", label: "Attendance Edit" },
+    { field: "canAccessAllTasks", label: "Add Task / All Tasks", short: "Add Task" },
+    { field: "canDeleteTask", label: "Delete Task", short: "Delete Task" },
+    { field: "canAccessInventory", label: "Inventory", short: "Inventory" },
+    { field: "canManageWorkflow", label: "Workflow", short: "Workflow" },
+    { field: "canManageDoers", label: "Doer Management", short: "Doer Mgmt" },
+    { field: "canViewTeamPerformance", label: "Team Performance", short: "Team Perf" },
+    { field: "canEditAttendance", label: "Attendance Edit", short: "Attendance" },
   ] as const;
 
-  // Grant/revoke one of the four MD-exclusive capabilities for a single PC.
+  // Grant/revoke one of the seven MD-controllable capabilities for a single PC.
   async function togglePermission(
     doer: Doer,
     field: (typeof PC_PERMISSIONS)[number]["field"],
@@ -157,14 +157,16 @@ function SettingsInner() {
    * (who's "the" PC vs. a second one), so label them PC, PC2, PC3… in the
    * order they were promoted (oldest account first).
    */
+  const pcs = useMemo(
+    () => doers.filter((d) => d.role === "PC").sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [doers]
+  );
+
   const pcLabels = useMemo(() => {
     const m = new Map<string, string>();
-    doers
-      .filter((d) => d.role === "PC")
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .forEach((d, i) => m.set(d.id, i === 0 ? "PC" : `PC${i + 1}`));
+    pcs.forEach((d, i) => m.set(d.id, i === 0 ? "PC" : `PC${i + 1}`));
     return m;
-  }, [doers]);
+  }, [pcs]);
 
   /** Unfinished tasks currently on this doer — what deleting them would orphan. */
   function openTaskCountFor(doerId: string): number {
@@ -302,21 +304,20 @@ function SettingsInner() {
                     <th className="py-3 px-4 border-r border-surface-variant w-32">User ID</th>
                     <th className="py-3 px-4 border-r border-surface-variant w-28 text-center">Role</th>
                     <th className="py-3 px-4 border-r border-surface-variant w-56">Lists</th>
-                    <th className="py-3 px-4 border-r border-surface-variant w-56">PC Management</th>
-                    <th className="py-3 px-4 w-64 text-center">Action</th>
+                    <th className="py-3 px-4 w-44 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-md text-on-surface">
                   {loading && (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         Loading...
                       </td>
                     </tr>
                   )}
                   {!loading && doers.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={5} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         No doers found.
                       </td>
                     </tr>
@@ -382,9 +383,10 @@ function SettingsInner() {
                           return (
                             <div className="relative">
                               <button
-                                onClick={() =>
-                                  setOpenListsDoerId((prev) => (prev === d.id ? null : d.id))
-                                }
+                                onClick={() => {
+                                  setOpenActionsDoerId(null);
+                                  setOpenListsDoerId((prev) => (prev === d.id ? null : d.id));
+                                }}
                                 className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
                               >
                                 <span className="truncate">
@@ -428,96 +430,65 @@ function SettingsInner() {
                           );
                         })()}
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant align-top">
-                        {d.role !== "PC" ? (
-                          <span className="font-data-mono text-data-mono text-on-surface-variant">—</span>
-                        ) : (
-                          (() => {
-                            const grantedCount = PC_PERMISSIONS.filter(
-                              (p) => d[p.field] === true
-                            ).length;
-                            return (
-                              <div className="relative">
-                                <button
-                                  onClick={() =>
-                                    setOpenPermsDoerId((prev) => (prev === d.id ? null : d.id))
-                                  }
-                                  className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                                >
-                                  <span className="truncate">
-                                    {grantedCount} granted
-                                  </span>
-                                  <span className="material-symbols-outlined text-base">
-                                    {openPermsDoerId === d.id ? "expand_less" : "expand_more"}
-                                  </span>
-                                </button>
-
-                                {openPermsDoerId === d.id && (
-                                  <div className="absolute z-20 mt-1 left-0 w-64 max-h-64 overflow-y-auto bg-surface border-2 border-on-surface shadow-lg">
-                                    {PC_PERMISSIONS.map((p) => {
-                                      const checked = d[p.field] === true;
-                                      const busy = savingPermKey === `${d.id}:${p.field}`;
-                                      return (
-                                        <label
-                                          key={p.field}
-                                          className={`flex items-center gap-2 px-3 py-2 border-b border-surface-variant last:border-b-0 hover:bg-surface-container ${
-                                            isMdViewer ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                                          }`}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            disabled={busy || !isMdViewer}
-                                            onChange={(e) => togglePermission(d, p.field, e.target.checked)}
-                                          />
-                                          <span className="font-label-sm text-label-sm uppercase text-on-surface">
-                                            {p.label}
-                                          </span>
-                                          {busy && (
-                                            <span className="ml-auto font-label-sm text-[10px] uppercase text-on-surface-variant">
-                                              Saving…
-                                            </span>
-                                          )}
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()
-                        )}
-                      </td>
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="relative inline-block">
                           <button
-                            onClick={() => handleRename(d)}
-                            className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                            onClick={() => {
+                              setOpenListsDoerId(null);
+                              setOpenActionsDoerId((prev) => (prev === d.id ? null : d.id));
+                            }}
+                            className="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
                           >
-                            Rename
+                            Actions
+                            <span className="material-symbols-outlined text-base">
+                              {openActionsDoerId === d.id ? "expand_less" : "expand_more"}
+                            </span>
                           </button>
-                          <button
-                            onClick={() => setDoerToReset(d)}
-                            className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
-                          >
-                            Reset Password
-                          </button>
-                          <button
-                            onClick={() => setReassignFrom(d)}
-                            title="Move every open task and active checklist to someone else — e.g. while they're on leave."
-                            className="px-2 py-1 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
-                          >
-                            Reassign All Work
-                          </button>
-                          {/* Deleting a doer is MD-only — a PC can add, rename
-                              and reset passwords but never remove someone. */}
-                          {canDeleteDoer(currentUser) && !currentUser?.isAssistant && (
-                            <button
-                              onClick={() => handleDelete(d)}
-                              className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                            >
-                              Delete
-                            </button>
+
+                          {openActionsDoerId === d.id && (
+                            <div className="absolute z-20 mt-1 right-0 w-52 bg-surface border-2 border-on-surface shadow-lg text-left">
+                              <button
+                                onClick={() => {
+                                  handleRename(d);
+                                  setOpenActionsDoerId(null);
+                                }}
+                                className="block w-full px-3 py-2.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors border-b border-surface-variant"
+                              >
+                                Rename
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDoerToReset(d);
+                                  setOpenActionsDoerId(null);
+                                }}
+                                className="block w-full px-3 py-2.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors border-b border-surface-variant"
+                              >
+                                Reset Password
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setReassignFrom(d);
+                                  setOpenActionsDoerId(null);
+                                }}
+                                title="Move every open task and active checklist to someone else — e.g. while they're on leave."
+                                className="block w-full px-3 py-2.5 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors border-b border-surface-variant last:border-b-0"
+                              >
+                                Reassign All Work
+                              </button>
+                              {/* Deleting a doer is MD-only — a PC can add, rename
+                                  and reset passwords but never remove someone. */}
+                              {canDeleteDoer(currentUser) && !currentUser?.isAssistant && (
+                                <button
+                                  onClick={() => {
+                                    handleDelete(d);
+                                    setOpenActionsDoerId(null);
+                                  }}
+                                  className="block w-full px-3 py-2.5 font-label-sm text-label-sm uppercase text-error hover:bg-error hover:text-on-error transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -599,6 +570,80 @@ function SettingsInner() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="border-b-2 border-on-surface pb-stack-md">
+            <h2 className="font-headline-lg-mobile md:font-headline-md text-headline-lg-mobile md:text-headline-md text-on-surface uppercase tracking-tighter">
+              PC Management
+            </h2>
+            <p className="mt-1 font-label-sm text-label-sm text-on-surface-variant">
+              One row per PC, one column per capability. Untick a box to revoke it from that PC —
+              MD only.
+            </p>
+          </div>
+
+          <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[980px]">
+              <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+                <tr>
+                  <th className="py-3 px-4 border-r border-surface-variant sticky left-0 bg-surface-container">
+                    PC
+                  </th>
+                  {PC_PERMISSIONS.map((p) => (
+                    <th
+                      key={p.field}
+                      className="py-3 px-2 border-r border-surface-variant w-28 text-center"
+                    >
+                      {p.short}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="font-body-md text-body-md text-on-surface">
+                {!loading && pcs.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={PC_PERMISSIONS.length + 1}
+                      className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
+                    >
+                      No PCs yet. Promote a doer to PC from the Role column above.
+                    </td>
+                  </tr>
+                )}
+                {pcs.map((pc) => (
+                  <tr
+                    key={pc.id}
+                    className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors"
+                  >
+                    <td className="py-3 px-4 border-r border-surface-variant sticky left-0 bg-surface-container-lowest">
+                      <div className="flex items-center gap-2">
+                        <InitialsAvatar name={pc.name} className="w-6 h-6 border border-on-surface shrink-0" />
+                        <span className="font-medium truncate">{pc.name}</span>
+                        <span className="border border-on-surface px-1.5 py-0.5 font-label-sm text-[10px] uppercase text-on-surface-variant shrink-0">
+                          {pcLabels.get(pc.id)}
+                        </span>
+                      </div>
+                    </td>
+                    {PC_PERMISSIONS.map((p) => {
+                      const checked = pc[p.field] === true;
+                      const busy = savingPermKey === `${pc.id}:${p.field}`;
+                      return (
+                        <td key={p.field} className="py-3 px-2 border-r border-surface-variant text-center">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={busy || !isMdViewer}
+                            onChange={(e) => togglePermission(pc, p.field, e.target.checked)}
+                            title={p.label}
+                            className="w-4 h-4 accent-on-surface cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
