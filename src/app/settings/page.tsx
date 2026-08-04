@@ -56,6 +56,11 @@ function SettingsInner() {
   const [savingPermKey, setSavingPermKey] = useState<string | null>(null);
   const [reassignFrom, setReassignFrom] = useState<Doer | null>(null);
   const isMdViewer = currentUser?.role === "MD";
+  // "+ Add PC" promotes an existing Doer — PC isn't a separate account type,
+  // so this is just the Role dropdown's promotion flow with its own picker.
+  const [showAddPc, setShowAddPc] = useState(false);
+  const [addPcDoerId, setAddPcDoerId] = useState("");
+  const [addingPc, setAddingPc] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -167,6 +172,27 @@ function SettingsInner() {
     pcs.forEach((d, i) => m.set(d.id, i === 0 ? "PC" : `PC${i + 1}`));
     return m;
   }, [pcs]);
+
+  /** Plain, active Doers — the only accounts "+ Add PC" can promote. */
+  const promotableDoers = useMemo(
+    () => doers.filter((d) => d.role === "Doer" && d.status === "Active"),
+    [doers]
+  );
+
+  async function handlePromoteToPc() {
+    if (!addPcDoerId) return;
+    setAddingPc(true);
+    try {
+      const updated = await api.patch<Doer>(`/users/${addPcDoerId}`, { role: "PC" });
+      setDoers((prev) => prev.map((d) => (d.id === addPcDoerId ? updated : d)));
+      setShowAddPc(false);
+      setAddPcDoerId("");
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to promote to PC.");
+    } finally {
+      setAddingPc(false);
+    }
+  }
 
   /** Unfinished tasks currently on this doer — what deleting them would orphan. */
   function openTaskCountFor(doerId: string): number {
@@ -574,14 +600,24 @@ function SettingsInner() {
             </table>
           </div>
 
-          <div className="border-b-2 border-on-surface pb-stack-md">
-            <h2 className="font-headline-lg-mobile md:font-headline-md text-headline-lg-mobile md:text-headline-md text-on-surface uppercase tracking-tighter">
-              PC Management
-            </h2>
-            <p className="mt-1 font-label-sm text-label-sm text-on-surface-variant">
-              One row per PC, one column per capability. Untick a box to revoke it from that PC —
-              MD only.
-            </p>
+          <div className="border-b-2 border-on-surface pb-stack-md flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="font-headline-lg-mobile md:font-headline-md text-headline-lg-mobile md:text-headline-md text-on-surface uppercase tracking-tighter">
+                PC Management
+              </h2>
+              <p className="mt-1 font-label-sm text-label-sm text-on-surface-variant">
+                One row per PC, one column per capability. Untick a box to revoke it from that PC —
+                MD only.
+              </p>
+            </div>
+            {isMdViewer && (
+              <button
+                onClick={() => setShowAddPc(true)}
+                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer shrink-0"
+              >
+                + Add PC
+              </button>
+            )}
           </div>
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
@@ -701,6 +737,81 @@ function SettingsInner() {
             loadData();
           }}
         />
+      )}
+
+      {showAddPc && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+          <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border-2 border-on-surface bg-surface-container-lowest">
+            <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md sticky top-0 bg-surface-container-lowest">
+              <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
+                Add PC
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddPc(false);
+                  setAddPcDoerId("");
+                }}
+                className="text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm uppercase"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-stack-md p-stack-lg">
+              <p className="font-body-md text-body-md text-on-surface">
+                PC isn&apos;t a separate account — pick an existing Doer to promote. They keep
+                their account, tasks and list access; PC Management access starts at whatever
+                the defaults are (Add Task, Inventory and Workflow ON; everything else OFF)
+                until you adjust it below.
+              </p>
+
+              <div>
+                <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Promote
+                </label>
+                <select
+                  value={addPcDoerId}
+                  onChange={(e) => setAddPcDoerId(e.target.value)}
+                  className="mt-1 min-h-[40px] w-full border border-on-surface bg-surface px-3 py-2 text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+                >
+                  <option value="">Select a doer…</option>
+                  {promotableDoers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} {d.employeeCode ? `(${d.employeeCode})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {promotableDoers.length === 0 && (
+                  <p className="mt-1 font-label-sm text-label-sm text-error">
+                    No plain Doer available to promote.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-stack-sm pt-2 border-t border-on-surface/30">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddPc(false);
+                    setAddPcDoerId("");
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePromoteToPc}
+                  disabled={addingPc || !addPcDoerId}
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {addingPc ? "Promoting…" : "Promote to PC"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
