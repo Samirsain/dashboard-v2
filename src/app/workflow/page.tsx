@@ -8,6 +8,7 @@ import CreateWorkflowTemplateModal from "@/components/CreateWorkflowTemplateModa
 import StartWorkflowInstanceModal from "@/components/StartWorkflowInstanceModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { canManageWorkflow } from "@/lib/access";
 import type {
   Doer,
   WorkflowInstance,
@@ -53,7 +54,7 @@ function formatTs(ts: string): string {
 
 function WorkflowInner() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "MD" || user?.role === "PC";
+  const isAdmin = canManageWorkflow(user);
 
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);

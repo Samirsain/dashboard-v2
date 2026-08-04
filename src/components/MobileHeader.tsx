@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import { useAuth } from "@/lib/auth-context";
-import { canAccessAllTasks, canManageDoers, canViewTeamPerformance } from "@/lib/access";
+import { canAccessAllTasks, canAccessInventory, canManageDoers, canViewTeamPerformance } from "@/lib/access";
 import { api } from "@/lib/api";
 import type { List } from "@/lib/types";
 
@@ -92,7 +92,7 @@ export default function MobileHeader() {
               <Link href="/master-sheet" className={rowFor("/master-sheet")}>
                 Master Sheet
               </Link>
-              {(user?.role === "MD" || user?.role === "PC") && (
+              {canAccessInventory(user) && (
                 <Link href="/ims" className={rowFor("/ims")}>
                   Inventory
                 </Link>

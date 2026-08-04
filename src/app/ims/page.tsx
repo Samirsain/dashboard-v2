@@ -9,6 +9,7 @@ import ImsTransactionModal from "@/components/ImsTransactionModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessInventory } from "@/lib/access";
 import type { ImsItem, ImsTransaction, ImsStockLedger, ImsReorderRow } from "@/lib/types";
 
 type Tab = "items" | "transactions" | "ledger" | "reorder";
@@ -732,12 +733,12 @@ function ImsInner() {
 export default function ImsPage() {
   const { user } = useAuth();
 
-  if (user && user.role !== "MD" && user.role !== "PC") {
+  if (user && !canAccessInventory(user)) {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <p className="font-data-mono text-data-mono text-error uppercase border-2 border-error p-4">
-          Access Denied. MD / PC Only.
+            Access Denied. Inventory not granted to this account.
           </p>
         </div>
       </AuthGuard>

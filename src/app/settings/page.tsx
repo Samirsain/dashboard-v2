@@ -114,7 +114,10 @@ function SettingsInner() {
   }
 
   const PC_PERMISSIONS = [
+    { field: "canAccessAllTasks", label: "Add Task / All Tasks" },
     { field: "canDeleteTask", label: "Delete Task" },
+    { field: "canAccessInventory", label: "Inventory" },
+    { field: "canManageWorkflow", label: "Workflow" },
     { field: "canManageDoers", label: "Doer Management" },
     { field: "canViewTeamPerformance", label: "Team Performance" },
     { field: "canEditAttendance", label: "Attendance Edit" },

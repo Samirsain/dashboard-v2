@@ -70,6 +70,9 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
     canManageDoers: user.canManageDoers,
     canViewTeamPerformance: user.canViewTeamPerformance,
     canEditAttendance: user.canEditAttendance,
+    canAccessAllTasks: user.canAccessAllTasks,
+    canAccessInventory: user.canAccessInventory,
+    canManageWorkflow: user.canManageWorkflow,
   };
   next();
 });

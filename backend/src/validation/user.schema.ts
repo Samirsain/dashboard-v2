@@ -26,6 +26,9 @@ export const updateUserSchema = z.object({
   canManageDoers: z.boolean().optional(),
   canViewTeamPerformance: z.boolean().optional(),
   canEditAttendance: z.boolean().optional(),
+  canAccessAllTasks: z.boolean().optional(),
+  canAccessInventory: z.boolean().optional(),
+  canManageWorkflow: z.boolean().optional(),
 });
 
 export const idParamSchema = z.object({

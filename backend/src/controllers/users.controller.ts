@@ -20,6 +20,9 @@ const PRIVILEGED_FIELDS = [
   "canManageDoers",
   "canViewTeamPerformance",
   "canEditAttendance",
+  "canAccessAllTasks",
+  "canAccessInventory",
+  "canManageWorkflow",
 ] as const;
 
 export const usersController = {

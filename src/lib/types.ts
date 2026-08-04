@@ -22,6 +22,13 @@ export interface Doer {
   canManageDoers: boolean;
   canViewTeamPerformance: boolean;
   canEditAttendance: boolean;
+  /**
+   * These three default TRUE — every PC already had them unconditionally, so
+   * this just makes them revocable per PC rather than granting anything new.
+   */
+  canAccessAllTasks: boolean;
+  canAccessInventory: boolean;
+  canManageWorkflow: boolean;
   createdAt: string;
 }
 

@@ -2,7 +2,8 @@ import { Router } from "express";
 import { imsController } from "../controllers/ims.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/role.middleware";
+import { requirePermission } from "../middleware/role.middleware";
+import { canAccessInventory } from "../utils/access";
 import {
   createImsItemSchema,
   updateImsItemSchema,
@@ -10,14 +11,14 @@ import {
 } from "../validation/ims.schema";
 
 /**
- * IMS (Inventory Management System) — new, standalone feature. Every route is
- * Admin-only for now (both viewing and editing) since this is a fresh module
- * still being trialed; broaden later if other roles need access.
+ * IMS (Inventory Management System). MD always; PC only if granted
+ * "Inventory" in PC Management (defaults on, since this used to be an
+ * unconditional MD/PC feature).
  */
 const router = Router();
 
 router.use(requireAuth);
-router.use(requireRole("MD", "PC"));
+router.use(requirePermission(canAccessInventory));
 
 // Item List
 router.get("/items", imsController.listItems);

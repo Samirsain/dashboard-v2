@@ -29,6 +29,9 @@ export const authService = {
       canManageDoers: user.canManageDoers,
       canViewTeamPerformance: user.canViewTeamPerformance,
       canEditAttendance: user.canEditAttendance,
+      canAccessAllTasks: user.canAccessAllTasks,
+      canAccessInventory: user.canAccessInventory,
+      canManageWorkflow: user.canManageWorkflow,
     });
     return { token, user: publicUser };
   },
@@ -57,6 +60,9 @@ export const authService = {
       canManageDoers: user.canManageDoers,
       canViewTeamPerformance: user.canViewTeamPerformance,
       canEditAttendance: user.canEditAttendance,
+      canAccessAllTasks: user.canAccessAllTasks,
+      canAccessInventory: user.canAccessInventory,
+      canManageWorkflow: user.canManageWorkflow,
     });
     return { token, user };
   },

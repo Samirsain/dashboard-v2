@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { canAccessAllTasks, canViewTeamPerformance } from "@/lib/access";
+import { canAccessAllTasks, canAccessInventory, canViewTeamPerformance } from "@/lib/access";
 import BrandLogo from "@/components/BrandLogo";
 import GoogleFormsIcon from "@/components/GoogleFormsIcon";
 
@@ -62,8 +62,8 @@ export default function SideNav({ active }: { active: NavKey }) {
           <span className={labelCls}>Master Sheet</span>
         </Link>
 
-        {/* Inventory (MD + PC only) */}
-        {(user?.role === "MD" || user?.role === "PC") && (
+        {/* Inventory — MD always, PC only if granted in PC Management */}
+        {canAccessInventory(user) && (
           <Link href="/ims" className={active === "ims" ? linkActive : linkBase}>
             <span className="material-symbols-outlined" data-icon="inventory_2">
               inventory_2

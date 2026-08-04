@@ -3,15 +3,12 @@ import type { Doer } from "./types";
 /**
  * Who can do what.
  *
- * MD has everything, always. PC is a deputy: full access, plus four
- * capabilities the MD grants (or doesn't) individually per PC from the "PC
- * Management" column in Settings —
- *   1. deleting a task
- *   2. Doer Management (Settings) — adding, renaming, resetting passwords,
- *      and managing list access
- *   3. Team Performance (the scoreboard)
- *   4. editing attendance records
- * Each defaults to false, so a freshly promoted PC starts with none of them.
+ * MD has everything, always. PC is a deputy whose reach is a per-PC set of
+ * toggles set from the "PC Management" column in Settings — some default
+ * OFF (capabilities that used to be MD-exclusive: delete a task, Doer
+ * Management, Team Performance, edit attendance), some default ON
+ * (capabilities every PC already had unconditionally, now revocable: the
+ * All Tasks page / creating tasks, Inventory, managing Workflow templates).
  * Deleting a doer specifically stays MD-only and isn't toggleable, even with
  * Doer Management access — see canDeleteDoer below.
  *
@@ -32,9 +29,23 @@ function isMd(user: Doer | null | undefined): boolean {
   return user?.role === "MD";
 }
 
-/** See everyone's tasks/checklists (not just your own) and create tasks. */
+/**
+ * See everyone's tasks/checklists (not just your own) and create tasks. MD
+ * always; PC only if granted in PC Management (defaults on — every PC had
+ * this unconditionally before PC Management existed).
+ */
 export function canAccessAllTasks(user: Doer | null | undefined): boolean {
-  return isManager(user);
+  return isMd(user) || (user?.role === "PC" && user.canAccessAllTasks === true);
+}
+
+/** Open Inventory. MD always; PC only if granted in PC Management (defaults on). */
+export function canAccessInventory(user: Doer | null | undefined): boolean {
+  return isMd(user) || (user?.role === "PC" && user.canAccessInventory === true);
+}
+
+/** Create/delete Workflow templates. MD always; PC only if granted in PC Management (defaults on). */
+export function canManageWorkflow(user: Doer | null | undefined): boolean {
+  return isMd(user) || (user?.role === "PC" && user.canManageWorkflow === true);
 }
 
 /** Mark attendance for other employees. PC can mark; only MD can edit a record. */

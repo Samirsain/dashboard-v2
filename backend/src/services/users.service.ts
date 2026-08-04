@@ -26,6 +26,9 @@ function toUser(record: SheetRecord): User {
     canManageDoers: (record["Can Manage Doers"] ?? "").toLowerCase() === "true",
     canViewTeamPerformance: (record["Can View Team Performance"] ?? "").toLowerCase() === "true",
     canEditAttendance: (record["Can Edit Attendance"] ?? "").toLowerCase() === "true",
+    canAccessAllTasks: (record["Can Access All Tasks"] ?? "").toLowerCase() === "true",
+    canAccessInventory: (record["Can Access Inventory"] ?? "").toLowerCase() === "true",
+    canManageWorkflow: (record["Can Manage Workflow"] ?? "").toLowerCase() === "true",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -102,6 +105,9 @@ export const usersService = {
       "Can Manage Doers": "false",
       "Can View Team Performance": "false",
       "Can Edit Attendance": "false",
+      "Can Access All Tasks": "true",
+      "Can Access Inventory": "true",
+      "Can Manage Workflow": "true",
       PasswordHash: passwordHash,
       CreatedAt: todayIso(),
     };
@@ -128,6 +134,9 @@ export const usersService = {
         | "canManageDoers"
         | "canViewTeamPerformance"
         | "canEditAttendance"
+        | "canAccessAllTasks"
+        | "canAccessInventory"
+        | "canManageWorkflow"
       >
     >
   ): Promise<User> {
@@ -151,6 +160,12 @@ export const usersService = {
       patch["Can View Team Performance"] = String(updates.canViewTeamPerformance);
     if (updates.canEditAttendance !== undefined)
       patch["Can Edit Attendance"] = String(updates.canEditAttendance);
+    if (updates.canAccessAllTasks !== undefined)
+      patch["Can Access All Tasks"] = String(updates.canAccessAllTasks);
+    if (updates.canAccessInventory !== undefined)
+      patch["Can Access Inventory"] = String(updates.canAccessInventory);
+    if (updates.canManageWorkflow !== undefined)
+      patch["Can Manage Workflow"] = String(updates.canManageWorkflow);
 
     const saved = await dataService.updateById(entity, id, patch);
     return toUser(saved);

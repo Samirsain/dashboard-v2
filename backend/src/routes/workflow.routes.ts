@@ -2,7 +2,8 @@ import { Router } from "express";
 import { workflowController } from "../controllers/workflow.controller";
 import { validate } from "../middleware/validate.middleware";
 import { requireAuth } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/role.middleware";
+import { requirePermission } from "../middleware/role.middleware";
+import { canManageWorkflow } from "../utils/access";
 import { idParamSchema } from "../validation/user.schema";
 import {
   createWorkflowTemplateSchema,
@@ -19,13 +20,13 @@ router.get("/templates", workflowController.listTemplates);
 router.get("/templates/:id", validate({ params: idParamSchema }), workflowController.getTemplate);
 router.post(
   "/templates",
-  requireRole("MD", "PC"),
+  requirePermission(canManageWorkflow),
   validate({ body: createWorkflowTemplateSchema }),
   workflowController.createTemplate
 );
 router.delete(
   "/templates/:id",
-  requireRole("MD", "PC"),
+  requirePermission(canManageWorkflow),
   validate({ params: idParamSchema }),
   workflowController.removeTemplate
 );
