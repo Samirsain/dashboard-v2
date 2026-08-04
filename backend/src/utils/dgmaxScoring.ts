@@ -1,8 +1,8 @@
 import type { Task, User, Revision, ChecklistInstance, TaskScoreCategory, DgmaxEmployeeSummary, DgmaxWeeklySummary } from "../types";
-import { calculatePerformance, DEFAULT_LATE_DONE_WEIGHT } from "./performanceScoring";
+import { calculatePerformance, DEFAULT_LATE_DONE_WEIGHT, DEFAULT_REVISION_PENALTY_PCT } from "./performanceScoring";
 import { buildOriginalDueDates } from "./dueDates";
 
-export { DEFAULT_LATE_DONE_WEIGHT };
+export { DEFAULT_LATE_DONE_WEIGHT, DEFAULT_REVISION_PENALTY_PCT };
 
 /** Daily rate (33% per day late) and cap (max 80% penalty for late done checklist items) */
 export const CHECKLIST_DAILY_RATE = 33;
@@ -48,11 +48,28 @@ export function buildDgmaxWeeklySummary(
   todayIso: string,
   fromDate: string,
   toDate: string,
-  lateDoneWeight: number = DEFAULT_LATE_DONE_WEIGHT
+  lateDoneWeight: number = DEFAULT_LATE_DONE_WEIGHT,
+  revisionPenaltyPct: number = DEFAULT_REVISION_PENALTY_PCT
 ): DgmaxWeeklySummary {
   const originalDueDates = buildOriginalDueDates(revisions);
   const doers = users.filter((u) => u.status === "Active" && u.role !== "MD" && u.role !== "PC");
   const weight = Math.min(100, Math.max(0, lateDoneWeight));
+  const revisionWeight = Math.max(0, revisionPenaltyPct);
+  const inWindow = (dateStr: string) => !!dateStr && dateStr >= fromDate && dateStr <= toDate;
+
+  // Every revision made THIS week counts against this week's score, on
+  // whichever doer currently holds the task — regardless of whether that
+  // task's own due date falls in this window. Revising itself is the
+  // behavior being penalized, not just the outcome.
+  const taskDoerMap = new Map(tasks.map((t) => [t.id, t.assignedDoerId]));
+  const revisionCountByDoer = new Map<string, number>();
+  for (const r of revisions) {
+    const revisedDate = r.revisedAt ? r.revisedAt.slice(0, 10) : "";
+    if (!inWindow(revisedDate)) continue;
+    const doerId = taskDoerMap.get(r.taskId);
+    if (!doerId) continue;
+    revisionCountByDoer.set(doerId, (revisionCountByDoer.get(doerId) || 0) + 1);
+  }
 
   const summaryMap = new Map<string, DgmaxEmployeeSummary>();
   const checklistItemsMap = new Map<string, ChecklistInstance[]>();
@@ -69,6 +86,7 @@ export function buildDgmaxWeeklySummary(
       yellowCount: 0,
       redCount: 0,
       pendingCount: 0,
+      revisionCount: 0,
       taskScore: 0,
       // Checklist
       assignedChecklists: 0,
@@ -84,8 +102,6 @@ export function buildDgmaxWeeklySummary(
     });
     checklistItemsMap.set(d.id, []);
   }
-
-  const inWindow = (dateStr: string) => !!dateStr && dateStr >= fromDate && dateStr <= toDate;
 
   // Process Tasks
   for (const t of tasks) {
@@ -136,12 +152,20 @@ export function buildDgmaxWeeklySummary(
   // Compute Scores per Doer
   const summaries = Array.from(summaryMap.values())
     .map((s) => {
-      // 1. Task Score
+      // 1. Task Score (Not Done + Late Done + a flat per-revision cut)
       s.assignedTasks = s.greenCount + s.yellowCount + s.redCount;
+      s.revisionCount = revisionCountByDoer.get(s.doerId) || 0;
       if (s.assignedTasks > 0) {
         const taskResult = calculatePerformance(
-          { assigned: s.assignedTasks, onTime: s.greenCount, lateDone: s.yellowCount, notDone: s.redCount },
-          weight
+          {
+            assigned: s.assignedTasks,
+            onTime: s.greenCount,
+            lateDone: s.yellowCount,
+            notDone: s.redCount,
+            revisions: s.revisionCount,
+          },
+          weight,
+          revisionWeight
         );
         s.taskScore = taskResult.negativeScore;
       } else {
@@ -212,7 +236,15 @@ export function buildDgmaxWeeklySummary(
 
   const weekLabel = `${formatDMY(fromDate)} to ${formatDMY(toDate)}`;
 
-  return { weekLabel, fromDate, toDate, lateDoneWeight: weight, summaries, totals };
+  return {
+    weekLabel,
+    fromDate,
+    toDate,
+    lateDoneWeight: weight,
+    revisionPenaltyPct: revisionWeight,
+    summaries,
+    totals,
+  };
 }
 
 function formatDMY(iso: string): string {

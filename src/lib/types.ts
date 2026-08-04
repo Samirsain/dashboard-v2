@@ -410,6 +410,7 @@ export interface DgmaxEmployeeSummary {
   yellowCount: number;
   redCount: number;
   pendingCount: number;
+  revisionCount: number;
   taskScore: number;
 
   assignedChecklists: number;
@@ -429,6 +430,7 @@ export interface DgmaxWeeklySummary {
   fromDate: string;
   toDate: string;
   lateDoneWeight: number;
+  revisionPenaltyPct: number;
   summaries: DgmaxEmployeeSummary[];
   totals: {
     assigned: number;

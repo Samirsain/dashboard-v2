@@ -3,7 +3,7 @@ import { usersService } from "../services/users.service";
 import { tasksService } from "../services/tasks.service";
 import { revisionsService } from "../services/revisions.service";
 import { checklistService } from "../services/checklist.service";
-import { buildDgmaxWeeklySummary, DEFAULT_LATE_DONE_WEIGHT } from "../utils/dgmaxScoring";
+import { buildDgmaxWeeklySummary, DEFAULT_LATE_DONE_WEIGHT, DEFAULT_REVISION_PENALTY_PCT } from "../utils/dgmaxScoring";
 import { todayIso, mondayOfIso, addDaysIso, isValidIsoDate } from "../utils/date";
 
 /** Resolves the [from, to] week window from query params, defaulting to the current Mon-Sun week. */
@@ -26,12 +26,19 @@ function resolveLateWeight(req: Request): number {
   return Number.isFinite(raw) ? raw : DEFAULT_LATE_DONE_WEIGHT;
 }
 
+/** Per-revision penalty %. Defaults to 20% and can be overridden via ?revisionWeight=. */
+function resolveRevisionWeight(req: Request): number {
+  const raw = Number((req.query as { revisionWeight?: string }).revisionWeight);
+  return Number.isFinite(raw) ? raw : DEFAULT_REVISION_PENALTY_PCT;
+}
+
 export const performanceController = {
   async getDgmaxSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const today = todayIso();
       const { from, to } = resolveWeekRange(req);
       const lateWeight = resolveLateWeight(req);
+      const revisionWeight = resolveRevisionWeight(req);
       const [users, tasks, revisions, checklists] = await Promise.all([
         usersService.list(),
         tasksService.list({}),
@@ -39,7 +46,17 @@ export const performanceController = {
         checklistService.listInstances({}),
       ]);
 
-      const summary = buildDgmaxWeeklySummary(users, tasks, revisions, checklists, today, from, to, lateWeight);
+      const summary = buildDgmaxWeeklySummary(
+        users,
+        tasks,
+        revisions,
+        checklists,
+        today,
+        from,
+        to,
+        lateWeight,
+        revisionWeight
+      );
       res.json({ status: "success", data: summary });
     } catch (err) {
       next(err);

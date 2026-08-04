@@ -65,12 +65,13 @@ function TeamPerformanceInner() {
 
   const weekLabel = dgmaxSummary?.weekLabel || `${formatDMY(weekStart)} to ${formatDMY(weekEnd)}`;
   const lateWeight = dgmaxSummary?.lateDoneWeight ?? 60;
+  const revisionWeight = dgmaxSummary?.revisionPenaltyPct ?? 20;
 
   function exportCSV() {
-    const headers = ["Week", "Rank", "Employee Name", "Assigned Tasks", "Assigned Checklists", "Task Score", "Checklist Score", "Average Score"];
+    const headers = ["Week", "Rank", "Employee Name", "Assigned Tasks", "Revisions", "Assigned Checklists", "Task Score", "Checklist Score", "Average Score"];
     const rows = (dgmaxSummary?.summaries ?? []).map((s, i) => [
       weekLabel, i + 1, s.doerName,
-      s.assignedTasks, s.assignedChecklists, s.taskScore, s.checklistScore, s.negativeScore,
+      s.assignedTasks, s.revisionCount, s.assignedChecklists, s.taskScore, s.checklistScore, s.negativeScore,
     ]);
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map((e) => e.join(",")).join("\n");
     const link = document.createElement("a");
@@ -126,9 +127,11 @@ function TeamPerformanceInner() {
 
         {/* Formula */}
         <p className="border border-on-surface/25 px-3 py-2 font-data-mono text-[11px] leading-relaxed text-on-surface-variant">
-          Task Score = −((Not Done × Per Task %) + (Late Done × Per Task % × {lateWeight}%))
+          Task Score = −((Not Done × Per Task %) + (Late Done × Per Task % × {lateWeight}%) + (Revisions
+          × Per Task % × {revisionWeight}%))
           &nbsp;·&nbsp;
-          Checklist Score = −Per-Day Late Penalty (33%/day late, capped at 80%)
+          Checklist Score = −Per-Day Late Penalty (33%/day late, capped at 80%) · Not Done = −100% of
+          that item
           <br />
           <strong className="text-on-surface">Final Doer Score = Average(Task Score, Checklist Score)</strong>
         </p>
@@ -136,12 +139,13 @@ function TeamPerformanceInner() {
         {/* Scoreboard */}
         <Card title="Employee Scores (Task + Checklist Average)" bodyClassName="">
           <TableWrap className="border-0">
-            <table className={`${tableClass} min-w-[720px]`}>
+            <table className={`${tableClass} min-w-[800px]`}>
               <thead className={theadClass}>
                 <tr>
                   <th className={`${thClass} w-10 text-center`}>#</th>
                   <th className={thClass}>Employee</th>
                   <th className={`${thClass} text-center`}>Tasks (Done/Assigned)</th>
+                  <th className={`${thClass} text-center`}>Revisions</th>
                   <th className={`${thClass} text-center`}>Task Score</th>
                   <th className={`${thClass} text-center`}>Checklists (Done/Assigned)</th>
                   <th className={`${thClass} text-center`}>Checklist Score</th>
@@ -149,9 +153,9 @@ function TeamPerformanceInner() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {loading && <StateRow colSpan={7}>Loading…</StateRow>}
+                {loading && <StateRow colSpan={8}>Loading…</StateRow>}
                 {!loading && (dgmaxSummary?.summaries.length ?? 0) === 0 && (
-                  <StateRow colSpan={7}>No data for this week.</StateRow>
+                  <StateRow colSpan={8}>No data for this week.</StateRow>
                 )}
                 {!loading &&
                   dgmaxSummary?.summaries.map((s, i) => (
@@ -159,6 +163,7 @@ function TeamPerformanceInner() {
                       <td className={`${tdClass} text-center font-data-mono text-on-surface-variant`}>{i + 1}</td>
                       <td className={tdClass}>{s.doerName}</td>
                       <td className={`${tdClass} text-center font-data-mono`}>{s.completedTasks}/{s.assignedTasks}</td>
+                      <td className={`${tdClass} text-center font-data-mono`}>{s.revisionCount ?? 0}</td>
                       <td className={`${tdClass} text-center font-data-mono`}>{formatPct(s.taskScore ?? 0)}</td>
                       <td className={`${tdClass} text-center font-data-mono`}>{s.completedChecklists ?? 0}/{s.assignedChecklists ?? 0}</td>
                       <td className={`${tdClass} text-center font-data-mono`}>{formatPct(s.checklistScore ?? 0)}</td>

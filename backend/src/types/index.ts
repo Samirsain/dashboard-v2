@@ -373,6 +373,7 @@ export interface DgmaxEmployeeSummary {
   yellowCount: number; // Late Done
   redCount: number; // Not Done
   pendingCount: number;
+  revisionCount: number; // Revisions made this week on the doer's tasks
   taskScore: number; // Task negative score (0 to -100)
 
   // Checklist Metrics & Score
@@ -394,6 +395,7 @@ export interface DgmaxWeeklySummary {
   fromDate: string; // YYYY-MM-DD, Monday
   toDate: string; // YYYY-MM-DD, Sunday
   lateDoneWeight: number; // 0-100, the weight used for this summary
+  revisionPenaltyPct: number; // flat % cut applied per task revision this summary used
   summaries: DgmaxEmployeeSummary[];
   totals: {
     assigned: number;
