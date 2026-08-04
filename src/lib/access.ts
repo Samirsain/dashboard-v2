@@ -48,6 +48,16 @@ export function canManageWorkflow(user: Doer | null | undefined): boolean {
   return isMd(user) || (user?.role === "PC" && user.canManageWorkflow === true);
 }
 
+/** Register/remove a Google Form, manage its access, set response status. MD always; PC only if granted (defaults on). */
+export function canManageForms(user: Doer | null | undefined): boolean {
+  return isMd(user) || (user?.role === "PC" && user.canManageForms === true);
+}
+
+/** Edit the Master Sheet. MD always; PC only if granted (defaults on). */
+export function canManageMasterSheet(user: Doer | null | undefined): boolean {
+  return isMd(user) || (user?.role === "PC" && user.canManageMasterSheet === true);
+}
+
 /** Mark attendance for other employees. PC can mark; only MD can edit a record. */
 export function canMarkAttendance(user: Doer | null | undefined): boolean {
   if (!user) return false;

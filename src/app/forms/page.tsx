@@ -6,6 +6,7 @@ import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { canManageForms } from "@/lib/access";
 import type { Doer, FormConfig, FormResponses, FormResponseStatusMap, FormResponseStatusValue } from "@/lib/types";
 
 // New submissions land in the Sheet at any time — re-check periodically so
@@ -482,10 +483,10 @@ function FormResponsesSection({
 
 function FormsInner() {
   const { user } = useAuth();
-  const canManage = user?.role === "MD" || user?.role === "PC";
+  const canManage = canManageForms(user);
   const canDelete = user?.role === "MD";
 
-  const canManageAccess = user?.role === "MD" || user?.role === "PC";
+  const canManageAccess = canManageForms(user);
 
   const [forms, setForms] = useState<FormConfig[]>([]);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);

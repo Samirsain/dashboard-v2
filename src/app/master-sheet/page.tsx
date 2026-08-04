@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { canManageMasterSheet } from "@/lib/access";
 import type { MasterSheetRow } from "@/lib/types";
 
 type Draft = Omit<MasterSheetRow, "id" | "createdAt">;
@@ -54,7 +55,7 @@ function LinkList({ raw }: { raw: string }) {
 
 function MasterSheetInner() {
   const { user } = useAuth();
-  const canEdit = user?.role === "MD" || user?.role === "PC";
+  const canEdit = canManageMasterSheet(user);
 
   const [rows, setRows] = useState<MasterSheetRow[]>([]);
   const [loading, setLoading] = useState(true);

@@ -41,6 +41,8 @@ export interface User {
   canAccessAllTasks: boolean;
   canAccessInventory: boolean;
   canManageWorkflow: boolean;
+  canManageForms: boolean;
+  canManageMasterSheet: boolean;
   createdAt: string;
 }
 
@@ -264,6 +266,8 @@ export interface JwtClaims {
   canAccessAllTasks?: boolean;
   canAccessInventory?: boolean;
   canManageWorkflow?: boolean;
+  canManageForms?: boolean;
+  canManageMasterSheet?: boolean;
 }
 
 export interface DashboardSummary {

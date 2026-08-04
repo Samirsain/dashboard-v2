@@ -29,6 +29,8 @@ export const updateUserSchema = z.object({
   canAccessAllTasks: z.boolean().optional(),
   canAccessInventory: z.boolean().optional(),
   canManageWorkflow: z.boolean().optional(),
+  canManageForms: z.boolean().optional(),
+  canManageMasterSheet: z.boolean().optional(),
 });
 
 export const idParamSchema = z.object({

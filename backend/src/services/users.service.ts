@@ -29,6 +29,8 @@ function toUser(record: SheetRecord): User {
     canAccessAllTasks: (record["Can Access All Tasks"] ?? "").toLowerCase() === "true",
     canAccessInventory: (record["Can Access Inventory"] ?? "").toLowerCase() === "true",
     canManageWorkflow: (record["Can Manage Workflow"] ?? "").toLowerCase() === "true",
+    canManageForms: (record["Can Manage Forms"] ?? "").toLowerCase() === "true",
+    canManageMasterSheet: (record["Can Manage Master Sheet"] ?? "").toLowerCase() === "true",
     createdAt: record["CreatedAt"] ?? "",
   };
 }
@@ -108,6 +110,8 @@ export const usersService = {
       "Can Access All Tasks": "true",
       "Can Access Inventory": "true",
       "Can Manage Workflow": "true",
+      "Can Manage Forms": "true",
+      "Can Manage Master Sheet": "true",
       PasswordHash: passwordHash,
       CreatedAt: todayIso(),
     };
@@ -137,6 +141,8 @@ export const usersService = {
         | "canAccessAllTasks"
         | "canAccessInventory"
         | "canManageWorkflow"
+        | "canManageForms"
+        | "canManageMasterSheet"
       >
     >
   ): Promise<User> {
@@ -166,6 +172,10 @@ export const usersService = {
       patch["Can Access Inventory"] = String(updates.canAccessInventory);
     if (updates.canManageWorkflow !== undefined)
       patch["Can Manage Workflow"] = String(updates.canManageWorkflow);
+    if (updates.canManageForms !== undefined)
+      patch["Can Manage Forms"] = String(updates.canManageForms);
+    if (updates.canManageMasterSheet !== undefined)
+      patch["Can Manage Master Sheet"] = String(updates.canManageMasterSheet);
 
     const saved = await dataService.updateById(entity, id, patch);
     return toUser(saved);

@@ -32,6 +32,8 @@ export const authService = {
       canAccessAllTasks: user.canAccessAllTasks,
       canAccessInventory: user.canAccessInventory,
       canManageWorkflow: user.canManageWorkflow,
+      canManageForms: user.canManageForms,
+      canManageMasterSheet: user.canManageMasterSheet,
     });
     return { token, user: publicUser };
   },
@@ -63,6 +65,8 @@ export const authService = {
       canAccessAllTasks: user.canAccessAllTasks,
       canAccessInventory: user.canAccessInventory,
       canManageWorkflow: user.canManageWorkflow,
+      canManageForms: user.canManageForms,
+      canManageMasterSheet: user.canManageMasterSheet,
     });
     return { token, user };
   },

@@ -23,6 +23,8 @@ const PRIVILEGED_FIELDS = [
   "canAccessAllTasks",
   "canAccessInventory",
   "canManageWorkflow",
+  "canManageForms",
+  "canManageMasterSheet",
 ] as const;
 
 export const usersController = {

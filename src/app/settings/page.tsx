@@ -123,6 +123,8 @@ function SettingsInner() {
     { field: "canDeleteTask", label: "Delete Task", short: "Delete Task" },
     { field: "canAccessInventory", label: "Inventory", short: "Inventory" },
     { field: "canManageWorkflow", label: "Workflow", short: "Workflow" },
+    { field: "canManageForms", label: "Google Forms", short: "Forms" },
+    { field: "canManageMasterSheet", label: "Master Sheet", short: "Master Sheet" },
     { field: "canManageDoers", label: "Doer Management", short: "Doer Mgmt" },
     { field: "canViewTeamPerformance", label: "Team Performance", short: "Team Perf" },
     { field: "canEditAttendance", label: "Attendance Edit", short: "Attendance" },
@@ -762,7 +764,8 @@ function SettingsInner() {
               <p className="font-body-md text-body-md text-on-surface">
                 PC isn&apos;t a separate account — pick an existing Doer to promote. They keep
                 their account, tasks and list access; PC Management access starts at whatever
-                the defaults are (Add Task, Inventory and Workflow ON; everything else OFF)
+                the defaults are (Add Task, Inventory, Workflow, Google Forms and Master Sheet
+                ON; everything else OFF)
                 until you adjust it below.
               </p>
 

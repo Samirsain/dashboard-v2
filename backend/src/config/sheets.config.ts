@@ -160,6 +160,8 @@ export const sheetsConfig = {
       "Can Access All Tasks": "can_access_all_tasks",
       "Can Access Inventory": "can_access_inventory",
       "Can Manage Workflow": "can_manage_workflow",
+      "Can Manage Forms": "can_manage_forms",
+      "Can Manage Master Sheet": "can_manage_master_sheet",
       PasswordHash: "password_hash",
       CreatedAt: "created_at",
     },

@@ -71,6 +71,16 @@ export function canManageWorkflow(user: JwtClaims | undefined): boolean {
   return isMd(user) || (user?.role === "PC" && user.canManageWorkflow === true);
 }
 
+/** Register/remove a Google Form, manage its access, set response status. Defaults true. */
+export function canManageForms(user: JwtClaims | undefined): boolean {
+  return isMd(user) || (user?.role === "PC" && user.canManageForms === true);
+}
+
+/** Edit the Master Sheet. Defaults true. */
+export function canManageMasterSheet(user: JwtClaims | undefined): boolean {
+  return isMd(user) || (user?.role === "PC" && user.canManageMasterSheet === true);
+}
+
 /**
  * Who sees everyone's tasks/checklists rather than only their own: MD and PC
  * by role, plus any doer explicitly flagged canViewAll.

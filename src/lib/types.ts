@@ -29,6 +29,8 @@ export interface Doer {
   canAccessAllTasks: boolean;
   canAccessInventory: boolean;
   canManageWorkflow: boolean;
+  canManageForms: boolean;
+  canManageMasterSheet: boolean;
   createdAt: string;
 }
 
