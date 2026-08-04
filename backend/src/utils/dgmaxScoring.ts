@@ -64,18 +64,16 @@ export function buildDgmaxWeeklySummary(
   const revisionWeight = Math.max(0, revisionPenaltyPct);
   const inWindow = (dateStr: string) => !!dateStr && dateStr >= fromDate && dateStr <= toDate;
 
-  // Every revision made THIS week counts against this week's score, on
-  // whichever doer currently holds the task — regardless of whether that
-  // task's own due date falls in this window. Revising itself is the
-  // behavior being penalized, not just the outcome.
-  const taskDoerMap = new Map(tasks.map((t) => [t.id, t.assignedDoerId]));
-  const revisionCountByDoer = new Map<string, number>();
+  // Revisions made THIS week (by revisedAt), per task — only counted below
+  // for tasks that actually land in this week's scored set (the same ones
+  // behind "Tasks Done/Assigned"), not every task the doer happens to hold.
+  // Otherwise a doer with dozens of open tasks elsewhere would rack up a
+  // Revisions count that has nothing to do with this week's 5 scored tasks.
+  const revisionCountByTask = new Map<string, number>();
   for (const r of revisions) {
     const revisedDate = r.revisedAt ? r.revisedAt.slice(0, 10) : "";
     if (!inWindow(revisedDate)) continue;
-    const doerId = taskDoerMap.get(r.taskId);
-    if (!doerId) continue;
-    revisionCountByDoer.set(doerId, (revisionCountByDoer.get(doerId) || 0) + 1);
+    revisionCountByTask.set(r.taskId, (revisionCountByTask.get(r.taskId) || 0) + 1);
   }
 
   const summaryMap = new Map<string, DgmaxEmployeeSummary>();
@@ -126,6 +124,12 @@ export function buildDgmaxWeeklySummary(
     else if (cat === "Yellow") s.yellowCount++;
     else if (cat === "Red") s.redCount++;
     else s.pendingCount++;
+    // Revisions only count toward the score for tasks that are actually
+    // assigned this week (Green/Yellow/Red) — a still-pending task's
+    // reschedule isn't part of "Tasks Done/Assigned" either.
+    if (cat !== "Pending") {
+      s.revisionCount += revisionCountByTask.get(t.id) || 0;
+    }
   }
 
   // Process Checklists
@@ -161,7 +165,6 @@ export function buildDgmaxWeeklySummary(
     .map((s) => {
       // 1. Task Score (Not Done + Late Done + a flat per-revision cut)
       s.assignedTasks = s.greenCount + s.yellowCount + s.redCount;
-      s.revisionCount = revisionCountByDoer.get(s.doerId) || 0;
       if (s.assignedTasks > 0) {
         const taskResult = calculatePerformance(
           {
