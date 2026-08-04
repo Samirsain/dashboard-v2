@@ -13,7 +13,6 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { canDeleteDoer, canManageDoers } from "@/lib/access";
 import { buildBuckets, hasListAccess, type Bucket } from "@/lib/listBuckets";
-import PcManagement from "@/components/PcManagement";
 import type { Doer, List, Task } from "@/lib/types";
 
 function StatusPill({ status }: { status: Doer["status"] }) {
@@ -52,10 +51,6 @@ function SettingsInner() {
   // "doerId:listId" currently being saved, so its checkbox disables briefly.
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [reassignFrom, setReassignFrom] = useState<Doer | null>(null);
-  const [tab, setTab] = useState<"doers" | "pcs">("doers");
-  // Whether "+ Add" creates a PC or a plain doer, driven by the active tab.
-  const [addRole, setAddRole] = useState<Doer["role"] | undefined>(undefined);
-  const [demotingId, setDemotingId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -124,26 +119,20 @@ function SettingsInner() {
     }
   }
 
-  const pcs = useMemo(() => doers.filter((d) => d.role === "PC"), [doers]);
-
   /**
-   * Drop a PC back to a plain Doer. Their account, tasks and sheet membership
-   * all stay put — only the extra reach goes away, so this is reversible and
-   * far safer than deleting them.
+   * PC isn't a separate account type — it's a role any Doer can be switched
+   * to below. When more than one exists they need to stay distinguishable
+   * (who's "the" PC vs. a second one), so label them PC, PC2, PC3… in the
+   * order they were promoted (oldest account first).
    */
-  async function handleDemotePc(pc: Doer) {
-    if (!confirm(`Remove PC access from ${pc.name}? They stay on as a Doer, keeping their tasks.`))
-      return;
-    setDemotingId(pc.id);
-    try {
-      const updated = await api.patch<Doer>(`/users/${pc.id}`, { role: "Doer" });
-      setDoers((prev) => prev.map((d) => (d.id === pc.id ? updated : d)));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to remove PC access.");
-    } finally {
-      setDemotingId(null);
-    }
-  }
+  const pcLabels = useMemo(() => {
+    const m = new Map<string, string>();
+    doers
+      .filter((d) => d.role === "PC")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .forEach((d, i) => m.set(d.id, i === 0 ? "PC" : `PC${i + 1}`));
+    return m;
+  }, [doers]);
 
   /** Unfinished tasks currently on this doer — what deleting them would orphan. */
   function openTaskCountFor(doerId: string): number {
@@ -223,7 +212,7 @@ function SettingsInner() {
       <div className="md:ml-64 flex-1 flex flex-col bg-background min-h-screen">
         <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
-            Settings — {tab === "pcs" ? "PC Management" : "Doer Management"}
+            Settings — Doer Management
           </div>
           <div className="flex items-center gap-4">
             <button
@@ -233,13 +222,10 @@ function SettingsInner() {
               + Create List
             </button>
             <button
-              onClick={() => {
-                setAddRole(tab === "pcs" ? "PC" : undefined);
-                setShowAddDoer(true);
-              }}
+              onClick={() => setShowAddDoer(true)}
               className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer"
             >
-              {tab === "pcs" ? "+ Add PC" : "+ Add Doer"}
+              + Add Doer
             </button>
           </div>
         </header>
@@ -247,7 +233,7 @@ function SettingsInner() {
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
           <div className="border-b-2 border-on-surface pb-stack-md flex justify-between items-end md:hidden">
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              {tab === "pcs" ? "PC Management" : "Doer Management"}
+              Doer Management
             </h2>
             <div className="flex items-center gap-2">
               <button
@@ -257,36 +243,12 @@ function SettingsInner() {
                 + List
               </button>
               <button
-                onClick={() => {
-                  setAddRole(tab === "pcs" ? "PC" : undefined);
-                  setShowAddDoer(true);
-                }}
+                onClick={() => setShowAddDoer(true)}
                 className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
               >
-                {tab === "pcs" ? "+ PC" : "+ Doer"}
+                + Doer
               </button>
             </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-2 border-b-2 border-on-surface pb-stack-md">
-            {([
-              { key: "doers", label: `Doer Management (${doers.length})` },
-              { key: "pcs", label: `PC Management (${pcs.length})` },
-            ] as const).map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                aria-pressed={tab === t.key}
-                className={`inline-flex items-center justify-center min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border-2 border-on-surface transition-colors cursor-pointer ${
-                  tab === t.key
-                    ? "bg-on-surface text-surface"
-                    : "bg-surface text-on-surface hover:bg-surface-container"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
           </div>
 
           {resetNotice && (
@@ -300,23 +262,7 @@ function SettingsInner() {
             </p>
           )}
 
-          {tab === "pcs" ? (
-            <PcManagement
-              pcs={pcs}
-              lists={lists}
-              buckets={buckets}
-              loading={loading}
-              savingKey={savingKey}
-              demotingId={demotingId}
-              onToggleAccess={toggleAccess}
-              onRename={handleRename}
-              onResetPassword={setDoerToReset}
-              onDemote={handleDemotePc}
-              onDelete={handleDelete}
-              onReassignWork={setReassignFrom}
-            />
-          ) : (
-            <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
+          <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   <tr>
@@ -348,6 +294,11 @@ function SettingsInner() {
                         <div className="flex items-center gap-2">
                           <InitialsAvatar name={d.name} className="w-6 h-6 border border-on-surface" />
                           <span className="font-medium">{d.name}</span>
+                          {pcLabels.has(d.id) && (
+                            <span className="border border-on-surface px-1.5 py-0.5 font-label-sm text-[10px] uppercase text-on-surface-variant">
+                              {pcLabels.get(d.id)}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
@@ -476,7 +427,6 @@ function SettingsInner() {
                 </tbody>
               </table>
             </div>
-          )}
 
           <div className="border-b-2 border-on-surface pb-stack-md">
             <h2 className="font-headline-lg-mobile md:font-headline-md text-headline-lg-mobile md:text-headline-md text-on-surface uppercase tracking-tighter">
@@ -558,7 +508,6 @@ function SettingsInner() {
 
       {showAddDoer && (
         <CreateDoerModal
-          lockedRole={addRole}
           onClose={() => setShowAddDoer(false)}
           onCreated={(doer) => {
             setDoers((prev) => [...prev, doer]);

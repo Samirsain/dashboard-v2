@@ -13,22 +13,18 @@ function passwordFromCode(code: string): string {
 export default function CreateDoerModal({
   onClose,
   onCreated,
-  lockedRole,
 }: {
   onClose: () => void;
   onCreated: (doer: Doer) => void;
-  /**
-   * Fixes the new account's role and hides the picker — used by PC Management,
-   * where "+ Add PC" should never be able to quietly create a Doer or an MD.
-   */
-  lockedRole?: Doer["role"];
 }) {
   const [name, setName] = useState("");
   const [employeeCode, setEmployeeCode] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [department, setDepartment] = useState("");
-  const [role, setRole] = useState<Doer["role"]>(lockedRole ?? "Doer");
+  // PC isn't offered here — it's not a separate account type, just a role you
+  // promote an existing Doer to from the table below.
+  const [role, setRole] = useState<Doer["role"]>("Doer");
   const [password, setPassword] = useState("");
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +51,7 @@ export default function CreateDoerModal({
       });
       onCreated(doer);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : `Failed to add ${lockedRole === "PC" ? "PC" : "doer"}.`);
+      setError(err instanceof ApiError ? err.message : "Failed to add doer.");
     } finally {
       setSubmitting(false);
     }
@@ -70,7 +66,7 @@ export default function CreateDoerModal({
       <div className="w-full max-w-lg bg-surface-container-lowest border-2 border-on-surface max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md sticky top-0 bg-surface-container-lowest">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
-            {lockedRole === "PC" ? "Add PC" : "Add Doer"}
+            Add Doer
           </h3>
           <button
             type="button"
@@ -94,25 +90,20 @@ export default function CreateDoerModal({
                 required
                 value={employeeCode}
                 onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
-                placeholder={lockedRole === "PC" ? "e.g. PC01" : "e.g. EM07"}
+                placeholder="e.g. EM07"
                 className={field}
               />
             </div>
             <div>
               <label className={label}>Role</label>
-              {lockedRole ? (
-                <p className={`${field} flex items-center font-data-mono`}>{lockedRole}</p>
-              ) : (
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as Doer["role"])}
-                  className={field}
-                >
-                  <option value="Doer">Doer</option>
-                  <option value="PC">PC</option>
-                  <option value="MD">MD</option>
-                </select>
-              )}
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as Doer["role"])}
+                className={field}
+              >
+                <option value="Doer">Doer</option>
+                <option value="MD">MD</option>
+              </select>
             </div>
 
             <div>
@@ -176,7 +167,7 @@ export default function CreateDoerModal({
               disabled={submitting}
               className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {submitting ? "Adding..." : lockedRole === "PC" ? "Add PC" : "Add Doer"}
+              {submitting ? "Adding..." : "Add Doer"}
             </button>
           </div>
         </form>
