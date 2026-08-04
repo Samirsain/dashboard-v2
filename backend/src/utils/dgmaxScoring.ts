@@ -8,6 +8,13 @@ export { DEFAULT_LATE_DONE_WEIGHT, DEFAULT_REVISION_PENALTY_PCT };
 export const CHECKLIST_DAILY_RATE = 33;
 export const CHECKLIST_MAX_CAP = 80;
 
+/**
+ * Final score weighting when a doer has both Task List and Checklist work:
+ * Task List counts for more since it's the primary work stream.
+ */
+export const TASK_WEIGHT = 0.75;
+export const CHECKLIST_WEIGHT = 0.25;
+
 function getDaysLate(dateStr: string, completedAtStr: string): number {
   if (!completedAtStr || !dateStr) return 1;
   const completedDateStr = completedAtStr.slice(0, 10);
@@ -197,12 +204,16 @@ export function buildDgmaxWeeklySummary(
         s.checklistScore = 0;
       }
 
-      // 3. Average Score of Task List & Checklist
+      // 3. Final Score: Task List is the primary work, so it's weighted
+      // heavier (75/25) than Checklist rather than a plain 50/50 average —
+      // otherwise a doer who does zero Task List work all week but keeps
+      // their checklist clean could land at a misleadingly mild final score.
       const hasTaskWork = s.assignedTasks > 0;
       const hasChecklistWork = s.assignedChecklists > 0;
 
       if (hasTaskWork && hasChecklistWork) {
-        s.negativeScore = Math.round(((s.taskScore + s.checklistScore) / 2) * 100) / 100;
+        s.negativeScore =
+          Math.round((s.taskScore * TASK_WEIGHT + s.checklistScore * CHECKLIST_WEIGHT) * 100) / 100;
       } else if (hasTaskWork) {
         s.negativeScore = s.taskScore;
       } else if (hasChecklistWork) {

@@ -133,7 +133,9 @@ function TeamPerformanceInner() {
           Checklist Score = −Per-Day Late Penalty (33%/day late, capped at 80%) · Not Done = −100% of
           that item
           <br />
-          <strong className="text-on-surface">Final Doer Score = Average(Task Score, Checklist Score)</strong>
+          <strong className="text-on-surface">
+            Final Doer Score = (Task Score × 75%) + (Checklist Score × 25%)
+          </strong>
         </p>
 
         {/* Scoreboard */}
