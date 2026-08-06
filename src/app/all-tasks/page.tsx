@@ -102,6 +102,19 @@ function AllTasksInner() {
   );
 
 
+  // If a real "OFFICE..." list exists, it's the same sheet as the implicit
+  // default bucket — use its id so "Office" isn't listed twice in the
+  // dropdown (once for the real list, once for the blank/no-list fallback)
+  // with the fallback silently matching nothing.
+  const officeTaskList = useMemo(
+    () => lists.find((l) => l.type === "task" && l.name.trim().toUpperCase().startsWith("OFFICE")),
+    [lists]
+  );
+  const officeChecklistList = useMemo(
+    () => lists.find((l) => l.type === "checklist" && l.name.trim().toUpperCase().startsWith("OFFICE")),
+    [lists]
+  );
+
   function inScope(listId: string): boolean {
     if (scope === "ALL") return true;
     if (scope === "OFFICE") return !listId;
@@ -441,9 +454,9 @@ function AllTasksInner() {
                 }
               >
                 <option value="ALL">Task List (All TL)</option>
-                <option value="OFFICE">Task List (Office TL)</option>
+                <option value={officeTaskList?.id ?? "OFFICE"}>Task List (Office TL)</option>
                 {lists
-                  .filter((l) => l.type === "task")
+                  .filter((l) => l.type === "task" && l.id !== officeTaskList?.id)
                   .map((l) => {
                     const first = l.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
                     return (
@@ -473,9 +486,9 @@ function AllTasksInner() {
                 }
               >
                 <option value="ALL">Checklist (All CL)</option>
-                <option value="OFFICE">Checklist (Office CL)</option>
+                <option value={officeChecklistList?.id ?? "OFFICE"}>Checklist (Office CL)</option>
                 {lists
-                  .filter((l) => l.type === "checklist")
+                  .filter((l) => l.type === "checklist" && l.id !== officeChecklistList?.id)
                   .map((l) => {
                     const first = l.name.trim().split(/\s+/)[0]?.toUpperCase() || "LIST";
                     return (
