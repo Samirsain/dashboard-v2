@@ -371,7 +371,7 @@ function ImsInner() {
                       <div className="flex items-center gap-0 border border-on-surface/30 bg-surface-container-lowest font-label-sm text-[10px] uppercase divide-x divide-on-surface/20 overflow-hidden">
                         <span className="px-3 py-2 text-on-surface-variant font-bold whitespace-nowrap">Color Guide</span>
                         <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
-                          <span className="inline-block w-2.5 h-2.5 bg-error/30 border border-error flex-shrink-0"></span>
+                          <span className="inline-block w-2.5 h-2.5 border border-error flex-shrink-0" style={{ backgroundColor: "#fecaca" }}></span>
                           <span className="text-error font-bold">Red</span>
                           <span className="text-on-surface-variant hidden sm:inline">— Stock critically low (order ≥ MOQ)</span>
                         </span>
@@ -379,11 +379,6 @@ function ImsInner() {
                           <span className="inline-block w-2.5 h-2.5 bg-amber-200 border border-amber-500 flex-shrink-0"></span>
                           <span className="text-amber-700 font-bold">Yellow</span>
                           <span className="text-on-surface-variant hidden sm:inline">— Stock slightly low (min. MOQ order)</span>
-                        </span>
-                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
-                          <span className="inline-block w-2.5 h-2.5 bg-emerald-200 border border-emerald-500 flex-shrink-0"></span>
-                          <span className="text-emerald-700 font-bold">Green</span>
-                          <span className="text-on-surface-variant hidden sm:inline">— Stock sufficient</span>
                         </span>
                       </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
@@ -416,11 +411,13 @@ function ImsInner() {
                               const raw = rd ? rd.effectiveMaxLevel - rd.closingStock - rd.materialInTransit : null;
                               const isBigShortage = raw !== null && raw >= i.moq;
                               const isSmallShortage = raw !== null && raw > 0 && raw < i.moq;
+                              // Critically low uses the same red as an overdue task on the
+                              // Dashboard. Sufficient stock is the normal state — no color needed.
                               const rowStyle = isBigShortage
-                                ? { backgroundColor: "rgba(254,226,226,0.6)" }
+                                ? { backgroundColor: "#fecaca" }
                                 : isSmallShortage
                                 ? { backgroundColor: "rgba(254,240,138,0.45)", borderLeft: "3px solid #eab308" }
-                                : { backgroundColor: "rgba(209,250,229,0.5)" };
+                                : undefined;
                               return (
                               <tr key={i.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0 transition-colors">
                                 <td className={tdCls}>{i.skuCode}</td>
@@ -630,7 +627,7 @@ function ImsInner() {
                       <div className="flex items-center gap-0 border border-on-surface/30 bg-surface-container-lowest font-label-sm text-[10px] uppercase divide-x divide-on-surface/20 overflow-hidden">
                         <span className="px-3 py-2 text-on-surface-variant font-bold whitespace-nowrap">Color Guide</span>
                         <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
-                          <span className="inline-block w-2.5 h-2.5 bg-error/30 border border-error flex-shrink-0"></span>
+                          <span className="inline-block w-2.5 h-2.5 border border-error flex-shrink-0" style={{ backgroundColor: "#fecaca" }}></span>
                           <span className="text-error font-bold">Red</span>
                           <span className="text-on-surface-variant hidden sm:inline">— Stock critically low (order ≥ MOQ)</span>
                         </span>
@@ -638,11 +635,6 @@ function ImsInner() {
                           <span className="inline-block w-2.5 h-2.5 bg-amber-200 border border-amber-500 flex-shrink-0"></span>
                           <span className="text-amber-700 font-bold">Yellow</span>
                           <span className="text-on-surface-variant hidden sm:inline">— Stock slightly low (min. MOQ order)</span>
-                        </span>
-                        <span className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
-                          <span className="inline-block w-2.5 h-2.5 bg-emerald-200 border border-emerald-500 flex-shrink-0"></span>
-                          <span className="text-emerald-700 font-bold">Green</span>
-                          <span className="text-on-surface-variant hidden sm:inline">— Stock sufficient</span>
                         </span>
                       </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
@@ -673,16 +665,18 @@ function ImsInner() {
                               const raw = r.effectiveMaxLevel - r.closingStock - r.materialInTransit;
                               const isBigShortage = raw >= r.moq;
                               const isSmallShortage = raw > 0 && raw < r.moq;
+                              // Critically low uses the same red as an overdue task on the
+                              // Dashboard. Sufficient stock is the normal state — no color needed.
                               const rowStyle = isBigShortage
-                                ? { backgroundColor: "rgba(254,226,226,0.6)" }
+                                ? { backgroundColor: "#fecaca" }
                                 : isSmallShortage
                                 ? { backgroundColor: "rgba(254,240,138,0.45)", borderLeft: "3px solid #eab308" }
-                                : { backgroundColor: "rgba(209,250,229,0.5)" };
+                                : undefined;
                               const qtyColor = isBigShortage
                                 ? "text-error"
                                 : isSmallShortage
                                 ? "text-amber-700"
-                                : "text-emerald-700";
+                                : "";
                               return (
                               <tr key={r.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0">
                                 <td className={tdCls}>{r.skuCode}</td>
