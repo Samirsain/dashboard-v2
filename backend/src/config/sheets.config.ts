@@ -311,6 +311,20 @@ export const sheetsConfig = {
     },
     "WORKFLOW_STEPS"
   ),
+  /** WFMS — the data fields a template's runs carry (PO Number, Vendor, ...). */
+  workflowTemplateFields: entity(
+    "WORKFLOW_TEMPLATE_FIELDS",
+    "workflow_template_fields",
+    "Field ID",
+    {
+      "Field ID": "id",
+      "Template ID": "template_id",
+      "Field No": "field_no",
+      Label: "label",
+      Type: "type",
+    },
+    "WORKFLOW_TEMPLATE_FIELDS"
+  ),
   /** WFMS — one row per run (instance) of a template. */
   workflowInstances: entity(
     "WORKFLOW_INSTANCES",
@@ -321,6 +335,7 @@ export const sheetsConfig = {
       "Template ID": "template_id",
       Title: "title",
       Details: "details",
+      "Field Values": "field_values",
       StartedAt: "started_at",
       Status: "status",
       RequestedBy: "requested_by",

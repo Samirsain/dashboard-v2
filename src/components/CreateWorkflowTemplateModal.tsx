@@ -2,7 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Doer, WorkflowTemplate } from "@/lib/types";
+import type { Doer, WorkflowFieldType, WorkflowTemplate } from "@/lib/types";
+
+type FieldDraft = { label: string; type: WorkflowFieldType };
 
 type TatMode = "minutes" | "hours" | "SAME_DAY" | "NEXT_DAY" | "WHENEVER_NEEDED";
 type StepDraft = { what: string; doerId: string; how: string; tatMode: TatMode; tatValue: string };
@@ -28,12 +30,17 @@ export default function CreateWorkflowTemplateModal({
   onCreated: (template: WorkflowTemplate) => void;
 }) {
   const [name, setName] = useState("");
+  const [fields, setFields] = useState<FieldDraft[]>([{ label: "", type: "text" }]);
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep(doers[0]?.id ?? "")]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function updateStep(index: number, patch: Partial<StepDraft>) {
     setSteps((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  }
+
+  function updateField(index: number, patch: Partial<FieldDraft>) {
+    setFields((prev) => prev.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   }
 
   function addStep() {
@@ -51,6 +58,10 @@ export default function CreateWorkflowTemplateModal({
     try {
       const template = await api.post<WorkflowTemplate>("/workflow/templates", {
         name,
+        // Blank rows are just unused slots the user left behind, not fields.
+        fields: fields
+          .filter((f) => f.label.trim())
+          .map((f) => ({ label: f.label.trim(), type: f.type })),
         steps: steps.map((s) => ({
           what: s.what,
           doerId: s.doerId,
@@ -96,6 +107,55 @@ export default function CreateWorkflowTemplateModal({
               placeholder="e.g. Video Production Pipeline"
               className={field}
             />
+          </div>
+
+          {/* The data every run of this template will carry. */}
+          <div className="border-2 border-on-surface p-stack-md flex flex-col gap-2">
+            <div>
+              <span className={label}>Data Fields</span>
+              <p className="mt-0.5 font-data-mono text-[10px] text-on-surface-variant uppercase">
+                What to fill in each time this runs. The first field names the run.
+              </p>
+            </div>
+
+            {fields.map((f, i) => (
+              <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                <input
+                  value={f.label}
+                  onChange={(e) => updateField(i, { label: e.target.value })}
+                  placeholder={i === 0 ? "e.g. PO Number (names the run)" : "e.g. Vendor Name"}
+                  className={field}
+                />
+                <select
+                  value={f.type}
+                  onChange={(e) => updateField(i, { type: e.target.value as WorkflowFieldType })}
+                  className={`${field} w-28`}
+                >
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                </select>
+                {fields.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setFields((prev) => prev.filter((_, x) => x !== i))}
+                    className="px-2 font-label-sm text-label-sm uppercase text-error"
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <span className="px-2" />
+                )}
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => setFields((prev) => [...prev, { label: "", type: "text" }])}
+              className="self-start border-2 border-on-surface px-3 py-1.5 font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+            >
+              + Add Field
+            </button>
           </div>
 
           <div className="flex flex-col gap-stack-md">

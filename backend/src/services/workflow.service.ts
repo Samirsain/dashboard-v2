@@ -6,6 +6,9 @@ import { generateId, generateUuid } from "../utils/id";
 import { addTAT, delayMinutes } from "../utils/tatEngine";
 import { AppError } from "../utils/AppError";
 import type {
+  WorkflowFieldType,
+  WorkflowFieldValue,
+  WorkflowTemplateField,
   WorkflowInstance,
   WorkflowInstanceStatus,
   WorkflowStep,
@@ -16,6 +19,7 @@ import type {
 
 const templatesEntity = sheetsConfig.workflowTemplates;
 const stepsEntity = sheetsConfig.workflowSteps;
+const fieldsEntity = sheetsConfig.workflowTemplateFields;
 const instancesEntity = sheetsConfig.workflowInstances;
 const eventsEntity = sheetsConfig.workflowStepEvents;
 
@@ -38,12 +42,42 @@ function toStep(r: SheetRecord): WorkflowStep {
   };
 }
 
+function toField(r: SheetRecord): WorkflowTemplateField {
+  const type = (r["Type"] ?? "text") as WorkflowFieldType;
+  return {
+    id: r["Field ID"] ?? "",
+    templateId: r["Template ID"] ?? "",
+    fieldNo: Number(r["Field No"] || 0),
+    label: r["Label"] ?? "",
+    type: type === "number" || type === "date" ? type : "text",
+  };
+}
+
+/**
+ * Field values are stored as a JSON array of {label, value}. Anything
+ * unreadable (hand-edited cell, older run from before fields existed) reads
+ * back as no fields rather than breaking the whole run.
+ */
+function parseFieldValues(raw: string): WorkflowFieldValue[] {
+  if (!raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((v) => v && typeof v.label === "string")
+      .map((v) => ({ label: String(v.label), value: String(v.value ?? "") }));
+  } catch {
+    return [];
+  }
+}
+
 function toInstance(r: SheetRecord): WorkflowInstance {
   return {
     id: r["Instance ID"] ?? "",
     templateId: r["Template ID"] ?? "",
     title: r["Title"] ?? "",
     details: r["Details"] ?? "",
+    fieldValues: parseFieldValues(r["Field Values"] ?? ""),
     startedAt: r["StartedAt"] ?? "",
     status: (r["Status"] as WorkflowInstanceStatus) || "Active",
     requestedBy: r["RequestedBy"] ?? "",
@@ -105,6 +139,14 @@ async function getStepsForTemplate(templateId: string): Promise<WorkflowStep[]> 
     .sort((a, b) => a.stepNo - b.stepNo);
 }
 
+async function getFieldsForTemplate(templateId: string): Promise<WorkflowTemplateField[]> {
+  const records = await dataService.findAll(fieldsEntity);
+  return records
+    .map(toField)
+    .filter((f) => f.templateId === templateId)
+    .sort((a, b) => a.fieldNo - b.fieldNo);
+}
+
 async function getEventsForInstance(instanceId: string): Promise<WorkflowStepEvent[]> {
   const records = await dataService.findAll(eventsEntity);
   return records
@@ -117,41 +159,66 @@ async function getEventsForInstance(instanceId: string): Promise<WorkflowStepEve
 export const workflowService = {
   // ---- Templates ---------------------------------------------------------
 
-  async listTemplates(): Promise<Array<WorkflowTemplate & { steps: WorkflowStep[] }>> {
-    const [templateRecords, stepRecords] = await Promise.all([
+  async listTemplates(): Promise<
+    Array<WorkflowTemplate & { steps: WorkflowStep[]; fields: WorkflowTemplateField[] }>
+  > {
+    const [templateRecords, stepRecords, fieldRecords] = await Promise.all([
       dataService.findAll(templatesEntity),
       dataService.findAll(stepsEntity),
+      dataService.findAll(fieldsEntity),
     ]);
     const steps = stepRecords.map(toStep);
+    const fields = fieldRecords.map(toField);
     return templateRecords
       .map(toTemplate)
       .map((t) => ({
         ...t,
         steps: steps.filter((s) => s.templateId === t.id).sort((a, b) => a.stepNo - b.stepNo),
+        fields: fields.filter((f) => f.templateId === t.id).sort((a, b) => a.fieldNo - b.fieldNo),
       }));
   },
 
-  async getTemplate(id: string): Promise<WorkflowTemplate & { steps: WorkflowStep[] }> {
+  async getTemplate(
+    id: string
+  ): Promise<WorkflowTemplate & { steps: WorkflowStep[]; fields: WorkflowTemplateField[] }> {
     const record = await dataService.findById(templatesEntity, id);
     if (!record) throw AppError.notFound(`Workflow template "${id}" not found`);
-    const steps = await getStepsForTemplate(id);
-    return { ...toTemplate(record), steps };
+    const [steps, fields] = await Promise.all([
+      getStepsForTemplate(id),
+      getFieldsForTemplate(id),
+    ]);
+    return { ...toTemplate(record), steps, fields };
   },
 
   async createTemplate(input: {
     name: string;
+    fields?: Array<{ label: string; type: WorkflowFieldType }>;
     steps: Array<{ what: string; doerId: string; how: string; tat: string }>;
-  }): Promise<WorkflowTemplate & { steps: WorkflowStep[] }> {
+  }): Promise<WorkflowTemplate & { steps: WorkflowStep[]; fields: WorkflowTemplateField[] }> {
     if (input.steps.length === 0) {
       throw AppError.badRequest("A workflow template needs at least one step");
     }
 
     const templateId = generateId("WFT");
+    const createdAt = new Date().toISOString();
     await dataService.append(templatesEntity, {
       "Template ID": templateId,
       Name: input.name,
-      CreatedAt: new Date().toISOString(),
+      CreatedAt: createdAt,
     });
+
+    const fields: WorkflowTemplateField[] = [];
+    for (let i = 0; i < (input.fields ?? []).length; i++) {
+      const f = input.fields![i]!;
+      const saved = await dataService.append(fieldsEntity, {
+        "Field ID": generateId("WFF"),
+        "Template ID": templateId,
+        "Field No": String(i + 1),
+        Label: f.label,
+        Type: f.type,
+      });
+      fields.push(toField(saved));
+    }
 
     const steps: WorkflowStep[] = [];
     for (let i = 0; i < input.steps.length; i++) {
@@ -169,13 +236,19 @@ export const workflowService = {
       steps.push(toStep(saved));
     }
 
-    return { id: templateId, name: input.name, createdAt: new Date().toISOString(), steps };
+    return { id: templateId, name: input.name, createdAt, steps, fields };
   },
 
   async removeTemplate(id: string): Promise<void> {
-    const steps = await getStepsForTemplate(id);
+    const [steps, fields] = await Promise.all([
+      getStepsForTemplate(id),
+      getFieldsForTemplate(id),
+    ]);
     for (const step of steps) {
       await dataService.deleteById(stepsEntity, step.id);
+    }
+    for (const field of fields) {
+      await dataService.deleteById(fieldsEntity, field.id);
     }
     await dataService.deleteById(templatesEntity, id);
   },
@@ -203,6 +276,8 @@ export const workflowService = {
       instanceId: string;
       instanceTitle: string;
       instanceDetails: string;
+      /** The run's data (PO Number, Vendor, ...) so the doer knows what this is about. */
+      fieldValues: WorkflowFieldValue[];
       totalSteps: number;
       isMyTurn: boolean;
       /** Resolved name for the step's WHO, so the doer view needs no user lookup. */
@@ -236,6 +311,7 @@ export const workflowService = {
           instanceId: instance.id,
           instanceTitle: instance.title,
           instanceDetails: instance.details,
+          fieldValues: instance.fieldValues,
           totalSteps: stepCountByInstance.get(step.instanceId) ?? 0,
           isMyTurn: step.status === "Active" || step.status === "Overdue",
           doerName: doer?.name ?? "",
@@ -260,13 +336,37 @@ export const workflowService = {
 
   async startInstance(input: {
     templateId: string;
-    title: string;
+    /** Optional — when the template defines fields, the first one names the run. */
+    title?: string;
     details?: string;
+    /** Values for the template's fields, in the template's own field order. */
+    fieldValues?: string[];
     requestedBy: string;
   }): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
-    const templateSteps = await getStepsForTemplate(input.templateId);
+    const [templateSteps, templateFields] = await Promise.all([
+      getStepsForTemplate(input.templateId),
+      getFieldsForTemplate(input.templateId),
+    ]);
     if (templateSteps.length === 0) {
       throw AppError.badRequest(`Workflow template "${input.templateId}" has no steps`);
+    }
+
+    // Pair each submitted value with its field's label, so the run carries a
+    // self-describing record rather than a bare positional array.
+    const fieldValues: WorkflowFieldValue[] = templateFields.map((f, i) => ({
+      label: f.label,
+      value: (input.fieldValues?.[i] ?? "").trim(),
+    }));
+
+    // The first field names the run ("PO-1042"), which is why there's no
+    // separate title to type. Templates with no fields still take one.
+    const title = (fieldValues[0]?.value || input.title || "").trim();
+    if (!title) {
+      throw AppError.badRequest(
+        templateFields.length > 0
+          ? `"${templateFields[0]!.label}" is required — it names this run.`
+          : "A title is required to start a run."
+      );
     }
 
     const instanceId = generateUuid();
@@ -275,8 +375,9 @@ export const workflowService = {
     await dataService.append(instancesEntity, {
       "Instance ID": instanceId,
       "Template ID": input.templateId,
-      Title: input.title,
+      Title: title,
       Details: input.details ?? "",
+      "Field Values": JSON.stringify(fieldValues),
       StartedAt: startedAt.toISOString(),
       Status: "Active",
       RequestedBy: input.requestedBy,
@@ -305,15 +406,16 @@ export const workflowService = {
     await activityService.log({
       user: input.requestedBy,
       action: "Started workflow",
-      task: input.title,
+      task: title,
       detail: `Step 1 (${templateSteps[0]!.what}) is now active`,
     });
 
     const instance: WorkflowInstance = {
       id: instanceId,
       templateId: input.templateId,
-      title: input.title,
+      title,
       details: input.details ?? "",
+      fieldValues,
       startedAt: startedAt.toISOString(),
       status: "Active",
       requestedBy: input.requestedBy,

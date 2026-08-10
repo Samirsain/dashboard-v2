@@ -16,8 +16,23 @@ export default function StartWorkflowInstanceModal({
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
+  // Keyed by template so switching templates mid-entry doesn't carry one
+  // template's answers into another's differently-shaped fields.
+  const [valuesByTemplate, setValuesByTemplate] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const template = templates.find((t) => t.id === templateId);
+  const fields = template?.fields ?? [];
+  const values = valuesByTemplate[templateId] ?? [];
+
+  function setValue(index: number, value: string) {
+    setValuesByTemplate((prev) => {
+      const next = [...(prev[templateId] ?? [])];
+      next[index] = value;
+      return { ...prev, [templateId]: next };
+    });
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -26,7 +41,14 @@ export default function StartWorkflowInstanceModal({
     try {
       const result = await api.post<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }>(
         "/workflow/instances",
-        { templateId, title, details }
+        {
+          templateId,
+          details,
+          // Sent positionally, matching the template's own field order.
+          fieldValues: fields.map((_, i) => values[i] ?? ""),
+          // Only templates without fields need a typed-in name.
+          ...(fields.length === 0 ? { title } : {}),
+        }
       );
       onStarted(result);
     } catch (err) {
@@ -73,19 +95,41 @@ export default function StartWorkflowInstanceModal({
             </select>
           </div>
 
-          <div>
-            <label className={label}>Title</label>
-            <input
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. 30M Website"
-              className={field}
-            />
-            <p className="mt-1 font-data-mono text-[10px] text-on-surface-variant uppercase">
-              Which one this run is for — each gets its own chain
-            </p>
-          </div>
+          {/* The template's own data fields. Templates created before fields
+              existed have none, so they still just take a name. */}
+          {fields.length === 0 ? (
+            <div>
+              <label className={label}>Title</label>
+              <input
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. 30M Website"
+                className={field}
+              />
+              <p className="mt-1 font-data-mono text-[10px] text-on-surface-variant uppercase">
+                Which one this run is for — each gets its own chain
+              </p>
+            </div>
+          ) : (
+            fields.map((f, i) => (
+              <div key={f.id}>
+                <label className={label}>{f.label}</label>
+                <input
+                  required={i === 0}
+                  type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                  value={values[i] ?? ""}
+                  onChange={(e) => setValue(i, e.target.value)}
+                  className={`${field} ${f.type === "text" ? "" : "font-data-mono"}`}
+                />
+                {i === 0 && (
+                  <p className="mt-1 font-data-mono text-[10px] text-on-surface-variant uppercase">
+                    This names the run
+                  </p>
+                )}
+              </div>
+            ))
+          )}
 
           <div>
             <label className={label}>Details (Optional)</label>

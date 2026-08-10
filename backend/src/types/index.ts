@@ -308,6 +308,30 @@ export interface WorkflowTemplate {
   createdAt: string;
 }
 
+export type WorkflowFieldType = "text" | "number" | "date";
+
+/**
+ * One piece of data a template's runs carry (e.g. "PO Number"). Defined once
+ * on the template; filled in per run when someone starts it.
+ */
+export interface WorkflowTemplateField {
+  id: string;
+  templateId: string;
+  fieldNo: number;
+  label: string;
+  type: WorkflowFieldType;
+}
+
+/**
+ * A filled-in field on a run. The label is stored alongside the value so a
+ * run stays readable on its own, even if its template is later changed or
+ * deleted — a finished run is a permanent record.
+ */
+export interface WorkflowFieldValue {
+  label: string;
+  value: string;
+}
+
 export interface WorkflowStep {
   id: string;
   templateId: string;
@@ -327,6 +351,8 @@ export interface WorkflowInstance {
   title: string;
   /** Free-text extra info (e.g. "Video Title: X, Sub Part: Y, Location: Z"). */
   details: string;
+  /** The template's data fields as filled in for this run. */
+  fieldValues: WorkflowFieldValue[];
   startedAt: string; // ISO timestamp
   status: WorkflowInstanceStatus;
   requestedBy: string;

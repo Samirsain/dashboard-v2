@@ -270,11 +270,29 @@ export interface WorkflowStep {
   tat: string;
 }
 
+export type WorkflowFieldType = "text" | "number" | "date";
+
+/** One piece of data a template's runs carry, e.g. "PO Number". */
+export interface WorkflowTemplateField {
+  id: string;
+  templateId: string;
+  fieldNo: number;
+  label: string;
+  type: WorkflowFieldType;
+}
+
+/** A filled-in field on a run — label stored with the value so it stays readable. */
+export interface WorkflowFieldValue {
+  label: string;
+  value: string;
+}
+
 export interface WorkflowTemplate {
   id: string;
   name: string;
   createdAt: string;
   steps: WorkflowStep[];
+  fields: WorkflowTemplateField[];
 }
 
 export type WorkflowInstanceStatus = "Active" | "Complete";
@@ -284,6 +302,7 @@ export interface WorkflowInstance {
   templateId: string;
   title: string;
   details: string;
+  fieldValues: WorkflowFieldValue[];
   startedAt: string;
   status: WorkflowInstanceStatus;
   requestedBy: string;

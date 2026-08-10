@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import { canManageWorkflow } from "@/lib/access";
 import type {
   Doer,
+  WorkflowFieldValue,
   WorkflowInstance,
   WorkflowInstanceStatus,
   WorkflowStepEvent,
@@ -57,6 +58,7 @@ type MyStep = {
   instanceId: string;
   instanceTitle: string;
   instanceDetails: string;
+  fieldValues: WorkflowFieldValue[];
   totalSteps: number;
   isMyTurn: boolean;
   doerName: string;
@@ -201,6 +203,22 @@ function MyWorkflowSteps() {
                     emphasis={overdue ? "error" : "normal"}
                   />
                 </div>
+
+                {/* The run's own data — what this step is actually about. */}
+                {row.fieldValues.length > 0 && (
+                  <div className="border border-on-surface/20 bg-surface-container-lowest p-3 flex flex-col gap-1">
+                    {row.fieldValues.map((f) => (
+                      <div key={f.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+                        <span className="w-32 shrink-0 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                          {f.label}
+                        </span>
+                        <span className="font-data-mono text-data-mono text-on-surface">
+                          {f.value || "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {row.instanceDetails && (
                   <p className="font-data-mono text-data-mono text-on-surface-variant text-xs whitespace-pre-wrap">
@@ -515,6 +533,16 @@ function WorkflowInner() {
             <div className="bg-surface border-2 border-on-surface p-stack-lg">
               <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md">
                 <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
+                {(selectedInstance?.fieldValues?.length ?? 0) > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                    {selectedInstance!.fieldValues.map((f) => (
+                      <span key={f.label} className="font-data-mono text-data-mono text-xs">
+                        <span className="uppercase text-on-surface-variant">{f.label}: </span>
+                        <span className="text-on-surface">{f.value || "—"}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {selectedInstance?.details && (
                   <p className="font-data-mono text-data-mono text-on-surface-variant text-sm mt-1 whitespace-pre-wrap">
                     {selectedInstance.details}

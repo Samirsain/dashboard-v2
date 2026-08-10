@@ -8,6 +8,16 @@ const tatSchema = z.string().refine((v) => {
 
 export const createWorkflowTemplateSchema = z.object({
   name: z.string().min(1),
+  // The data each run of this template carries (e.g. PO Number, Vendor Name).
+  // Optional — a template can have no fields and just be named per run.
+  fields: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        type: z.enum(["text", "number", "date"]).default("text"),
+      })
+    )
+    .default([]),
   steps: z
     .array(
       z.object({
@@ -22,8 +32,12 @@ export const createWorkflowTemplateSchema = z.object({
 
 export const startWorkflowInstanceSchema = z.object({
   templateId: z.string().min(1),
-  title: z.string().min(1),
+  // Only used by templates with no fields — otherwise the first field names
+  // the run, so there's nothing for the user to type twice.
+  title: z.string().optional(),
   details: z.string().default(""),
+  /** Values for the template's fields, in the template's field order. */
+  fieldValues: z.array(z.string()).default([]),
 });
 
 export const stepNoParamSchema = z.object({
