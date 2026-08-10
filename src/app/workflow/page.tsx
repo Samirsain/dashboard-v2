@@ -355,7 +355,7 @@ function WorkflowInner() {
   }
 
   async function handleDeleteTemplate(id: string) {
-    if (!confirm("Delete this workflow template? Existing runs are unaffected.")) return;
+    if (!confirm("Delete this workflow template? Work already in progress is unaffected.")) return;
     try {
       await api.delete(`/workflow/templates/${id}`);
       setTemplates((prev) => prev.filter((t) => t.id !== id));
@@ -462,7 +462,7 @@ function WorkflowInner() {
           {/* Instances */}
           <div className="bg-surface border-2 border-on-surface flex flex-col">
             <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex justify-between items-center">
-              <h3 className="font-headline-md text-headline-md text-on-surface">Runs</h3>
+              <h3 className="font-headline-md text-headline-md text-on-surface">Ongoing Work</h3>
               <div className="flex gap-2">
                 {(["Active", "Complete"] as WorkflowInstanceStatus[]).map((s) => (
                   <button
@@ -493,7 +493,7 @@ function WorkflowInner() {
                   {!loading && instances.length === 0 && (
                     <tr>
                       <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                        No {statusFilter.toLowerCase()} runs.
+                        No {statusFilter.toLowerCase()} work.
                       </td>
                     </tr>
                   )}
