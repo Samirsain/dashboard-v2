@@ -4,10 +4,18 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { Doer, WorkflowTemplate } from "@/lib/types";
 
-type StepDraft = { what: string; doerId: string; how: string; tatMode: "hours" | "SAME_DAY" | "NEXT_DAY" | "WHENEVER_NEEDED"; tatHours: string };
+type TatMode = "minutes" | "hours" | "SAME_DAY" | "NEXT_DAY" | "WHENEVER_NEEDED";
+type StepDraft = { what: string; doerId: string; how: string; tatMode: TatMode; tatValue: string };
 
 function emptyStep(defaultDoerId: string): StepDraft {
-  return { what: "", doerId: defaultDoerId, how: "", tatMode: "hours", tatHours: "2" };
+  return { what: "", doerId: defaultDoerId, how: "", tatMode: "hours", tatValue: "2" };
+}
+
+/** Draft -> the canonical TAT string the backend parses ("30m", "2h", "SAME_DAY", ...). */
+function toTatString(s: StepDraft): string {
+  if (s.tatMode === "minutes") return `${s.tatValue}m`;
+  if (s.tatMode === "hours") return `${s.tatValue}h`;
+  return s.tatMode;
 }
 
 export default function CreateWorkflowTemplateModal({
@@ -20,7 +28,6 @@ export default function CreateWorkflowTemplateModal({
   onCreated: (template: WorkflowTemplate) => void;
 }) {
   const [name, setName] = useState("");
-  const [link, setLink] = useState("");
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep(doers[0]?.id ?? "")]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -44,12 +51,11 @@ export default function CreateWorkflowTemplateModal({
     try {
       const template = await api.post<WorkflowTemplate>("/workflow/templates", {
         name,
-        link,
         steps: steps.map((s) => ({
           what: s.what,
           doerId: s.doerId,
           how: s.how,
-          tat: s.tatMode === "hours" ? `${s.tatHours}h` : s.tatMode,
+          tat: toTatString(s),
         })),
       });
       onCreated(template);
@@ -90,20 +96,6 @@ export default function CreateWorkflowTemplateModal({
               placeholder="e.g. Video Production Pipeline"
               className={field}
             />
-          </div>
-
-          <div>
-            <label className={label}>Google Sheet / Connected Link (Optional)</label>
-            <input
-              type="url"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              placeholder="https://docs.google.com/spreadsheets/d/..."
-              className={field}
-            />
-            <p className="mt-1 font-data-mono text-[10px] text-on-surface-variant uppercase">
-              Attach a Google Sheet link so users can open it directly from the workflow.
-            </p>
           </div>
 
           <div className="flex flex-col gap-stack-md">
@@ -156,23 +148,33 @@ export default function CreateWorkflowTemplateModal({
                 <div className="grid grid-cols-2 gap-2">
                   <select
                     value={s.tatMode}
-                    onChange={(e) => updateStep(i, { tatMode: e.target.value as StepDraft["tatMode"] })}
+                    onChange={(e) => {
+                      const tatMode = e.target.value as TatMode;
+                      // Swapping the unit keeps a sane default rather than
+                      // carrying "2" from hours into minutes (or vice versa).
+                      updateStep(i, {
+                        tatMode,
+                        ...(tatMode === "minutes" ? { tatValue: "30" } : {}),
+                        ...(tatMode === "hours" ? { tatValue: "2" } : {}),
+                      });
+                    }}
                     className={field}
                   >
+                    <option value="minutes">Minutes</option>
                     <option value="hours">Hours</option>
                     <option value="SAME_DAY">Same Day</option>
                     <option value="NEXT_DAY">Next Day</option>
                     <option value="WHENEVER_NEEDED">Whenever Needed</option>
                   </select>
-                  {s.tatMode === "hours" && (
+                  {(s.tatMode === "minutes" || s.tatMode === "hours") && (
                     <input
                       required
                       type="number"
-                      min="0.5"
-                      step="0.5"
-                      value={s.tatHours}
-                      onChange={(e) => updateStep(i, { tatHours: e.target.value })}
-                      placeholder="TAT in hours"
+                      min={s.tatMode === "minutes" ? "1" : "0.5"}
+                      step={s.tatMode === "minutes" ? "5" : "0.5"}
+                      value={s.tatValue}
+                      onChange={(e) => updateStep(i, { tatValue: e.target.value })}
+                      placeholder={s.tatMode === "minutes" ? "TAT in minutes" : "TAT in hours"}
                       className={`${field} font-data-mono`}
                     />
                   )}

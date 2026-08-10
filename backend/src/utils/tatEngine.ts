@@ -95,7 +95,16 @@ function nextWorkingMoment(date: Date): Date {
  * Sundays, rolling the remainder across day boundaries.
  */
 export function addBusinessHours(start: Date, hours: number): Date {
-  let remainingMs = hours * 3600 * 1000;
+  return addBusinessMinutes(start, hours * 60);
+}
+
+/**
+ * Adds `minutes` of business time to `start`, skipping non-working hours and
+ * Sundays, rolling the remainder across day boundaries. Short steps ("15m")
+ * are common, so minutes — not hours — is the underlying unit.
+ */
+export function addBusinessMinutes(start: Date, minutes: number): Date {
+  let remainingMs = minutes * 60 * 1000;
   let current = nextWorkingMoment(start);
 
   while (remainingMs > 0) {
@@ -112,6 +121,7 @@ export function addBusinessHours(start: Date, hours: number): Date {
 
 /**
  * Canonical TAT string forms (PRD §7.1):
+ *   "<number>m"      duration in business minutes (e.g. "30m")
  *   "<number>h"      duration in business hours (bare numbers also accepted -> hours)
  *   "SAME_DAY"       end of the current working day (18:30)
  *   "NEXT_DAY"       end of the next working day (18:30)
@@ -132,6 +142,12 @@ export function addTAT(start: Date, tat: string): Date | null {
     return endOfWorkDay(nextWorkingDayStart(moment));
   }
 
+  const minutesMatch = tat.trim().match(/^(\d+(?:\.\d+)?)\s*m$/i);
+  if (minutesMatch) {
+    return addBusinessMinutes(start, Number(minutesMatch[1]));
+  }
+
+  // Bare numbers stay hours, so existing "4" values keep their meaning.
   const hoursMatch = tat.trim().match(/^(\d+(?:\.\d+)?)\s*h?$/i);
   if (hoursMatch) {
     return addBusinessHours(start, Number(hoursMatch[1]));

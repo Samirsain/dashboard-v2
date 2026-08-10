@@ -16,17 +16,8 @@ export default function StartWorkflowInstanceModal({
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
-  const [link, setLink] = useState(templates[0]?.link ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function handleTemplateSelect(id: string) {
-    setTemplateId(id);
-    const selected = templates.find((t) => t.id === id);
-    if (selected?.link) {
-      setLink(selected.link);
-    }
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -35,7 +26,7 @@ export default function StartWorkflowInstanceModal({
     try {
       const result = await api.post<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }>(
         "/workflow/instances",
-        { templateId, title, details, link }
+        { templateId, title, details }
       );
       onStarted(result);
     } catch (err) {
@@ -71,7 +62,7 @@ export default function StartWorkflowInstanceModal({
             <select
               required
               value={templateId}
-              onChange={(e) => handleTemplateSelect(e.target.value)}
+              onChange={(e) => setTemplateId(e.target.value)}
               className={field}
             >
               {templates.map((t) => (
@@ -88,9 +79,12 @@ export default function StartWorkflowInstanceModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Site Walkthrough Video — Sector 12"
+              placeholder="e.g. 30M Website"
               className={field}
             />
+            <p className="mt-1 font-data-mono text-[10px] text-on-surface-variant uppercase">
+              Which one this run is for — each gets its own chain
+            </p>
           </div>
 
           <div>
@@ -99,21 +93,9 @@ export default function StartWorkflowInstanceModal({
               value={details}
               onChange={(e) => setDetails(e.target.value)}
               rows={3}
-              placeholder="e.g. Video Title: Sector 12 Walkthrough, Sub Part: Exterior, No of Video: 2"
+              placeholder="Any extra info for the team"
               className={field}
             />
-          </div>
-
-          <div>
-            <label className={label}>Reference Link (Optional)</label>
-            <input
-              type="url"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              placeholder="https://docs.google.com/spreadsheets/..."
-              className={field}
-            />
-            <p className="mt-1 font-data-mono text-[10px] text-on-surface-variant uppercase">Google Sheet, Drive link, etc.</p>
           </div>
 
           {error && (

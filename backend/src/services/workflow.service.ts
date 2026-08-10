@@ -22,7 +22,7 @@ const eventsEntity = sheetsConfig.workflowStepEvents;
 const MAX_REWORK = 3;
 
 function toTemplate(r: SheetRecord): WorkflowTemplate {
-  return { id: r["Template ID"] ?? "", name: r["Name"] ?? "", link: r["Link"] ?? "", createdAt: r["CreatedAt"] ?? "" };
+  return { id: r["Template ID"] ?? "", name: r["Name"] ?? "", createdAt: r["CreatedAt"] ?? "" };
 }
 
 function toStep(r: SheetRecord): WorkflowStep {
@@ -43,7 +43,6 @@ function toInstance(r: SheetRecord): WorkflowInstance {
     templateId: r["Template ID"] ?? "",
     title: r["Title"] ?? "",
     details: r["Details"] ?? "",
-    link: r["Link"] ?? "",
     startedAt: r["StartedAt"] ?? "",
     status: (r["Status"] as WorkflowInstanceStatus) || "Active",
     requestedBy: r["RequestedBy"] ?? "",
@@ -124,7 +123,6 @@ export const workflowService = {
 
   async createTemplate(input: {
     name: string;
-    link?: string;
     steps: Array<{ what: string; doerId: string; how: string; tat: string }>;
   }): Promise<WorkflowTemplate & { steps: WorkflowStep[] }> {
     if (input.steps.length === 0) {
@@ -135,7 +133,6 @@ export const workflowService = {
     await dataService.append(templatesEntity, {
       "Template ID": templateId,
       Name: input.name,
-      Link: input.link ?? "",
       CreatedAt: new Date().toISOString(),
     });
 
@@ -155,7 +152,7 @@ export const workflowService = {
       steps.push(toStep(saved));
     }
 
-    return { id: templateId, name: input.name, link: input.link ?? "", createdAt: new Date().toISOString(), steps };
+    return { id: templateId, name: input.name, createdAt: new Date().toISOString(), steps };
   },
 
   async removeTemplate(id: string): Promise<void> {
@@ -188,7 +185,6 @@ export const workflowService = {
     templateId: string;
     title: string;
     details?: string;
-    link?: string;
     requestedBy: string;
   }): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
     const templateSteps = await getStepsForTemplate(input.templateId);
@@ -204,7 +200,6 @@ export const workflowService = {
       "Template ID": input.templateId,
       Title: input.title,
       Details: input.details ?? "",
-      Link: input.link ?? "",
       StartedAt: startedAt.toISOString(),
       Status: "Active",
       RequestedBy: input.requestedBy,
@@ -242,7 +237,6 @@ export const workflowService = {
       templateId: input.templateId,
       title: input.title,
       details: input.details ?? "",
-      link: input.link ?? "",
       startedAt: startedAt.toISOString(),
       status: "Active",
       requestedBy: input.requestedBy,

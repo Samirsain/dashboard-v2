@@ -232,19 +232,6 @@ function WorkflowInner() {
                         ))}
                       </ol>
                     </div>
-                    {t.link && (
-                      <div className="mt-3 pt-2 border-t border-outline-variant">
-                        <a
-                          href={t.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs font-label-sm uppercase text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded transition-colors"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>description</span>
-                          Open Google Sheet
-                        </a>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -277,7 +264,6 @@ function WorkflowInner() {
                 <thead>
                   <tr className="bg-surface-container-low border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface">
                     <th className="py-3 px-4">Title</th>
-                    <th className="py-3 px-4">Google Sheet</th>
                     <th className="py-3 px-4">Started</th>
                     <th className="py-3 px-4 text-right">Status</th>
                   </tr>
@@ -285,7 +271,7 @@ function WorkflowInner() {
                 <tbody className="font-body-md text-body-md text-on-surface">
                   {!loading && instances.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         No {statusFilter.toLowerCase()} runs.
                       </td>
                     </tr>
@@ -308,23 +294,6 @@ function WorkflowInner() {
                           </div>
                         )}
                       </td>
-                      <td className="py-4 px-4">
-                        {inst.link ? (
-                          <a
-                            href={inst.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-xs font-label-sm uppercase text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-1 rounded transition-colors"
-                            title="Open Google Sheet"
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>open_in_new</span>
-                            Open Sheet
-                          </a>
-                        ) : (
-                          <span className="text-on-surface-variant text-xs font-data-mono">—</span>
-                        )}
-                      </td>
                       <td className="py-4 px-4 font-data-mono text-data-mono text-on-surface-variant">
                         {formatTs(inst.startedAt)}
                       </td>
@@ -342,20 +311,7 @@ function WorkflowInner() {
           {selectedId && (
             <div className="bg-surface border-2 border-on-surface p-stack-lg">
               <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md">
-                <div className="flex items-center justify-between gap-4">
-                  <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
-                  {selectedInstance?.link && (
-                    <a
-                      href={selectedInstance.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 border-2 border-emerald-600 bg-emerald-600 text-white px-4 py-1.5 font-label-sm text-label-sm uppercase hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
-                    >
-                      <span className="material-symbols-outlined text-base" style={{ fontSize: "18px" }}>description</span>
-                      Open Connected Google Sheet
-                    </a>
-                  )}
-                </div>
+                <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
                 {selectedInstance?.details && (
                   <p className="font-data-mono text-data-mono text-on-surface-variant text-sm mt-1 whitespace-pre-wrap">
                     {selectedInstance.details}

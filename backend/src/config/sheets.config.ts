@@ -321,7 +321,6 @@ export const sheetsConfig = {
       "Template ID": "template_id",
       Title: "title",
       Details: "details",
-      Link: "link",
       StartedAt: "started_at",
       Status: "status",
       RequestedBy: "requested_by",

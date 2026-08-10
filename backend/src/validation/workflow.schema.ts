@@ -3,12 +3,11 @@ import { z } from "zod";
 const tatSchema = z.string().refine((v) => {
   const t = v.trim().toUpperCase();
   if (["SAME_DAY", "NEXT_DAY", "WHENEVER_NEEDED"].includes(t)) return true;
-  return /^(\d+(\.\d+)?)H?$/.test(t);
-}, "TAT must be a number of hours (e.g. \"5h\"), or SAME_DAY / NEXT_DAY / WHENEVER_NEEDED");
+  return /^(\d+(\.\d+)?)\s*[HM]?$/.test(t);
+}, "TAT must be minutes (e.g. \"30m\") or hours (e.g. \"5h\"), or SAME_DAY / NEXT_DAY / WHENEVER_NEEDED");
 
 export const createWorkflowTemplateSchema = z.object({
   name: z.string().min(1),
-  link: z.string().url("Must be a valid URL").or(z.literal("")).default(""),
   steps: z
     .array(
       z.object({
@@ -25,7 +24,6 @@ export const startWorkflowInstanceSchema = z.object({
   templateId: z.string().min(1),
   title: z.string().min(1),
   details: z.string().default(""),
-  link: z.string().url("Must be a valid URL").or(z.literal("")).default(""),
 });
 
 export const stepNoParamSchema = z.object({

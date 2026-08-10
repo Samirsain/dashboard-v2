@@ -273,7 +273,6 @@ export interface WorkflowStep {
 export interface WorkflowTemplate {
   id: string;
   name: string;
-  link?: string;
   createdAt: string;
   steps: WorkflowStep[];
 }
@@ -285,8 +284,6 @@ export interface WorkflowInstance {
   templateId: string;
   title: string;
   details: string;
-  /** Optional reference link (e.g. Google Sheet, Drive folder). */
-  link: string;
   startedAt: string;
   status: WorkflowInstanceStatus;
   requestedBy: string;
