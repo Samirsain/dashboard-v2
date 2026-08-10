@@ -1,6 +1,7 @@
 import { sheetsConfig } from "../config/sheets.config";
 import { dataService, type SheetRecord } from "./data.service";
 import { activityService } from "./activity.service";
+import { usersService } from "./users.service";
 import { generateId, generateUuid } from "../utils/id";
 import { addTAT, delayMinutes } from "../utils/tatEngine";
 import { AppError } from "../utils/AppError";
@@ -78,6 +79,22 @@ function withDerivedStatus(event: WorkflowStepEvent): WorkflowStepEvent {
     }
   }
   return event;
+}
+
+/**
+ * A step belongs to exactly one person, and only that person acts on it —
+ * otherwise anyone signed in could mark a colleague's work done (or bounce it
+ * back) straight through the API, and the Planned/Actual record would be a
+ * lie. Whoever manages workflows can still step in when someone is away.
+ */
+function assertOwnStep(
+  step: WorkflowStepEvent,
+  actorId: string,
+  canManageAnyStep: boolean,
+  action: string
+): void {
+  if (canManageAnyStep || step.doerId === actorId) return;
+  throw AppError.forbidden(`Only the doer this step is assigned to can ${action} it.`);
 }
 
 async function getStepsForTemplate(templateId: string): Promise<WorkflowStep[]> {
@@ -172,6 +189,66 @@ export const workflowService = {
     return instances.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   },
 
+  /**
+   * Every step of an in-flight run that belongs to `doerId` — what that person
+   * actually needs to see. Used by the Doer's Workflow view, which shows only
+   * their own steps rather than the whole template/run machinery.
+   *
+   * `isMyTurn` is the only thing that decides whether they can act: a step is
+   * theirs to do when it's Active (or already Overdue). Pending steps are
+   * returned too so they can see what's coming, but not acted on.
+   */
+  async listStepsForDoer(doerId: string): Promise<
+    Array<{
+      instanceId: string;
+      instanceTitle: string;
+      instanceDetails: string;
+      totalSteps: number;
+      isMyTurn: boolean;
+      /** Resolved name for the step's WHO, so the doer view needs no user lookup. */
+      doerName: string;
+      step: WorkflowStepEvent;
+    }>
+  > {
+    const [instanceRecords, eventRecords, doer] = await Promise.all([
+      dataService.findAll(instancesEntity),
+      dataService.findAll(eventsEntity),
+      usersService.getById(doerId).catch(() => null),
+    ]);
+
+    const activeInstances = instanceRecords.map(toInstance).filter((i) => i.status === "Active");
+    const instanceById = new Map(activeInstances.map((i) => [i.id, i]));
+
+    const events = eventRecords.map(toEvent);
+    const stepCountByInstance = new Map<string, number>();
+    for (const e of events) {
+      stepCountByInstance.set(e.instanceId, (stepCountByInstance.get(e.instanceId) ?? 0) + 1);
+    }
+
+    return events
+      .filter((e) => e.doerId === doerId && instanceById.has(e.instanceId))
+      .map(withDerivedStatus)
+      // A finished step is history, not work — leave it out of their list.
+      .filter((e) => e.status !== "Complete")
+      .map((step) => {
+        const instance = instanceById.get(step.instanceId)!;
+        return {
+          instanceId: instance.id,
+          instanceTitle: instance.title,
+          instanceDetails: instance.details,
+          totalSteps: stepCountByInstance.get(step.instanceId) ?? 0,
+          isMyTurn: step.status === "Active" || step.status === "Overdue",
+          doerName: doer?.name ?? "",
+          step,
+        };
+      })
+      .sort((a, b) => {
+        // Actionable work first, then whatever is due soonest.
+        if (a.isMyTurn !== b.isMyTurn) return a.isMyTurn ? -1 : 1;
+        return (a.step.planned || "9999").localeCompare(b.step.planned || "9999");
+      });
+  },
+
   async getInstanceDetail(
     id: string
   ): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
@@ -248,7 +325,8 @@ export const workflowService = {
   async completeStep(
     instanceId: string,
     stepNo: number,
-    actorId: string
+    actorId: string,
+    canManageAnyStep = false
   ): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
     const events = await getEventsForInstance(instanceId);
     const current = events.find((e) => e.stepNo === stepNo);
@@ -256,6 +334,7 @@ export const workflowService = {
     if (current.status !== "Active" && current.status !== "Overdue") {
       throw AppError.badRequest(`Step ${stepNo} is not active — cannot complete it`);
     }
+    assertOwnStep(current, actorId, canManageAnyStep, "complete");
 
     const now = new Date();
     await dataService.updateById(eventsEntity, current.id, {
@@ -297,7 +376,8 @@ export const workflowService = {
   async rejectStep(
     instanceId: string,
     stepNo: number,
-    actorId: string
+    actorId: string,
+    canManageAnyStep = false
   ): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
     if (stepNo <= 1) {
       throw AppError.badRequest("The first step has no previous step to send rework back to");
@@ -309,6 +389,7 @@ export const workflowService = {
     if (current.status !== "Active" && current.status !== "Overdue") {
       throw AppError.badRequest(`Step ${stepNo} is not active — cannot reject it`);
     }
+    assertOwnStep(current, actorId, canManageAnyStep, "send back");
 
     const newReworkCount = current.reworkCount + 1;
     await dataService.updateById(eventsEntity, current.id, {

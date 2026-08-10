@@ -52,6 +52,209 @@ function formatTs(ts: string): string {
   return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** One of the signed-in doer's own steps, as returned by /workflow/my-steps. */
+type MyStep = {
+  instanceId: string;
+  instanceTitle: string;
+  instanceDetails: string;
+  totalSteps: number;
+  isMyTurn: boolean;
+  doerName: string;
+  step: WorkflowStepEvent;
+};
+
+/** One labelled WHAT / WHO / HOW / WHEN line on a doer's step card. */
+function StepFact({
+  label,
+  value,
+  emphasis,
+}: {
+  label: string;
+  value: string;
+  emphasis?: "normal" | "error";
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+      <span className="w-14 shrink-0 font-label-sm text-label-sm uppercase text-on-surface-variant">
+        {label}
+      </span>
+      <span
+        className={`font-body-md text-body-md ${
+          emphasis === "error" ? "text-error font-bold" : "text-on-surface"
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The Workflow page as a plain doer sees it: just their own steps and a button
+ * to mark one done. No templates, no runs table, no starting a workflow —
+ * those are management concerns and only add noise here.
+ */
+function MyWorkflowSteps() {
+  const [rows, setRows] = useState<MyStep[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  async function load() {
+    setError(null);
+    try {
+      setRows(await api.get<MyStep[]>("/workflow/my-steps"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load your workflow steps.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      load();
+    });
+  }, []);
+
+  async function act(row: MyStep, action: "complete" | "reject") {
+    if (
+      action === "reject" &&
+      !confirm(`Send "${row.step.what}" back to the previous person for rework?`)
+    ) {
+      return;
+    }
+    setBusyKey(`${row.instanceId}:${row.step.stepNo}`);
+    try {
+      await api.post(`/workflow/instances/${row.instanceId}/steps/${row.step.stepNo}/${action}`);
+      await load();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Could not update this step.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  const myTurn = rows.filter((r) => r.isMyTurn);
+  const later = rows.filter((r) => !r.isMyTurn);
+
+  return (
+    <>
+      <MobileHeader />
+      <SideNav active="workflow" />
+
+      <div className="md:ml-64 flex flex-col min-h-screen bg-background">
+        <header className="flex w-full items-center border-b border-on-surface bg-surface p-3 z-30 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+          <h2 className="font-headline-md text-headline-md text-on-surface uppercase">My Workflow</h2>
+        </header>
+
+        <main className="flex-1 p-4 md:p-container-padding flex flex-col gap-stack-lg">
+          {error && (
+            <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>
+          )}
+
+          {loading && (
+            <p className="font-data-mono text-data-mono text-on-surface-variant">Loading…</p>
+          )}
+
+          {!loading && myTurn.length === 0 && (
+            <div className="border-2 border-on-surface bg-surface p-8 text-center">
+              <p className="font-body-md text-body-md text-on-surface">
+                Nothing is waiting on you right now.
+              </p>
+              <p className="mt-1 font-data-mono text-data-mono text-on-surface-variant text-xs">
+                A step shows up here the moment it becomes your turn.
+              </p>
+            </div>
+          )}
+
+          {myTurn.map((row) => {
+            const s = row.step;
+            const overdue = s.status === "Overdue";
+            const busy = busyKey === `${row.instanceId}:${s.stepNo}`;
+            return (
+              <div
+                key={s.id}
+                className={`border-2 bg-surface p-stack-lg flex flex-col gap-3 ${
+                  overdue ? "border-error" : "border-on-surface"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-on-surface/20 pb-2">
+                  <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                    {row.instanceTitle} · Step {s.stepNo} of {row.totalSteps}
+                  </p>
+                  <StepStatusBadge status={s.status} />
+                </div>
+
+                {/* The four things a doer needs: what to do, who does it, how, and by when. */}
+                <div className="flex flex-col gap-2">
+                  <StepFact label="What" value={s.what} />
+                  <StepFact label="Who" value={row.doerName || "You"} />
+                  <StepFact label="How" value={s.how || "—"} />
+                  <StepFact
+                    label="When"
+                    value={
+                      s.tat.toUpperCase() === "WHENEVER_NEEDED"
+                        ? "No deadline"
+                        : `${overdue ? "Was due " : "By "}${formatTs(s.planned)}`
+                    }
+                    emphasis={overdue ? "error" : "normal"}
+                  />
+                </div>
+
+                {row.instanceDetails && (
+                  <p className="font-data-mono text-data-mono text-on-surface-variant text-xs whitespace-pre-wrap">
+                    {row.instanceDetails}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-3 border-t border-on-surface/20 pt-3">
+                  <button
+                    onClick={() => act(row, "complete")}
+                    disabled={busy}
+                    className="inline-flex items-center justify-center min-h-[44px] px-6 font-label-sm text-label-sm uppercase tracking-wide border-2 border-on-surface bg-on-surface text-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40"
+                  >
+                    {busy ? "Saving…" : "Mark Done"}
+                  </button>
+                  {s.stepNo > 1 && (
+                    <button
+                      onClick={() => act(row, "reject")}
+                      disabled={busy}
+                      title="Work isn't right — send it back to the previous person"
+                      className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-error transition-colors cursor-pointer disabled:opacity-40"
+                    >
+                      Send Back
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {later.length > 0 && (
+            <div className="border-2 border-on-surface bg-surface">
+              <p className="border-b-2 border-on-surface bg-surface-container-low px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                Coming up for you ({later.length})
+              </p>
+              {later.map((row) => (
+                <div
+                  key={row.step.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant px-4 py-3 last:border-b-0"
+                >
+                  <span className="font-body-md text-body-md text-on-surface">{row.step.what}</span>
+                  <span className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                    {row.instanceTitle} · waiting on step {row.step.stepNo - 1}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+    </>
+  );
+}
+
 function WorkflowInner() {
   const { user } = useAuth();
   const isAdmin = canManageWorkflow(user);
@@ -417,10 +620,23 @@ function WorkflowInner() {
   );
 }
 
+/**
+ * Two genuinely different screens behind one route: whoever manages workflows
+ * gets the templates + runs + timeline view, everyone else gets just their own
+ * steps. Splitting here (rather than hiding pieces inside one component) keeps
+ * the doer's screen free of machinery they can't use anyway.
+ */
+function WorkflowRouter() {
+  const { user } = useAuth();
+  // Wait for the user before choosing, so a doer never flashes the admin view.
+  if (!user) return null;
+  return canManageWorkflow(user) ? <WorkflowInner /> : <MyWorkflowSteps />;
+}
+
 export default function WorkflowPage() {
   return (
     <AuthGuard>
-      <WorkflowInner />
+      <WorkflowRouter />
     </AuthGuard>
   );
 }

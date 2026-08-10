@@ -31,12 +31,18 @@ router.delete(
   workflowController.removeTemplate
 );
 
-// Instances (runs) — any authenticated user can start a run and act on their
-// own step, same openness as marking a task/checklist item done.
+// A doer's own steps — this is the entire Workflow page for anyone who can't
+// manage workflows, so it stays open to every signed-in user.
+router.get("/my-steps", workflowController.mySteps);
+
+// Instances (runs). Starting one is a management decision, same as creating a
+// template; acting on your OWN step stays open to every doer, like marking a
+// task or checklist item done.
 router.get("/instances", workflowController.listInstances);
 router.get("/instances/:id", validate({ params: idParamSchema }), workflowController.getInstance);
 router.post(
   "/instances",
+  requirePermission(canManageWorkflow),
   validate({ body: startWorkflowInstanceSchema }),
   workflowController.startInstance
 );

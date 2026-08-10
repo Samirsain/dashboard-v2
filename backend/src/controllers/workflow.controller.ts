@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ok, created } from "../utils/response";
 import { workflowService } from "../services/workflow.service";
+import { canManageWorkflow } from "../utils/access";
 import type { CreateWorkflowTemplateInput, StartWorkflowInstanceInput } from "../validation/workflow.schema";
 import type { WorkflowInstanceStatus } from "../types";
 
@@ -33,6 +34,11 @@ export const workflowController = {
     ok(res, await workflowService.getInstanceDetail(req.params.id as string));
   }),
 
+  /** The signed-in user's own workflow steps — the whole of the Doer's view. */
+  mySteps: asyncHandler(async (req: Request, res: Response) => {
+    ok(res, await workflowService.listStepsForDoer(req.user!.sub));
+  }),
+
   startInstance: asyncHandler(async (req: Request, res: Response) => {
     const input = req.body as StartWorkflowInstanceInput;
     created(res, await workflowService.startInstance({ ...input, requestedBy: req.user!.sub }));
@@ -40,11 +46,27 @@ export const workflowController = {
 
   completeStep: asyncHandler(async (req: Request, res: Response) => {
     const stepNo = Number(req.params.stepNo);
-    ok(res, await workflowService.completeStep(req.params.id as string, stepNo, req.user!.sub));
+    ok(
+      res,
+      await workflowService.completeStep(
+        req.params.id as string,
+        stepNo,
+        req.user!.sub,
+        canManageWorkflow(req.user)
+      )
+    );
   }),
 
   rejectStep: asyncHandler(async (req: Request, res: Response) => {
     const stepNo = Number(req.params.stepNo);
-    ok(res, await workflowService.rejectStep(req.params.id as string, stepNo, req.user!.sub));
+    ok(
+      res,
+      await workflowService.rejectStep(
+        req.params.id as string,
+        stepNo,
+        req.user!.sub,
+        canManageWorkflow(req.user)
+      )
+    );
   }),
 };
