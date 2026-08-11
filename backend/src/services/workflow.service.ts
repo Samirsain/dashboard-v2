@@ -302,6 +302,9 @@ export const workflowService = {
     fieldLabels: string[];
     steps: Array<{ stepNo: number; what: string; doerName: string; how: string; tat: string }>;
     runs: Array<{
+      id: string;
+      title: string;
+      status: WorkflowInstanceStatus;
       startedAt: string;
       fieldValues: string[];
       steps: Array<{
@@ -350,6 +353,9 @@ export const workflowService = {
       runs: instances.map((inst) => {
         const instEvents = eventsByInstance.get(inst.id) ?? [];
         return {
+          id: inst.id,
+          title: inst.title,
+          status: inst.status,
           startedAt: inst.startedAt,
           fieldValues: inst.fieldValues.map((f) => f.value),
           steps: templateSteps.map((s) => {

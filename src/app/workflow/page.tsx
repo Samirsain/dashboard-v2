@@ -25,6 +25,9 @@ type WorkflowTemplateExport = {
   fieldLabels: string[];
   steps: Array<{ stepNo: number; what: string; doerName: string; how: string; tat: string }>;
   runs: Array<{
+    id: string;
+    title: string;
+    status: WorkflowInstanceStatus;
     startedAt: string;
     fieldValues: string[];
     steps: Array<{
@@ -100,91 +103,240 @@ function formatTs(ts: string): string {
   return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** Fixed width (px) of each sticky identity column (Timestamp + each field). */
+const IDENTITY_COL_WIDTH = 168;
+/** At 100+ runs the plain list stops being scannable — page it instead. */
+const RUN_PAGE_SIZE = 20;
+
 /**
- * Live, on-screen version of handleExportTemplate's CSV — same What/Who/How/
- * When header blocks (via colSpan, so they visually merge like the sheet),
- * one row per run underneath. Reuses the same export endpoint and data.
+ * The full home for one workflow's runs — search, Active/Complete tabs,
+ * paging, opening a run's Step Timeline, and deleting a run, all inside the
+ * same sheet layout the original tracking sheet used. Nothing about managing
+ * a workflow's runs happens outside this box anymore.
  */
-function WorkflowSheetTable({ data }: { data: WorkflowTemplateExport }) {
+function WorkflowSheetTable({
+  data,
+  search,
+  onSearchChange,
+  statusFilter,
+  onStatusFilterChange,
+  visibleCount,
+  onShowMore,
+  selectedId,
+  onRowClick,
+  onDeleteRow,
+}: {
+  data: WorkflowTemplateExport;
+  search: string;
+  onSearchChange: (v: string) => void;
+  statusFilter: WorkflowInstanceStatus;
+  onStatusFilterChange: (v: WorkflowInstanceStatus) => void;
+  visibleCount: number;
+  onShowMore: () => void;
+  selectedId: string | null;
+  onRowClick: (id: string) => void;
+  onDeleteRow: (id: string, title: string, status: WorkflowInstanceStatus, e: { stopPropagation: () => void }) => void;
+}) {
+  const q = search.trim().toLowerCase();
+  const filteredRuns = data.runs.filter((run) => {
+    if (run.status !== statusFilter) return false;
+    if (!q) return true;
+    return run.title.toLowerCase().includes(q) || run.fieldValues.some((v) => v.toLowerCase().includes(q));
+  });
+  const visibleRuns = filteredRuns.slice(0, visibleCount);
+  const colCount = 1 + data.fieldLabels.length + data.steps.length * 4 + 1;
+
   return (
-    <div className="border-2 border-on-surface overflow-x-auto bg-surface-container-lowest">
-      <table className="border-collapse text-left" style={{ minWidth: `${480 + data.steps.length * 480}px` }}>
-        <thead className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-          {(["What", "Who", "How", "When"] as const).map((label) => (
-            <tr key={label} className="border-b border-surface-variant">
-              <th className="py-1.5 px-3 border-r border-surface-variant text-left" colSpan={1 + data.fieldLabels.length}>
-                {label}
+    <div className="flex flex-col gap-0">
+      {/* Step pipeline: the What/Who/How/When of the chain, read left to right once. */}
+      <div className="flex items-stretch overflow-x-auto border-2 border-on-surface bg-surface">
+        {data.steps.map((s, i) => (
+          <Fragment key={s.stepNo}>
+            <div className="flex-shrink-0 w-52 p-3 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 flex items-center justify-center border-2 border-on-surface bg-on-surface text-surface font-label-sm text-[10px] shrink-0">
+                  {s.stepNo}
+                </span>
+                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant truncate">
+                  {describeTat(s.tat)}
+                </span>
+              </div>
+              <p className="font-body-md text-body-md text-on-surface font-semibold leading-tight" title={s.what}>
+                {s.what}
+              </p>
+              <p className="font-label-sm text-label-sm text-on-surface-variant truncate" title={`${s.doerName} · ${s.how}`}>
+                {s.doerName} · {s.how}
+              </p>
+            </div>
+            {i < data.steps.length - 1 && (
+              <div className="flex items-center justify-center w-7 flex-shrink-0 text-on-surface-variant border-l-2 border-on-surface bg-surface-container-lowest">
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </div>
+            )}
+          </Fragment>
+        ))}
+      </div>
+
+      {/* Search + Active/Complete tabs — this run list is what "Ongoing Work" used to be. */}
+      <div className="flex flex-wrap items-center gap-2 border-2 border-t-0 border-on-surface bg-surface-container-low p-2">
+        <input
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search title or any field value..."
+          className="min-h-[36px] flex-1 min-w-[180px] border-2 border-on-surface bg-surface px-3 py-1 font-data-mono text-sm text-on-surface focus:outline-none"
+        />
+        <div className="flex gap-2">
+          {(["Active", "Complete"] as WorkflowInstanceStatus[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => onStatusFilterChange(s)}
+              className={
+                statusFilter === s
+                  ? "border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase"
+                  : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+              }
+            >
+              {s} ({data.runs.filter((r) => r.status === s).length})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Run data: pinned Timestamp + fields on the left, steps scroll on the right. */}
+      <div className="border-2 border-t-0 border-on-surface overflow-auto max-h-[65vh] bg-surface-container-lowest">
+        <table className="border-collapse text-left w-full">
+          <thead>
+            <tr className="bg-surface-container">
+              <th
+                className="sticky top-0 left-0 z-30 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase whitespace-nowrap"
+                style={{ width: IDENTITY_COL_WIDTH }}
+              >
+                Timestamp
               </th>
+              {data.fieldLabels.map((label, i) => (
+                <th
+                  key={label}
+                  className="sticky top-0 z-20 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase whitespace-nowrap"
+                  style={{ left: (i + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
+                >
+                  {label}
+                </th>
+              ))}
               {data.steps.map((s) => (
                 <th
                   key={s.stepNo}
                   colSpan={4}
-                  className="py-1.5 px-3 border-r border-surface-variant text-left font-normal normal-case text-on-surface"
+                  className="sticky top-0 z-10 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-center"
                 >
-                  {label === "What" && s.what}
-                  {label === "Who" && s.doerName}
-                  {label === "How" && s.how}
-                  {label === "When" && describeTat(s.tat)}
+                  Step {s.stepNo}
                 </th>
               ))}
+              <th className="sticky top-0 z-10 bg-surface-container py-2 px-3 border-b-2 border-on-surface w-24" />
             </tr>
-          ))}
-          <tr className="border-b-2 border-on-surface bg-surface-container">
-            <th className="py-2 px-3 border-r border-surface-variant">Timestamp</th>
-            {data.fieldLabels.map((label) => (
-              <th key={label} className="py-2 px-3 border-r border-surface-variant">
-                {label}
-              </th>
-            ))}
-            {data.steps.map((s) =>
-              ["Planned", "Actual", "Status", "Time Delay"].map((h) => (
-                <th key={`${s.stepNo}-${h}`} className="py-2 px-3 border-r border-surface-variant">
-                  {h}
-                </th>
+            <tr className="bg-surface-container">
+              <th
+                className="sticky top-9 left-0 z-30 bg-surface-container border-r-2 border-b-2 border-on-surface"
+                style={{ width: IDENTITY_COL_WIDTH }}
+              />
+              {data.fieldLabels.map((label, i) => (
+                <th
+                  key={label}
+                  className="sticky top-9 z-20 bg-surface-container border-r-2 border-b-2 border-on-surface"
+                  style={{ left: (i + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
+                />
+              ))}
+              {data.steps.map((s) =>
+                ["Planned", "Actual", "Status", "Delay"].map((h) => (
+                  <th
+                    key={`${s.stepNo}-${h}`}
+                    className="sticky top-9 z-10 bg-surface-container-low py-1.5 px-3 border-r border-b-2 border-on-surface font-label-sm text-[10px] uppercase text-on-surface-variant whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
+                ))
+              )}
+              <th className="sticky top-9 z-10 bg-surface-container-low border-b-2 border-on-surface" />
+            </tr>
+          </thead>
+          <tbody className="font-body-md text-body-md text-on-surface">
+            {visibleRuns.length === 0 ? (
+              <tr>
+                <td colSpan={colCount} className="py-6 px-3 text-center text-on-surface-variant">
+                  {data.runs.length === 0 ? "No runs yet." : `No ${statusFilter.toLowerCase()} runs match this search.`}
+                </td>
+              </tr>
+            ) : (
+              visibleRuns.map((run) => (
+                <tr
+                  key={run.id}
+                  onClick={() => onRowClick(run.id)}
+                  className={`cursor-pointer transition-colors ${
+                    selectedId === run.id ? "bg-primary-container" : "odd:bg-surface even:bg-surface-container-lowest hover:bg-surface-container-low"
+                  }`}
+                >
+                  <td
+                    className="sticky left-0 z-10 bg-inherit py-2 px-3 border-r-2 border-b border-on-surface font-label-sm text-label-sm whitespace-nowrap"
+                    style={{ width: IDENTITY_COL_WIDTH }}
+                  >
+                    {formatTs(run.startedAt)}
+                  </td>
+                  {run.fieldValues.map((v, j) => (
+                    <td
+                      key={j}
+                      className="sticky z-10 bg-inherit py-2 px-3 border-r-2 border-b border-on-surface font-semibold truncate"
+                      style={{ left: (j + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
+                      title={v}
+                    >
+                      {v || "—"}
+                    </td>
+                  ))}
+                  {run.steps.map((s) => (
+                    <Fragment key={s.stepNo}>
+                      <td className="py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs text-on-surface-variant">
+                        {s.planned ? formatTs(s.planned) : "—"}
+                      </td>
+                      <td className="py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs text-on-surface-variant">
+                        {s.actual ? formatTs(s.actual) : "—"}
+                      </td>
+                      <td className="py-2 px-3 border-r border-b border-on-surface">
+                        <StepStatusBadge status={s.status} />
+                      </td>
+                      <td
+                        className={`py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs font-semibold ${
+                          s.delayMinutes === null
+                            ? "text-on-surface-variant"
+                            : s.delayMinutes > 0
+                            ? "text-error"
+                            : "text-primary"
+                        }`}
+                      >
+                        {formatDelayMinutes(s.delayMinutes)}
+                      </td>
+                    </Fragment>
+                  ))}
+                  <td className="py-2 px-3 border-b border-on-surface text-right">
+                    <button
+                      onClick={(e) => onDeleteRow(run.id, run.title, run.status, e)}
+                      className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-[10px] uppercase hover:bg-error hover:text-on-error transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
               ))
             )}
-          </tr>
-        </thead>
-        <tbody className="font-data-mono text-data-mono text-xs text-on-surface">
-          {data.runs.length === 0 ? (
-            <tr>
-              <td
-                colSpan={1 + data.fieldLabels.length + data.steps.length * 4}
-                className="py-4 px-3 text-center text-on-surface-variant"
-              >
-                No runs yet.
-              </td>
-            </tr>
-          ) : (
-            data.runs.map((run, i) => (
-              <tr key={i} className="border-b border-surface-variant last:border-b-0">
-                <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">{formatTs(run.startedAt)}</td>
-                {run.fieldValues.map((v, j) => (
-                  <td key={j} className="py-1.5 px-3 border-r border-surface-variant">
-                    {v || "—"}
-                  </td>
-                ))}
-                {run.steps.map((s) => (
-                  <Fragment key={s.stepNo}>
-                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
-                      {s.planned ? formatTs(s.planned) : "—"}
-                    </td>
-                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
-                      {s.actual ? formatTs(s.actual) : "—"}
-                    </td>
-                    <td className="py-1.5 px-3 border-r border-surface-variant">
-                      {s.status}
-                    </td>
-                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
-                      {formatDelayMinutes(s.delayMinutes)}
-                    </td>
-                  </Fragment>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
+
+      {filteredRuns.length > visibleRuns.length && (
+        <button
+          onClick={onShowMore}
+          className="border-2 border-t-0 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+        >
+          Show {Math.min(RUN_PAGE_SIZE, filteredRuns.length - visibleRuns.length)} more ({filteredRuns.length - visibleRuns.length} left)
+        </button>
+      )}
     </div>
   );
 }
@@ -502,13 +654,11 @@ function WorkflowInner() {
 
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
-  const [instances, setInstances] = useState<WorkflowInstance[]>([]);
-  const [statusFilter, setStatusFilter] = useState<WorkflowInstanceStatus>("Active");
-  // At 100+ runs the plain list stops being scannable — narrow it down
-  // instead of rendering everything at once.
+  // Active/Complete tab + search + pagination for whichever template's sheet
+  // is currently open — everything about a workflow's runs is managed right
+  // inside that sheet now, so there's no separate global runs list anymore.
+  const [sheetStatusFilter, setSheetStatusFilter] = useState<WorkflowInstanceStatus>("Active");
   const [runSearch, setRunSearch] = useState("");
-  const [templateFilter, setTemplateFilter] = useState("ALL");
-  const RUN_PAGE_SIZE = 20;
   const [visibleRunCount, setVisibleRunCount] = useState(RUN_PAGE_SIZE);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedSteps, setSelectedSteps] = useState<WorkflowStepEvent[]>([]);
@@ -531,14 +681,12 @@ function WorkflowInner() {
     setLoading(true);
     setError(null);
     try {
-      const [templateData, doerData, instanceData] = await Promise.all([
+      const [templateData, doerData] = await Promise.all([
         api.get<WorkflowTemplate[]>("/workflow/templates"),
         api.get<Doer[]>("/users"),
-        api.get<WorkflowInstance[]>(`/workflow/instances?status=${statusFilter}`),
       ]);
       setTemplates(templateData);
       setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "MD" || d.role === "PC"));
-      setInstances(instanceData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load workflow data.");
     } finally {
@@ -550,22 +698,7 @@ function WorkflowInner() {
     queueMicrotask(() => {
       loadData();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  const templateName = (id: string) => templates.find((t) => t.id === id)?.name ?? "—";
-
-  const filteredInstances = instances.filter((inst) => {
-    if (templateFilter !== "ALL" && inst.templateId !== templateFilter) return false;
-    const q = runSearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      inst.title.toLowerCase().includes(q) ||
-      inst.details.toLowerCase().includes(q) ||
-      inst.fieldValues.some((f) => f.value.toLowerCase().includes(q))
-    );
-  });
-  const visibleInstances = filteredInstances.slice(0, visibleRunCount);
+  }, []);
 
   async function openInstance(id: string) {
     setSelectedId(id);
@@ -582,7 +715,7 @@ function WorkflowInner() {
 
   async function refreshSelected() {
     if (selectedId) await openInstance(selectedId);
-    await loadData();
+    if (openTemplateId) await loadSheet(openTemplateId, { force: true });
   }
 
   async function handleComplete(stepNo: number) {
@@ -676,8 +809,8 @@ function WorkflowInner() {
   }
 
   /** Same data as the export, shown live on-screen instead of downloaded. */
-  async function loadSheet(templateId: string) {
-    if (sheetDataByTemplate[templateId]) return;
+  async function loadSheet(templateId: string, opts?: { force?: boolean }) {
+    if (!opts?.force && sheetDataByTemplate[templateId]) return;
     setSheetLoadingId(templateId);
     try {
       const data = await api.get<WorkflowTemplateExport>(`/workflow/templates/${templateId}/export`);
@@ -689,17 +822,23 @@ function WorkflowInner() {
     }
   }
 
-  async function handleDeleteInstance(inst: WorkflowInstance, e?: { stopPropagation: () => void }) {
+  async function handleDeleteInstance(
+    templateId: string,
+    id: string,
+    title: string,
+    status: WorkflowInstanceStatus,
+    e?: { stopPropagation: () => void }
+  ) {
     e?.stopPropagation(); // don't also trigger the row's openInstance click
     const warning =
-      inst.status === "Active"
+      status === "Active"
         ? " This work is still in progress — its full step history goes with it."
         : "";
-    if (!confirm(`Permanently delete "${inst.title}"? This can't be undone.${warning}`)) return;
+    if (!confirm(`Permanently delete "${title}"? This can't be undone.${warning}`)) return;
     try {
-      await api.delete(`/workflow/instances/${inst.id}`);
-      setInstances((prev) => prev.filter((i) => i.id !== inst.id));
-      if (selectedId === inst.id) {
+      await api.delete(`/workflow/instances/${id}`);
+      await loadSheet(templateId, { force: true });
+      if (selectedId === id) {
         setSelectedId(null);
         setSelectedSteps([]);
         setSelectedInstance(null);
@@ -769,7 +908,9 @@ function WorkflowInner() {
             <h3 className="font-headline-md text-headline-md text-on-surface border-b-2 border-on-surface pb-stack-md mb-stack-md">
               Templates
             </h3>
-            {templates.length === 0 ? (
+            {loading ? (
+              <p className="font-data-mono text-data-mono text-on-surface-variant">Loading…</p>
+            ) : templates.length === 0 ? (
               <p className="font-data-mono text-data-mono text-on-surface-variant">
                 No workflow templates yet.
                 {isAdmin ? ' Use "+ New Template" above.' : ""}
@@ -784,6 +925,9 @@ function WorkflowInner() {
                         onClick={() => {
                           const next = open ? null : t.id;
                           setOpenTemplateId(next);
+                          setRunSearch("");
+                          setSheetStatusFilter("Active");
+                          setVisibleRunCount(RUN_PAGE_SIZE);
                           if (next && isAdmin) loadSheet(next);
                         }}
                         className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-surface-container transition-colors"
@@ -807,7 +951,24 @@ function WorkflowInner() {
                             sheetLoadingId === t.id ? (
                               <p className="font-data-mono text-data-mono text-on-surface-variant text-xs">Loading…</p>
                             ) : sheetDataByTemplate[t.id] ? (
-                              <WorkflowSheetTable data={sheetDataByTemplate[t.id]!} />
+                              <WorkflowSheetTable
+                                data={sheetDataByTemplate[t.id]!}
+                                search={runSearch}
+                                onSearchChange={(v) => {
+                                  setRunSearch(v);
+                                  setVisibleRunCount(RUN_PAGE_SIZE);
+                                }}
+                                statusFilter={sheetStatusFilter}
+                                onStatusFilterChange={(v) => {
+                                  setSheetStatusFilter(v);
+                                  setVisibleRunCount(RUN_PAGE_SIZE);
+                                }}
+                                visibleCount={visibleRunCount}
+                                onShowMore={() => setVisibleRunCount((prev) => prev + RUN_PAGE_SIZE)}
+                                selectedId={selectedId}
+                                onRowClick={openInstance}
+                                onDeleteRow={(id, title, status, e) => handleDeleteInstance(t.id, id, title, status, e)}
+                              />
                             ) : null
                           ) : (
                             <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
@@ -845,152 +1006,6 @@ function WorkflowInner() {
             )}
           </div>
 
-          {/* Instances */}
-          <div className="bg-surface border-2 border-on-surface flex flex-col">
-            <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-col gap-3">
-              <div className="flex flex-wrap justify-between items-center gap-2">
-                <h3 className="font-headline-md text-headline-md text-on-surface">
-                  Ongoing Work
-                  <span className="ml-2 font-data-mono text-data-mono text-on-surface-variant text-sm">
-                    ({filteredInstances.length})
-                  </span>
-                </h3>
-                <div className="flex gap-2">
-                  {(["Active", "Complete"] as WorkflowInstanceStatus[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => {
-                        setStatusFilter(s);
-                        setVisibleRunCount(RUN_PAGE_SIZE);
-                      }}
-                      className={
-                        statusFilter === s
-                          ? "border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase"
-                          : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                      }
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Search + template narrow the list down once there are many
-                  templates each with many runs — scanning stops scaling fast. */}
-              <div className="flex flex-wrap gap-2">
-                <input
-                  value={runSearch}
-                  onChange={(e) => {
-                    setRunSearch(e.target.value);
-                    setVisibleRunCount(RUN_PAGE_SIZE);
-                  }}
-                  placeholder="Search title, details, or any field value..."
-                  className="min-h-[38px] flex-1 min-w-[200px] border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-sm text-on-surface focus:outline-none"
-                />
-                <select
-                  value={templateFilter}
-                  onChange={(e) => {
-                    setTemplateFilter(e.target.value);
-                    setVisibleRunCount(RUN_PAGE_SIZE);
-                  }}
-                  className="min-h-[38px] border-2 border-on-surface bg-surface px-2 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
-                >
-                  <option value="ALL">All Templates</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-surface-container-low border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface">
-                    <th className="py-3 px-4">Title</th>
-                    <th className="py-3 px-4">Template</th>
-                    <th className="py-3 px-4">Started</th>
-                    <th className="py-3 px-4 text-right">Status</th>
-                    {isAdmin && <th className="py-3 px-4 w-20" />}
-                  </tr>
-                </thead>
-                <tbody className="font-body-md text-body-md text-on-surface">
-                  {!loading && filteredInstances.length === 0 && (
-                    <tr>
-                      <td colSpan={isAdmin ? 5 : 4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                        {instances.length === 0
-                          ? `No ${statusFilter.toLowerCase()} work.`
-                          : "Nothing matches this search."}
-                      </td>
-                    </tr>
-                  )}
-                  {visibleInstances.map((inst) => (
-                    <tr
-                      key={inst.id}
-                      onClick={() => openInstance(inst.id)}
-                      className={`border-b border-outline-variant last:border-b-0 hover:bg-surface-container-lowest transition-colors cursor-pointer ${
-                        selectedId === inst.id ? "bg-surface-container-lowest" : ""
-                      }`}
-                    >
-                      <td className="py-4 px-4 font-medium">
-                        <div className="flex items-center gap-2">
-                          {inst.title}
-                        </div>
-                        {/* The title alone can repeat — e.g. two runs with the
-                            same PO Number — so show whatever else the run
-                            carries (Vendor, Qty, ...) to tell them apart. */}
-                        {inst.fieldValues.length > 1 && (
-                          <div className="font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5 truncate max-w-xs">
-                            {inst.fieldValues
-                              .slice(1)
-                              .map((f) => `${f.label}: ${f.value || "—"}`)
-                              .join(" · ")}
-                          </div>
-                        )}
-                        {inst.details && (
-                          <div className="font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5 truncate max-w-xs">
-                            {inst.details}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-4 px-4 font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
-                        {templateName(inst.templateId)}
-                      </td>
-                      <td className="py-4 px-4 font-data-mono text-data-mono text-on-surface-variant">
-                        {formatTs(inst.startedAt)}
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <StepStatusBadge status={inst.status === "Complete" ? "Complete" : "Active"} />
-                      </td>
-                      {isAdmin && (
-                        <td className="py-4 px-4 text-right">
-                          <button
-                            onClick={(e) => handleDeleteInstance(inst, e)}
-                            className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredInstances.length > visibleInstances.length && (
-              <button
-                onClick={() => setVisibleRunCount((prev) => prev + RUN_PAGE_SIZE)}
-                className="border-t-2 border-on-surface px-4 py-3 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-              >
-                Show {Math.min(RUN_PAGE_SIZE, filteredInstances.length - visibleInstances.length)} more
-                ({filteredInstances.length - visibleInstances.length} left)
-              </button>
-            )}
-          </div>
-
           {/* Selected instance detail */}
           {selectedId && (
             <div className="bg-surface border-2 border-on-surface p-stack-lg">
@@ -999,7 +1014,14 @@ function WorkflowInner() {
                   <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
                   {isAdmin && selectedInstance && (
                     <button
-                      onClick={() => handleDeleteInstance(selectedInstance)}
+                      onClick={() =>
+                        handleDeleteInstance(
+                          selectedInstance.templateId,
+                          selectedInstance.id,
+                          selectedInstance.title,
+                          selectedInstance.status
+                        )
+                      }
                       className="border-2 border-error text-error px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors shrink-0"
                     >
                       Delete This Work
@@ -1113,8 +1135,11 @@ function WorkflowInner() {
           onClose={() => setShowStartInstance(false)}
           onStarted={({ instance }) => {
             setShowStartInstance(false);
-            setStatusFilter("Active");
-            loadData();
+            setOpenTemplateId(instance.templateId);
+            setSheetStatusFilter("Active");
+            setRunSearch("");
+            setVisibleRunCount(RUN_PAGE_SIZE);
+            loadSheet(instance.templateId, { force: true });
             openInstance(instance.id);
           }}
         />
