@@ -407,6 +407,26 @@ function WorkflowInner() {
     }
   }
 
+  async function handleDeleteInstance(inst: WorkflowInstance, e?: { stopPropagation: () => void }) {
+    e?.stopPropagation(); // don't also trigger the row's openInstance click
+    const warning =
+      inst.status === "Active"
+        ? " This work is still in progress — its full step history goes with it."
+        : "";
+    if (!confirm(`Permanently delete "${inst.title}"? This can't be undone.${warning}`)) return;
+    try {
+      await api.delete(`/workflow/instances/${inst.id}`);
+      setInstances((prev) => prev.filter((i) => i.id !== inst.id));
+      if (selectedId === inst.id) {
+        setSelectedId(null);
+        setSelectedSteps([]);
+        setSelectedInstance(null);
+      }
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to delete this work.");
+    }
+  }
+
   const doerName = (id: string) => doers.find((d) => d.id === id)?.name ?? id;
 
   return (
@@ -589,12 +609,13 @@ function WorkflowInner() {
                     <th className="py-3 px-4">Template</th>
                     <th className="py-3 px-4">Started</th>
                     <th className="py-3 px-4 text-right">Status</th>
+                    {isAdmin && <th className="py-3 px-4 w-20" />}
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-md text-on-surface">
                   {!loading && filteredInstances.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                      <td colSpan={isAdmin ? 5 : 4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                         {instances.length === 0
                           ? `No ${statusFilter.toLowerCase()} work.`
                           : "Nothing matches this search."}
@@ -628,6 +649,16 @@ function WorkflowInner() {
                       <td className="py-4 px-4 text-right">
                         <StepStatusBadge status={inst.status === "Complete" ? "Complete" : "Active"} />
                       </td>
+                      {isAdmin && (
+                        <td className="py-4 px-4 text-right">
+                          <button
+                            onClick={(e) => handleDeleteInstance(inst, e)}
+                            className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -649,7 +680,17 @@ function WorkflowInner() {
           {selectedId && (
             <div className="bg-surface border-2 border-on-surface p-stack-lg">
               <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md">
-                <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
+                  {isAdmin && selectedInstance && (
+                    <button
+                      onClick={() => handleDeleteInstance(selectedInstance)}
+                      className="border-2 border-error text-error px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors shrink-0"
+                    >
+                      Delete This Work
+                    </button>
+                  )}
+                </div>
                 {(selectedInstance?.fieldValues?.length ?? 0) > 0 && (
                   <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
                     {selectedInstance!.fieldValues.map((f) => (

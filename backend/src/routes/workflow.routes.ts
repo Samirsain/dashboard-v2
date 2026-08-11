@@ -46,6 +46,12 @@ router.post(
   validate({ body: startWorkflowInstanceSchema }),
   workflowController.startInstance
 );
+router.delete(
+  "/instances/:id",
+  requirePermission(canManageWorkflow),
+  validate({ params: idParamSchema }),
+  workflowController.removeInstance
+);
 router.post(
   "/instances/:id/steps/:stepNo/complete",
   validate({ params: stepNoParamSchema }),

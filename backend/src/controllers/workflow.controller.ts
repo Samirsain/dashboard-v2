@@ -34,6 +34,11 @@ export const workflowController = {
     ok(res, await workflowService.getInstanceDetail(req.params.id as string));
   }),
 
+  removeInstance: asyncHandler(async (req: Request, res: Response) => {
+    await workflowService.removeInstance(req.params.id as string);
+    ok(res, { deleted: true });
+  }),
+
   /** The signed-in user's own workflow steps — the whole of the Doer's view. */
   mySteps: asyncHandler(async (req: Request, res: Response) => {
     ok(res, await workflowService.listStepsForDoer(req.user!.sub));

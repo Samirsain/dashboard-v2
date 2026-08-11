@@ -277,6 +277,21 @@ export const workflowService = {
   },
 
   /**
+   * Permanently removes a run and its step events — Active or Complete,
+   * either can be deleted (e.g. a run started by mistake, or old records
+   * being cleared out). This does not touch the template it came from.
+   */
+  async removeInstance(id: string): Promise<void> {
+    const record = await dataService.findById(instancesEntity, id);
+    if (!record) throw AppError.notFound(`Workflow instance "${id}" not found`);
+    const events = await getEventsForInstance(id);
+    for (const event of events) {
+      await dataService.deleteById(eventsEntity, event.id);
+    }
+    await dataService.deleteById(instancesEntity, id);
+  },
+
+  /**
    * Every step of an in-flight run that belongs to `doerId` — what that person
    * actually needs to see. Used by the Doer's Workflow view, which shows only
    * their own steps rather than the whole template/run machinery.
