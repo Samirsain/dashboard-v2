@@ -308,6 +308,9 @@ function WorkflowInner() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
   const [showStartInstance, setShowStartInstance] = useState(false);
+  // Which template's step list is currently expanded — collapsed by default
+  // so the section reads as a name list, not a wall of every chain at once.
+  const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -450,31 +453,50 @@ function WorkflowInner() {
                 {isAdmin ? ' Use "+ New Template" above.' : ""}
               </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {templates.map((t) => (
-                  <div key={t.id} className="border-2 border-on-surface p-stack-md flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-body-md text-body-md text-on-surface font-semibold">{t.name}</span>
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleDeleteTemplate(t.id)}
-                            className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                      <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
-                        {t.steps.map((s) => (
-                          <li key={s.id}>
-                            {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
-                          </li>
-                        ))}
-                      </ol>
+              <div className="border-2 border-on-surface divide-y-2 divide-on-surface">
+                {templates.map((t) => {
+                  const open = openTemplateId === t.id;
+                  return (
+                    <div key={t.id}>
+                      <button
+                        onClick={() => setOpenTemplateId((prev) => (prev === t.id ? null : t.id))}
+                        className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-surface-container transition-colors"
+                      >
+                        <span className="font-body-md text-body-md text-on-surface font-semibold uppercase">
+                          {t.name}
+                        </span>
+                        <span className="flex items-center gap-3 shrink-0">
+                          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                            {t.steps.length} step{t.steps.length === 1 ? "" : "s"}
+                          </span>
+                          <span className="material-symbols-outlined text-on-surface-variant">
+                            {open ? "expand_less" : "expand_more"}
+                          </span>
+                        </span>
+                      </button>
+
+                      {open && (
+                        <div className="border-t-2 border-on-surface bg-surface-container-lowest p-stack-md flex flex-col gap-3">
+                          <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
+                            {t.steps.map((s) => (
+                              <li key={s.id}>
+                                {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
+                              </li>
+                            ))}
+                          </ol>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDeleteTemplate(t.id)}
+                              className="self-start border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
