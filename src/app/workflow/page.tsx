@@ -506,8 +506,13 @@ function WorkflowSheetTable({
                 // The pinned cell needs its own opaque background — a sticky
                 // cell paints over scrolled content, so it can't rely on the
                 // row's stripe showing through.
+                //
+                // Selection uses primary-*fixed* (a light tint), not
+                // primary-container: the latter is near-black navy, and the
+                // row's text stays on-surface, so it would paint dark on dark
+                // and the row would go blank the moment it was picked.
                 const rowBg = selected
-                  ? "bg-primary-container"
+                  ? "bg-primary-fixed"
                   : rowIndex % 2 === 0
                   ? "bg-surface"
                   : "bg-surface-container-lowest";
@@ -550,10 +555,12 @@ function WorkflowSheetTable({
                         <div className="mt-1 font-label-sm text-[10px] text-on-surface-variant truncate">
                           {s.actual ? formatTsShort(s.actual) : s.planned ? `by ${formatTsShort(s.planned)}` : "—"}
                         </div>
+                        {/* Only lateness is worth colouring — on-time is the
+                            normal case and reads fine as plain text. */}
                         {s.delayMinutes !== null && (
                           <div
                             className={`font-label-sm text-[10px] font-semibold truncate ${
-                              s.delayMinutes > 0 ? "text-error" : "text-primary"
+                              s.delayMinutes > 0 ? "text-error" : "text-on-surface-variant"
                             }`}
                           >
                             {formatDelayMinutes(s.delayMinutes)}
