@@ -19,6 +19,53 @@ import type {
   WorkflowTemplate,
 } from "@/lib/types";
 
+/** GET /workflow/templates/:id/export — one What/Who/How/When block per step, one row per run. */
+type WorkflowTemplateExport = {
+  templateName: string;
+  fieldLabels: string[];
+  steps: Array<{ stepNo: number; what: string; doerName: string; how: string; tat: string }>;
+  runs: Array<{
+    startedAt: string;
+    fieldValues: string[];
+    steps: Array<{
+      stepNo: number;
+      planned: string;
+      actual: string;
+      status: WorkflowStepStatus | "Pending";
+      delayMinutes: number | null;
+    }>;
+  }>;
+};
+
+/** "30m" -> "30 minutes", "2h" -> "2 hours", the symbolic ones as their plain-English name. */
+function describeTat(tat: string): string {
+  const t = tat.trim().toUpperCase();
+  if (t === "WHENEVER_NEEDED") return "Whenever Needed";
+  if (t === "SAME_DAY") return "Same Day";
+  if (t === "NEXT_DAY") return "Next Day";
+  const minutes = t.match(/^(\d+(?:\.\d+)?)M$/);
+  if (minutes) return `${minutes[1]} minutes`;
+  const hours = t.match(/^(\d+(?:\.\d+)?)H?$/);
+  if (hours) return `${hours[1]} hours`;
+  return tat;
+}
+
+function formatDelayMinutes(minutes: number | null): string {
+  if (minutes === null) return "—";
+  if (minutes === 0) return "On time";
+  const abs = Math.abs(minutes);
+  const hours = Math.floor(abs / 60);
+  const mins = abs % 60;
+  const label = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  return minutes > 0 ? `+${label} late` : `-${label} early`;
+}
+
+/** Quotes a CSV cell only when it needs it, doubling any embedded quotes. */
+function csvCell(value: string | number): string {
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 function StepStatusBadge({ status }: { status: WorkflowStepStatus }) {
   const styles: Record<WorkflowStepStatus, string> = {
     Pending: "border-2 border-on-surface-variant text-on-surface-variant",
@@ -384,6 +431,8 @@ function WorkflowInner() {
   // Which template's step list is currently expanded — collapsed by default
   // so the section reads as a name list, not a wall of every chain at once.
   const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
+  // Template id currently being exported, so its button disables briefly.
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -471,6 +520,65 @@ function WorkflowInner() {
       setTemplates((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to delete template.");
+    }
+  }
+
+  /**
+   * Lays a template's runs out exactly like the original tracking sheet:
+   * one What/Who/How/When header block per step, one row per run below —
+   * that run's own field values, then every step's Planned/Actual/Status/
+   * Delay in order. New runs just add rows underneath as they happen.
+   */
+  async function handleExportTemplate(templateId: string) {
+    setExportingId(templateId);
+    try {
+      const data = await api.get<WorkflowTemplateExport>(`/workflow/templates/${templateId}/export`);
+
+      const rows: string[][] = [];
+      rows.push([]); // blank spacer row, matching the original sheet
+
+      const stepBlock = (get: (s: WorkflowTemplateExport["steps"][number]) => string) => {
+        const cells: string[] = [];
+        for (const s of data.steps) {
+          cells.push(get(s), "", "", ""); // value in the block's first column, 3 blanks after
+        }
+        return cells;
+      };
+      rows.push(["What", ...data.fieldLabels.map(() => ""), ...stepBlock((s) => s.what)]);
+      rows.push(["Who", ...data.fieldLabels.map(() => ""), ...stepBlock((s) => s.doerName)]);
+      rows.push(["How", ...data.fieldLabels.map(() => ""), ...stepBlock((s) => s.how)]);
+      rows.push(["When", ...data.fieldLabels.map(() => ""), ...stepBlock((s) => describeTat(s.tat))]);
+
+      const perStepHeaders = data.steps.flatMap(() => ["Planned", "Actual", "Status", "Time Delay"]);
+      rows.push(["Timestamp", ...data.fieldLabels, ...perStepHeaders]);
+
+      for (const run of data.runs) {
+        const stepCells: string[] = [];
+        for (const s of run.steps) {
+          stepCells.push(
+            s.planned ? formatTs(s.planned) : "—",
+            s.actual ? formatTs(s.actual) : "—",
+            s.status,
+            formatDelayMinutes(s.delayMinutes)
+          );
+        }
+        rows.push([formatTs(run.startedAt), ...run.fieldValues, ...stepCells]);
+      }
+
+      const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${data.templateName.replace(/[^a-z0-9]+/gi, "-")}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to export this workflow.");
+    } finally {
+      setExportingId(null);
     }
   }
 
@@ -592,12 +700,22 @@ function WorkflowInner() {
                             ))}
                           </ol>
                           {isAdmin && (
-                            <button
-                              onClick={() => handleDeleteTemplate(t.id)}
-                              className="self-start border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                            >
-                              Delete
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleExportTemplate(t.id)}
+                                disabled={exportingId === t.id}
+                                title="Download every run of this workflow as a spreadsheet — steps across the top, one row per run"
+                                className="self-start border-2 border-on-surface text-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
+                              >
+                                {exportingId === t.id ? "Exporting…" : "Export"}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTemplate(t.id)}
+                                className="self-start border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}

@@ -292,6 +292,82 @@ export const workflowService = {
   },
 
   /**
+   * Everything needed to lay a template's runs out spreadsheet-style — one
+   * What/Who/How/When header block per step, one row per run underneath,
+   * each run's own field values plus every step's Planned/Actual/Status/Delay
+   * in order. Mirrors the original PO tracking sheet this replaced.
+   */
+  async exportTemplateData(templateId: string): Promise<{
+    templateName: string;
+    fieldLabels: string[];
+    steps: Array<{ stepNo: number; what: string; doerName: string; how: string; tat: string }>;
+    runs: Array<{
+      startedAt: string;
+      fieldValues: string[];
+      steps: Array<{
+        stepNo: number;
+        planned: string;
+        actual: string;
+        status: WorkflowStepStatus | "Pending";
+        delayMinutes: number | null;
+      }>;
+    }>;
+  }> {
+    const templateRecord = await dataService.findById(templatesEntity, templateId);
+    if (!templateRecord) throw AppError.notFound(`Workflow template "${templateId}" not found`);
+
+    const [templateSteps, templateFields, instanceRecords, eventRecords, users] = await Promise.all([
+      getStepsForTemplate(templateId),
+      getFieldsForTemplate(templateId),
+      dataService.findAll(instancesEntity),
+      dataService.findAll(eventsEntity),
+      usersService.list(),
+    ]);
+
+    const doerNameById = new Map(users.map((u) => [u.id, u.name]));
+    const instances = instanceRecords
+      .map(toInstance)
+      .filter((i) => i.templateId === templateId)
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+
+    const eventsByInstance = new Map<string, WorkflowStepEvent[]>();
+    for (const raw of eventRecords) {
+      const e = withDerivedStatus(toEvent(raw));
+      if (!eventsByInstance.has(e.instanceId)) eventsByInstance.set(e.instanceId, []);
+      eventsByInstance.get(e.instanceId)!.push(e);
+    }
+
+    return {
+      templateName: toTemplate(templateRecord).name,
+      fieldLabels: templateFields.map((f) => f.label),
+      steps: templateSteps.map((s) => ({
+        stepNo: s.stepNo,
+        what: s.what,
+        doerName: doerNameById.get(s.doerId) ?? s.doerId,
+        how: s.how,
+        tat: s.tat,
+      })),
+      runs: instances.map((inst) => {
+        const instEvents = eventsByInstance.get(inst.id) ?? [];
+        return {
+          startedAt: inst.startedAt,
+          fieldValues: inst.fieldValues.map((f) => f.value),
+          steps: templateSteps.map((s) => {
+            const ev = instEvents.find((e) => e.stepNo === s.stepNo);
+            return {
+              stepNo: s.stepNo,
+              planned: ev?.planned ?? "",
+              actual: ev?.actual ?? "",
+              status: ev?.status ?? "Pending",
+              delayMinutes: ev ? computeDelayMinutes(ev) : null,
+            };
+          }),
+        };
+      }),
+    };
+  },
+
+  /**
    * Every step of an in-flight run that belongs to `doerId` — what that person
    * actually needs to see. Used by the Doer's Workflow view, which shows only
    * their own steps rather than the whole template/run machinery.

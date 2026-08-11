@@ -25,6 +25,10 @@ export const workflowController = {
     ok(res, { deleted: true });
   }),
 
+  exportTemplate: asyncHandler(async (req: Request, res: Response) => {
+    ok(res, await workflowService.exportTemplateData(req.params.id as string));
+  }),
+
   listInstances: asyncHandler(async (req: Request, res: Response) => {
     const status = req.query.status as WorkflowInstanceStatus | undefined;
     ok(res, await workflowService.listInstances({ status }));

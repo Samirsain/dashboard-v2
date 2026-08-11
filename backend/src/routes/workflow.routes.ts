@@ -30,6 +30,15 @@ router.delete(
   validate({ params: idParamSchema }),
   workflowController.removeTemplate
 );
+// Registered before "/templates/:id" would matter if "export" collided with
+// an id, but Express matches this literal path fine either way since it's
+// nested one level deeper.
+router.get(
+  "/templates/:id/export",
+  requirePermission(canManageWorkflow),
+  validate({ params: idParamSchema }),
+  workflowController.exportTemplate
+);
 
 // A doer's own steps — this is the entire Workflow page for anyone who can't
 // manage workflows, so it stays open to every signed-in user.
