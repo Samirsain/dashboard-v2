@@ -311,7 +311,7 @@ export const sheetsConfig = {
     },
     "WORKFLOW_STEPS"
   ),
-  /** WFMS — the data fields a template's runs carry (PO Number, Vendor, ...). */
+  /** WFMS — the data fields a template's runs carry, whatever it defines. */
   workflowTemplateFields: entity(
     "WORKFLOW_TEMPLATE_FIELDS",
     "workflow_template_fields",

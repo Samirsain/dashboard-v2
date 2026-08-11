@@ -296,7 +296,7 @@ export const workflowService = {
    * Everything needed to lay a template's runs out spreadsheet-style — one
    * What/Who/How/When header block per step, one row per run underneath,
    * each run's own field values plus every step's Planned/Actual/Status/Delay
-   * in order. Mirrors the original PO tracking sheet this replaced.
+   * in order. Mirrors the shape of the tracking sheet this replaced.
    */
   async exportTemplateData(templateId: string): Promise<{
     templateName: string;
@@ -478,7 +478,8 @@ export const workflowService = {
           instanceId: instance.id,
           templateId: instance.templateId,
           templateName: template?.name ?? "",
-          // The first field (PO Number, ...) is what people actually call a run.
+          // Whatever the template's first field is, that value is what people
+          // call this run — the template decides, not this code.
           runTitle: instance.fieldValues[0]?.value || instance.title,
           stepNo: step.stepNo,
           what: step.what,
@@ -513,10 +514,10 @@ export const workflowService = {
      * rows nobody can act on, and a payload that grows with the backlog.
      *
      * Grouping by (workflow, step, person) turns that pile into the one fact
-     * it actually represents: "Samir has 1000 POs sitting on Generate PO, 12 of
-     * them late." Each group carries exact counts but only its most urgent
-     * handful of runs, so the response is bounded by how the workflows are
-     * configured rather than by how much work is outstanding.
+     * it actually represents: "this person has 1000 runs sitting on this step,
+     * 12 of them late." Each group carries exact counts but only its most
+     * urgent handful of runs, so the response is bounded by how the workflows
+     * are configured rather than by how much work is outstanding.
      */
     const bucketMap = new Map<string, (typeof buckets)[number]>();
     const buckets: Array<{
@@ -618,7 +619,7 @@ export const workflowService = {
       instanceDetails: string;
       /** The template this run belongs to — which workflow this actually is. */
       templateName: string;
-      /** The run's data (PO Number, Vendor, ...) so the doer knows what this is about. */
+      /** Whatever fields this template collects, so the doer knows what this is about. */
       fieldValues: WorkflowFieldValue[];
       totalSteps: number;
       isMyTurn: boolean;
@@ -719,7 +720,7 @@ export const workflowService = {
       value: (input.fieldValues?.[i] ?? "").trim(),
     }));
 
-    // The first field names the run ("PO-1042"), which is why there's no
+    // The template's first field names the run, which is why there's no
     // separate title to type. Templates with no fields still take one.
     const title = (fieldValues[0]?.value || input.title || "").trim();
     if (!title) {

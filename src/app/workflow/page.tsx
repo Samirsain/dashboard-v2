@@ -199,7 +199,7 @@ function StatTile({ label, value, tone }: { label: string; value: number; tone: 
  * "what is late anywhere", which is the question actually asked each morning.
  *
  * Listing every outstanding step individually doesn't survive real volume: a
- * thousand POs waiting on the same person at the same step is a thousand rows
+ * thousand runs waiting on the same person at the same step is a thousand rows
  * that all say the same thing. So the board shows the *pile* — one row per
  * (workflow, step, person) with an exact count — and opens up to the most
  * urgent few inside it. That keeps the screen the same size whether there are
@@ -434,7 +434,7 @@ function WorkflowSheetTable({
   });
   const visibleRuns = filteredRuns.slice(0, visibleCount);
 
-  // The first field (PO Number, ...) is what actually identifies a run, so it
+  // The template's first field is what actually identifies a run, so it
   // takes the pinned column and the rest follow. With no fields defined at all
   // the run's own title stands in.
   const identityLabel = data.fieldLabels[0] ?? "Run";

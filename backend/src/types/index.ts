@@ -311,7 +311,7 @@ export interface WorkflowTemplate {
 export type WorkflowFieldType = "text" | "number" | "date";
 
 /**
- * One piece of data a template's runs carry (e.g. "PO Number"). Defined once
+ * One piece of data a template's runs carry, named by the template. Defined once
  * on the template; filled in per run when someone starts it.
  */
 export interface WorkflowTemplateField {

@@ -272,7 +272,7 @@ export interface WorkflowStep {
 
 export type WorkflowFieldType = "text" | "number" | "date";
 
-/** One piece of data a template's runs carry, e.g. "PO Number". */
+/** One piece of data a template's runs carry — the template names it. */
 export interface WorkflowTemplateField {
   id: string;
   templateId: string;

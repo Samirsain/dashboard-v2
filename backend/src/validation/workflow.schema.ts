@@ -8,7 +8,7 @@ const tatSchema = z.string().refine((v) => {
 
 export const createWorkflowTemplateSchema = z.object({
   name: z.string().min(1),
-  // The data each run of this template carries (e.g. PO Number, Vendor Name).
+  // The data each run of this template carries, defined per template.
   // Optional — a template can have no fields and just be named per run.
   fields: z
     .array(

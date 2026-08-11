@@ -123,7 +123,7 @@ export default function CreateWorkflowTemplateModal({
                 <input
                   value={f.label}
                   onChange={(e) => updateField(i, { label: e.target.value })}
-                  placeholder={i === 0 ? "e.g. PO Number (names the run)" : "e.g. Vendor Name"}
+                  placeholder={i === 0 ? "First field — this names each run" : "Another detail to record"}
                   className={field}
                 />
                 <select
