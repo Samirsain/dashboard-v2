@@ -121,6 +121,12 @@ function MyWorkflowSteps() {
     queueMicrotask(() => {
       load();
     });
+    // Overdue is computed from the current time on every request, so a step
+    // due "now" won't turn red on its own — someone has to ask again. Re-poll
+    // periodically so it goes red on its own while the page is left open,
+    // instead of only updating on a manual reload.
+    const timer = setInterval(load, 60000);
+    return () => clearInterval(timer);
   }, []);
 
   async function act(row: MyStep, action: "complete" | "reject") {
