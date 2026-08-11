@@ -41,17 +41,28 @@ function TicketDetailsInner() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    async function load() {
+    let cancelled = false;
+
+    async function load(opts?: { silent?: boolean }) {
+      if (!opts?.silent) setLoading(true);
       try {
         const data = await api.get<Ticket>(`/tickets/${id}`);
-        setTicket(data);
+        if (!cancelled) setTicket(data);
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to load ticket details.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load ticket details.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     load();
+    // A reply or status change from the other side (admin <-> employee)
+    // shouldn't need a manual reload to show up here.
+    const timer = setInterval(() => load({ silent: true }), 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [id]);
 
   async function handleAdminSubmitSolution() {

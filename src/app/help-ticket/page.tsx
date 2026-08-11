@@ -36,23 +36,34 @@ function HelpTicketInner() {
   const [viewMode, setViewMode] = useState<"active" | "history">("active");
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
+    let cancelled = false;
+
+    async function load(opts?: { silent?: boolean }) {
+      if (!opts?.silent) setLoading(true);
       setError(null);
       try {
         const t = await api.get<Ticket[]>("/tickets");
+        if (cancelled) return;
         setTickets(t);
         if (isAdmin) {
           const s = await api.get<TicketDashboardStats>("/tickets/stats");
-          setStats(s);
+          if (!cancelled) setStats(s);
         }
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Failed to load tickets.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load tickets.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     load();
+    // New tickets, replies, and status changes come from other people — poll
+    // rather than making everyone hit refresh to see them.
+    const timer = setInterval(() => load({ silent: true }), 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [isAdmin]);
 
   const filteredTickets = tickets.filter(t => 
