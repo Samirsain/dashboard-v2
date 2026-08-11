@@ -52,6 +52,19 @@ function idColumnName(entity: SheetEntityConfig): string {
   return column;
 }
 
+/** The Postgres column backing an arbitrary record header. */
+function columnFor(entity: SheetEntityConfig, header: string): string {
+  const column = entity.columns[header];
+  if (!column) {
+    throw new AppError(
+      `Misconfigured entity "${entity.table}": header "${header}" has no column mapping.`,
+      500,
+      "CONFIG_ERROR"
+    );
+  }
+  return column;
+}
+
 function fail(operation: string, error: { message?: string; code?: string } | null): never {
   const message = error?.message ?? "Unknown error";
   logger.error({ operation, code: error?.code, message }, "Supabase query failed");
@@ -73,6 +86,46 @@ export const dataService = {
       .maybeSingle();
     if (error) fail(`findById(${entity.table})`, error);
     return data ? rowToRecord(entity, data as Record<string, unknown>) : null;
+  },
+
+  /**
+   * Every row where `header` (a record header, e.g. "Template ID") equals
+   * `value`. The same filtering done in JS after a findAll costs a full table
+   * read every call, which is fine at a few hundred rows and not fine at a few
+   * hundred thousand — this pushes it down to Postgres instead.
+   */
+  async findWhere(entity: SheetEntityConfig, header: string, value: string): Promise<SheetRecord[]> {
+    const column = columnFor(entity, header);
+    const { data, error } = await getSupabase().from(entity.table).select("*").eq(column, value);
+    if (error) fail(`findWhere(${entity.table}, ${header})`, error);
+    return (data ?? []).map((row) => rowToRecord(entity, row as Record<string, unknown>));
+  },
+
+  /**
+   * Every row whose `header` is any of `values` — the batched form of
+   * findWhere, for "all the events belonging to these runs".
+   *
+   * PostgREST puts the `in` list in the query string, so a few thousand ids
+   * would blow past URL limits; the list is chunked and the chunks issued
+   * together rather than left to fail at some unpredictable size.
+   */
+  async findWhereIn(entity: SheetEntityConfig, header: string, values: string[]): Promise<SheetRecord[]> {
+    if (values.length === 0) return [];
+    const column = columnFor(entity, header);
+    const unique = Array.from(new Set(values));
+    const CHUNK = 200;
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < unique.length; i += CHUNK) chunks.push(unique.slice(i, i + CHUNK));
+
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        const { data, error } = await getSupabase().from(entity.table).select("*").in(column, chunk);
+        if (error) fail(`findWhereIn(${entity.table}, ${header})`, error);
+        return (data ?? []).map((row) => rowToRecord(entity, row as Record<string, unknown>));
+      })
+    );
+    return results.flat();
   },
 
   async append(entity: SheetEntityConfig, record: SheetRecord): Promise<SheetRecord> {
@@ -130,14 +183,7 @@ export const dataService = {
 
   /** Deletes every row where `header` (a record header, e.g. "Status") equals `value`. Irreversible. */
   async deleteWhere(entity: SheetEntityConfig, header: string, value: string): Promise<number> {
-    const column = entity.columns[header];
-    if (!column) {
-      throw new AppError(
-        `Misconfigured entity "${entity.table}": header "${header}" has no column mapping.`,
-        500,
-        "CONFIG_ERROR"
-      );
-    }
+    const column = columnFor(entity, header);
     const { data, error } = await getSupabase()
       .from(entity.table)
       .delete()

@@ -146,26 +146,19 @@ function resolveDeadline(tat: string, from: Date): Date | null {
 }
 
 async function getStepsForTemplate(templateId: string): Promise<WorkflowStep[]> {
-  const records = await dataService.findAll(stepsEntity);
-  return records
-    .map(toStep)
-    .filter((s) => s.templateId === templateId)
-    .sort((a, b) => a.stepNo - b.stepNo);
+  const records = await dataService.findWhere(stepsEntity, "Template ID", templateId);
+  return records.map(toStep).sort((a, b) => a.stepNo - b.stepNo);
 }
 
 async function getFieldsForTemplate(templateId: string): Promise<WorkflowTemplateField[]> {
-  const records = await dataService.findAll(fieldsEntity);
-  return records
-    .map(toField)
-    .filter((f) => f.templateId === templateId)
-    .sort((a, b) => a.fieldNo - b.fieldNo);
+  const records = await dataService.findWhere(fieldsEntity, "Template ID", templateId);
+  return records.map(toField).sort((a, b) => a.fieldNo - b.fieldNo);
 }
 
 async function getEventsForInstance(instanceId: string): Promise<WorkflowStepEvent[]> {
-  const records = await dataService.findAll(eventsEntity);
+  const records = await dataService.findWhere(eventsEntity, "Instance ID", instanceId);
   return records
     .map(toEvent)
-    .filter((e) => e.instanceId === instanceId)
     .sort((a, b) => a.stepNo - b.stepNo)
     .map(withDerivedStatus);
 }
@@ -270,10 +263,10 @@ export const workflowService = {
   // ---- Instances -----------------------------------------------------------
 
   async listInstances(filter?: { status?: WorkflowInstanceStatus }): Promise<WorkflowInstance[]> {
-    const records = await dataService.findAll(instancesEntity);
-    let instances = records.map(toInstance);
-    if (filter?.status) instances = instances.filter((i) => i.status === filter.status);
-    return instances.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    const records = filter?.status
+      ? await dataService.findWhere(instancesEntity, "Status", filter.status)
+      : await dataService.findAll(instancesEntity);
+    return records.map(toInstance).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   },
 
   /**
@@ -319,19 +312,25 @@ export const workflowService = {
     const templateRecord = await dataService.findById(templatesEntity, templateId);
     if (!templateRecord) throw AppError.notFound(`Workflow template "${templateId}" not found`);
 
-    const [templateSteps, templateFields, instanceRecords, eventRecords, users] = await Promise.all([
+    const [templateSteps, templateFields, instanceRecords, users] = await Promise.all([
       getStepsForTemplate(templateId),
       getFieldsForTemplate(templateId),
-      dataService.findAll(instancesEntity),
-      dataService.findAll(eventsEntity),
+      dataService.findWhere(instancesEntity, "Template ID", templateId),
       usersService.list(),
     ]);
 
     const doerNameById = new Map(users.map((u) => [u.id, u.name]));
     const instances = instanceRecords
       .map(toInstance)
-      .filter((i) => i.templateId === templateId)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+
+    // Only this template's runs, so the events read stays proportional to what
+    // is being shown rather than to every step event ever recorded.
+    const eventRecords = await dataService.findWhereIn(
+      eventsEntity,
+      "Instance ID",
+      instances.map((i) => i.id)
+    );
 
     const eventsByInstance = new Map<string, WorkflowStepEvent[]>();
     for (const raw of eventRecords) {
@@ -403,10 +402,13 @@ export const workflowService = {
       lateMinutes: number | null;
     }>;
   }> {
-    const [templateRecords, instanceRecords, eventRecords, users] = await Promise.all([
+    // Only in-flight runs matter here — a Complete run has nothing outstanding,
+    // and its whole step history is dead weight on this query. Finished work is
+    // the bulk of the table over time, so filtering both reads down to Active
+    // keeps this roughly flat as history piles up.
+    const [templateRecords, instanceRecords, users] = await Promise.all([
       dataService.findAll(templatesEntity),
-      dataService.findAll(instancesEntity),
-      dataService.findAll(eventsEntity),
+      dataService.findWhere(instancesEntity, "Status", "Active"),
       usersService.list(),
     ]);
 
@@ -414,9 +416,14 @@ export const workflowService = {
     const templates = templateRecords.map(toTemplate);
     const templateById = new Map(templates.map((t) => [t.id, t]));
 
-    // Only in-flight runs matter here — a Complete run has nothing outstanding.
-    const activeInstances = instanceRecords.map(toInstance).filter((i) => i.status === "Active");
+    const activeInstances = instanceRecords.map(toInstance);
     const instanceById = new Map(activeInstances.map((i) => [i.id, i]));
+
+    const eventRecords = await dataService.findWhereIn(
+      eventsEntity,
+      "Instance ID",
+      activeInstances.map((i) => i.id)
+    );
 
     const activeRunsByTemplate = new Map<string, number>();
     for (const inst of activeInstances) {
@@ -515,25 +522,35 @@ export const workflowService = {
       step: WorkflowStepEvent;
     }>
   > {
-    const [instanceRecords, eventRecords, templateRecords, doer] = await Promise.all([
-      dataService.findAll(instancesEntity),
-      dataService.findAll(eventsEntity),
+    // This person's own step events, not everybody's — the read scales with
+    // their workload rather than with the whole company's history.
+    const [instanceRecords, myEventRecords, templateRecords, doer] = await Promise.all([
+      dataService.findWhere(instancesEntity, "Status", "Active"),
+      dataService.findWhere(eventsEntity, "Doer ID", doerId),
       dataService.findAll(templatesEntity),
       usersService.getById(doerId).catch(() => null),
     ]);
 
-    const activeInstances = instanceRecords.map(toInstance).filter((i) => i.status === "Active");
+    const activeInstances = instanceRecords.map(toInstance);
     const instanceById = new Map(activeInstances.map((i) => [i.id, i]));
     const templateNameById = new Map(templateRecords.map(toTemplate).map((t) => [t.id, t.name]));
 
-    const events = eventRecords.map(toEvent);
+    const events = myEventRecords.map(toEvent).filter((e) => instanceById.has(e.instanceId));
+
+    // "Step 2 of 5" counts every step of the run, including other people's, so
+    // it needs the runs' full event sets — but only for the runs actually shown.
+    const siblingRecords = await dataService.findWhereIn(
+      eventsEntity,
+      "Instance ID",
+      events.map((e) => e.instanceId)
+    );
     const stepCountByInstance = new Map<string, number>();
-    for (const e of events) {
-      stepCountByInstance.set(e.instanceId, (stepCountByInstance.get(e.instanceId) ?? 0) + 1);
+    for (const raw of siblingRecords) {
+      const instanceId = raw["Instance ID"] ?? "";
+      stepCountByInstance.set(instanceId, (stepCountByInstance.get(instanceId) ?? 0) + 1);
     }
 
     return events
-      .filter((e) => e.doerId === doerId && instanceById.has(e.instanceId))
       .map(withDerivedStatus)
       // A finished step is history, not work — leave it out of their list.
       .filter((e) => e.status !== "Complete")
