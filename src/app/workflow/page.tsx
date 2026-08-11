@@ -786,12 +786,13 @@ function WorkflowInner() {
                 )}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[900px]">
+                <table className="w-full text-left border-collapse min-w-[1000px]">
                   <thead>
                     <tr className="bg-surface-container-low border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface">
                       <th className="py-2 px-3">#</th>
                       <th className="py-2 px-3">What</th>
                       <th className="py-2 px-3">Who</th>
+                      <th className="py-2 px-3">How</th>
                       <th className="py-2 px-3">Planned</th>
                       <th className="py-2 px-3">Actual</th>
                       <th className="py-2 px-3">Delay</th>
@@ -809,6 +810,7 @@ function WorkflowInner() {
                           <td className="py-3 px-3 font-data-mono text-data-mono">{s.stepNo}</td>
                           <td className="py-3 px-3">{s.what}</td>
                           <td className="py-3 px-3 text-on-surface-variant">{doerName(s.doerId)}</td>
+                          <td className="py-3 px-3 text-on-surface-variant">{s.how || "—"}</td>
                           <td className="py-3 px-3 font-data-mono text-data-mono text-on-surface-variant">
                             {s.planned ? formatTs(s.planned) : "—"}
                           </td>
