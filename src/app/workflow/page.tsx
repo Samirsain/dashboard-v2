@@ -301,6 +301,12 @@ function WorkflowInner() {
   const [doers, setDoers] = useState<Doer[]>([]);
   const [instances, setInstances] = useState<WorkflowInstance[]>([]);
   const [statusFilter, setStatusFilter] = useState<WorkflowInstanceStatus>("Active");
+  // At 100+ runs the plain list stops being scannable — narrow it down
+  // instead of rendering everything at once.
+  const [runSearch, setRunSearch] = useState("");
+  const [templateFilter, setTemplateFilter] = useState("ALL");
+  const RUN_PAGE_SIZE = 20;
+  const [visibleRunCount, setVisibleRunCount] = useState(RUN_PAGE_SIZE);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedSteps, setSelectedSteps] = useState<WorkflowStepEvent[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<WorkflowInstance | null>(null);
@@ -337,6 +343,20 @@ function WorkflowInner() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
+
+  const templateName = (id: string) => templates.find((t) => t.id === id)?.name ?? "—";
+
+  const filteredInstances = instances.filter((inst) => {
+    if (templateFilter !== "ALL" && inst.templateId !== templateFilter) return false;
+    const q = runSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      inst.title.toLowerCase().includes(q) ||
+      inst.details.toLowerCase().includes(q) ||
+      inst.fieldValues.some((f) => f.value.toLowerCase().includes(q))
+    );
+  });
+  const visibleInstances = filteredInstances.slice(0, visibleRunCount);
 
   async function openInstance(id: string) {
     setSelectedId(id);
@@ -503,22 +523,61 @@ function WorkflowInner() {
 
           {/* Instances */}
           <div className="bg-surface border-2 border-on-surface flex flex-col">
-            <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex justify-between items-center">
-              <h3 className="font-headline-md text-headline-md text-on-surface">Ongoing Work</h3>
-              <div className="flex gap-2">
-                {(["Active", "Complete"] as WorkflowInstanceStatus[]).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setStatusFilter(s)}
-                    className={
-                      statusFilter === s
-                        ? "border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase"
-                        : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-                    }
-                  >
-                    {s}
-                  </button>
-                ))}
+            <div className="bg-surface-container-low border-b-2 border-on-surface p-stack-md flex flex-col gap-3">
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <h3 className="font-headline-md text-headline-md text-on-surface">
+                  Ongoing Work
+                  <span className="ml-2 font-data-mono text-data-mono text-on-surface-variant text-sm">
+                    ({filteredInstances.length})
+                  </span>
+                </h3>
+                <div className="flex gap-2">
+                  {(["Active", "Complete"] as WorkflowInstanceStatus[]).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setStatusFilter(s);
+                        setVisibleRunCount(RUN_PAGE_SIZE);
+                      }}
+                      className={
+                        statusFilter === s
+                          ? "border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase"
+                          : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+                      }
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search + template narrow the list down once there are many
+                  templates each with many runs — scanning stops scaling fast. */}
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={runSearch}
+                  onChange={(e) => {
+                    setRunSearch(e.target.value);
+                    setVisibleRunCount(RUN_PAGE_SIZE);
+                  }}
+                  placeholder="Search title, details, or any field value..."
+                  className="min-h-[38px] flex-1 min-w-[200px] border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-sm text-on-surface focus:outline-none"
+                />
+                <select
+                  value={templateFilter}
+                  onChange={(e) => {
+                    setTemplateFilter(e.target.value);
+                    setVisibleRunCount(RUN_PAGE_SIZE);
+                  }}
+                  className="min-h-[38px] border-2 border-on-surface bg-surface px-2 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
+                >
+                  <option value="ALL">All Templates</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -527,19 +586,22 @@ function WorkflowInner() {
                 <thead>
                   <tr className="bg-surface-container-low border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface">
                     <th className="py-3 px-4">Title</th>
+                    <th className="py-3 px-4">Template</th>
                     <th className="py-3 px-4">Started</th>
                     <th className="py-3 px-4 text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-md text-on-surface">
-                  {!loading && instances.length === 0 && (
+                  {!loading && filteredInstances.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
-                        No {statusFilter.toLowerCase()} work.
+                      <td colSpan={4} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                        {instances.length === 0
+                          ? `No ${statusFilter.toLowerCase()} work.`
+                          : "Nothing matches this search."}
                       </td>
                     </tr>
                   )}
-                  {instances.map((inst) => (
+                  {visibleInstances.map((inst) => (
                     <tr
                       key={inst.id}
                       onClick={() => openInstance(inst.id)}
@@ -557,6 +619,9 @@ function WorkflowInner() {
                           </div>
                         )}
                       </td>
+                      <td className="py-4 px-4 font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                        {templateName(inst.templateId)}
+                      </td>
                       <td className="py-4 px-4 font-data-mono text-data-mono text-on-surface-variant">
                         {formatTs(inst.startedAt)}
                       </td>
@@ -568,6 +633,16 @@ function WorkflowInner() {
                 </tbody>
               </table>
             </div>
+
+            {filteredInstances.length > visibleInstances.length && (
+              <button
+                onClick={() => setVisibleRunCount((prev) => prev + RUN_PAGE_SIZE)}
+                className="border-t-2 border-on-surface px-4 py-3 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+              >
+                Show {Math.min(RUN_PAGE_SIZE, filteredInstances.length - visibleInstances.length)} more
+                ({filteredInstances.length - visibleInstances.length} left)
+              </button>
+            )}
           </div>
 
           {/* Selected instance detail */}
