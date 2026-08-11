@@ -139,6 +139,7 @@ function MyWorkflowSteps() {
 
   const myTurn = rows.filter((r) => r.isMyTurn);
   const later = rows.filter((r) => !r.isMyTurn);
+  const overdueCount = myTurn.filter((r) => r.step.status === "Overdue").length;
 
   return (
     <>
@@ -167,6 +168,25 @@ function MyWorkflowSteps() {
               <p className="mt-1 font-data-mono text-data-mono text-on-surface-variant text-xs">
                 A step shows up here the moment it becomes your turn.
               </p>
+            </div>
+          )}
+
+          {/* One-glance count so a long list doesn't need scrolling to know
+              how much is pending and how much is already late. */}
+          {!loading && myTurn.length > 0 && (
+            <div
+              className={`flex flex-wrap items-center gap-2 border-2 px-4 py-2.5 ${
+                overdueCount > 0 ? "border-error bg-error/10" : "border-on-surface bg-surface"
+              }`}
+            >
+              <span className="font-headline-md text-headline-md text-on-surface">
+                {myTurn.length} {myTurn.length === 1 ? "task" : "tasks"} with you
+              </span>
+              {overdueCount > 0 && (
+                <span className="border-2 border-error bg-error text-on-error px-2 py-0.5 font-label-sm text-label-sm uppercase">
+                  {overdueCount} overdue
+                </span>
+              )}
             </div>
           )}
 
