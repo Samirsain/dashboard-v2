@@ -29,6 +29,11 @@ export const workflowController = {
     ok(res, await workflowService.exportTemplateData(req.params.id as string));
   }),
 
+  /** Everything in flight across every template — the manager's landing view. */
+  overview: asyncHandler(async (_req: Request, res: Response) => {
+    ok(res, await workflowService.getOverview());
+  }),
+
   listInstances: asyncHandler(async (req: Request, res: Response) => {
     const status = req.query.status as WorkflowInstanceStatus | undefined;
     ok(res, await workflowService.listInstances({ status }));

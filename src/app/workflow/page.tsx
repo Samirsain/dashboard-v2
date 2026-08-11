@@ -40,6 +40,26 @@ type WorkflowTemplateExport = {
   }>;
 };
 
+/** GET /workflow/overview — everything in flight, across every template. */
+type WorkflowOverview = {
+  totals: { activeRuns: number; overdueSteps: number; dueTodaySteps: number };
+  templates: Array<{ id: string; name: string; activeRuns: number; overdueSteps: number }>;
+  attention: Array<{
+    instanceId: string;
+    templateId: string;
+    templateName: string;
+    runTitle: string;
+    stepNo: number;
+    what: string;
+    how: string;
+    doerId: string;
+    doerName: string;
+    planned: string;
+    status: WorkflowStepStatus;
+    lateMinutes: number | null;
+  }>;
+};
+
 /** "30m" -> "30 minutes", "2h" -> "2 hours", the symbolic ones as their plain-English name. */
 function describeTat(tat: string): string {
   const t = tat.trim().toUpperCase();
@@ -51,6 +71,17 @@ function describeTat(tat: string): string {
   const hours = t.match(/^(\d+(?:\.\d+)?)H?$/);
   if (hours) return `${hours[1]} hours`;
   return tat;
+}
+
+/** "3h 20m late" — how far past its deadline a step is right now. */
+function formatLateness(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h late`;
+  }
+  return hours > 0 ? `${hours}h ${mins}m late` : `${mins}m late`;
 }
 
 function formatDelayMinutes(minutes: number | null): string {
@@ -128,6 +159,195 @@ const COL_STEP = 172;
 const COL_ACTION = 96;
 /** At 100+ runs the plain list stops being scannable — page it instead. */
 const RUN_PAGE_SIZE = 20;
+
+/** How many attention rows to show before "show more". */
+const ATTENTION_PAGE_SIZE = 15;
+
+/** One headline number on the live board. */
+function StatTile({ label, value, tone }: { label: string; value: number; tone: "plain" | "error" | "warn" }) {
+  const styles =
+    tone === "error"
+      ? "border-error bg-error/10 text-error"
+      : tone === "warn"
+      ? "border-on-surface bg-surface-container text-on-surface"
+      : "border-on-surface bg-surface text-on-surface";
+  return (
+    <div className={`flex-1 min-w-[130px] border-2 px-4 py-2.5 ${styles}`}>
+      <p className="font-headline-lg text-headline-lg leading-none">{value}</p>
+      <p className="mt-1 font-label-sm text-label-sm uppercase opacity-80">{label}</p>
+    </div>
+  );
+}
+
+/**
+ * The manager's landing view: every step that is somebody's turn right now,
+ * across every template, most-overdue first.
+ *
+ * A per-template sheet answers "how is this workflow doing". It cannot answer
+ * "what is late anywhere", which is the question actually asked each morning —
+ * and answering it by opening each template in turn stops working as soon as
+ * there are more than a few. This stays one flat list however many workflows
+ * exist, so the cost of adding a workflow is a row, not another place to look.
+ */
+function WorkflowControlRoom({
+  overview,
+  onOpenRun,
+}: {
+  overview: WorkflowOverview;
+  onOpenRun: (instanceId: string, templateId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [doerFilter, setDoerFilter] = useState<string | null>(null);
+  const [visible, setVisible] = useState(ATTENTION_PAGE_SIZE);
+
+  // Who currently holds work, with their load — so "Sandeep ke paas kya hai?"
+  // is one click, and an overloaded person is visible without asking.
+  const byDoer = new Map<string, { name: string; count: number; overdue: number }>();
+  for (const a of overview.attention) {
+    const prev = byDoer.get(a.doerId) ?? { name: a.doerName, count: 0, overdue: 0 };
+    byDoer.set(a.doerId, {
+      name: a.doerName,
+      count: prev.count + 1,
+      overdue: prev.overdue + (a.lateMinutes !== null ? 1 : 0),
+    });
+  }
+  const people = Array.from(byDoer.entries()).sort((a, b) => b[1].count - a[1].count);
+
+  const q = search.trim().toLowerCase();
+  const rows = overview.attention.filter((a) => {
+    if (doerFilter && a.doerId !== doerFilter) return false;
+    if (!q) return true;
+    return (
+      a.runTitle.toLowerCase().includes(q) ||
+      a.what.toLowerCase().includes(q) ||
+      a.templateName.toLowerCase().includes(q) ||
+      a.doerName.toLowerCase().includes(q)
+    );
+  });
+  const shown = rows.slice(0, visible);
+
+  return (
+    <div className="bg-surface border-2 border-on-surface p-stack-lg flex flex-col gap-stack-md">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-on-surface pb-stack-md">
+        <h3 className="font-headline-md text-headline-md text-on-surface">Live Board</h3>
+        <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+          Everything waiting on someone, right now
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <StatTile label="Running Work" value={overview.totals.activeRuns} tone="plain" />
+        <StatTile label="Overdue Steps" value={overview.totals.overdueSteps} tone={overview.totals.overdueSteps > 0 ? "error" : "plain"} />
+        <StatTile label="Due Today" value={overview.totals.dueTodaySteps} tone="warn" />
+      </div>
+
+      {/* Filter by person — chips rather than a dropdown so the load per
+          person is visible without opening anything. */}
+      {people.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              setDoerFilter(null);
+              setVisible(ATTENTION_PAGE_SIZE);
+            }}
+            className={
+              doerFilter === null
+                ? "border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase"
+                : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            }
+          >
+            Everyone ({overview.attention.length})
+          </button>
+          {people.map(([id, p]) => (
+            <button
+              key={id}
+              onClick={() => {
+                setDoerFilter((prev) => (prev === id ? null : id));
+                setVisible(ATTENTION_PAGE_SIZE);
+              }}
+              className={`px-3 py-1 font-label-sm text-label-sm uppercase border-2 transition-colors ${
+                doerFilter === id
+                  ? "border-on-surface bg-on-surface text-surface"
+                  : p.overdue > 0
+                  ? "border-error text-error hover:bg-error/10"
+                  : "border-on-surface text-on-surface hover:bg-surface-container"
+              }`}
+            >
+              {p.name} ({p.count}
+              {p.overdue > 0 ? ` · ${p.overdue} late` : ""})
+            </button>
+          ))}
+        </div>
+      )}
+
+      <input
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setVisible(ATTENTION_PAGE_SIZE);
+        }}
+        placeholder="Search any run, step, workflow or person..."
+        className="min-h-[38px] w-full border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-sm text-on-surface focus:outline-none"
+      />
+
+      {shown.length === 0 ? (
+        <p className="border-2 border-on-surface bg-surface-container-lowest px-4 py-8 text-center font-body-md text-body-md text-on-surface-variant">
+          {overview.attention.length === 0
+            ? "Nothing is waiting on anyone. All caught up."
+            : "Nothing matches this filter."}
+        </p>
+      ) : (
+        <div className="border-2 border-on-surface divide-y divide-outline-variant">
+          {shown.map((a) => {
+            const late = a.lateMinutes !== null;
+            return (
+              <button
+                key={`${a.instanceId}:${a.stepNo}`}
+                onClick={() => onOpenRun(a.instanceId, a.templateId)}
+                className={`w-full text-left flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 transition-colors ${
+                  late ? "bg-error/5 hover:bg-error/10" : "hover:bg-surface-container-low"
+                }`}
+              >
+                <span className="flex-1 min-w-[200px]">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-body-md text-body-md text-on-surface font-semibold">{a.runTitle}</span>
+                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                      {a.templateName}
+                    </span>
+                  </span>
+                  <span className="block font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5">
+                    Step {a.stepNo} · {a.what} · {a.doerName}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`font-label-sm text-label-sm ${late ? "text-error font-bold" : "text-on-surface-variant"}`}
+                  >
+                    {late
+                      ? formatLateness(a.lateMinutes!)
+                      : a.planned
+                      ? `by ${formatTsShort(a.planned)}`
+                      : "no deadline"}
+                  </span>
+                  <StepStatusBadge status={a.status} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {rows.length > shown.length && (
+        <button
+          onClick={() => setVisible((prev) => prev + ATTENTION_PAGE_SIZE)}
+          className="border-2 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+        >
+          Show {Math.min(ATTENTION_PAGE_SIZE, rows.length - shown.length)} more ({rows.length - shown.length} left)
+        </button>
+      )}
+    </div>
+  );
+}
 
 /**
  * The full home for one workflow's runs — search, Active/Complete tabs,
@@ -476,6 +696,14 @@ function MyWorkflowSteps() {
     myTurnByWorkflow.set(key, [...(myTurnByWorkflow.get(key) ?? []), row]);
   }
 
+  // `openWorkflow` is null until the doer touches anything, and "" once they
+  // deliberately close a box. That distinction matters: with a single workflow
+  // the box opens on its own (there is nothing to choose between), but it must
+  // still be closable — treating "closed" as null would just reopen it.
+  const workflowNames = Array.from(myTurnByWorkflow.keys());
+  const effectiveOpenWorkflow =
+    openWorkflow === null ? (workflowNames.length === 1 ? workflowNames[0]! : null) : openWorkflow || null;
+
   return (
     <>
       <MobileHeader />
@@ -525,9 +753,12 @@ function MyWorkflowSteps() {
             </div>
           )}
 
-          {/* One box per workflow — tick its name to open it and see its steps. */}
+          {/* One box per workflow — tick its name to open it and see its steps.
+              With only one workflow there is nothing to choose between, so it
+              opens itself rather than making the doer click to see their only
+              list of work. */}
           {Array.from(myTurnByWorkflow.entries()).map(([workflowName, workflowRows]) => {
-            const open = openWorkflow === workflowName;
+            const open = effectiveOpenWorkflow === workflowName;
             const workflowOverdueCount = workflowRows.filter((r) => r.step.status === "Overdue").length;
             return (
               <div
@@ -537,7 +768,7 @@ function MyWorkflowSteps() {
                 }`}
               >
                 <button
-                  onClick={() => setOpenWorkflow((prev) => (prev === workflowName ? null : workflowName))}
+                  onClick={() => setOpenWorkflow(open ? "" : workflowName)}
                   className="w-full flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-surface-container transition-colors"
                 >
                   <span className="flex items-center gap-2 min-w-0">
@@ -683,6 +914,7 @@ function WorkflowInner() {
 
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [doers, setDoers] = useState<Doer[]>([]);
+  const [overview, setOverview] = useState<WorkflowOverview | null>(null);
   // Active/Complete tab + search + pagination for whichever template's sheet
   // is currently open — everything about a workflow's runs is managed right
   // inside that sheet now, so there's no separate global runs list anymore.
@@ -706,20 +938,22 @@ function WorkflowInner() {
   const [sheetLoadingId, setSheetLoadingId] = useState<string | null>(null);
   const [sheetDataByTemplate, setSheetDataByTemplate] = useState<Record<string, WorkflowTemplateExport>>({});
 
-  async function loadData() {
-    setLoading(true);
+  async function loadData(opts?: { silent?: boolean }) {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const [templateData, doerData] = await Promise.all([
+      const [templateData, doerData, overviewData] = await Promise.all([
         api.get<WorkflowTemplate[]>("/workflow/templates"),
         api.get<Doer[]>("/users"),
+        api.get<WorkflowOverview>("/workflow/overview"),
       ]);
       setTemplates(templateData);
       setDoers(doerData.filter((d) => d.role === "Doer" || d.role === "MD" || d.role === "PC"));
+      setOverview(overviewData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load workflow data.");
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }
 
@@ -728,6 +962,20 @@ function WorkflowInner() {
       loadData();
     });
   }, []);
+
+  // Overdue is derived from the clock on every read, and doers are marking
+  // steps done all day — without this the board silently goes stale and
+  // whoever is watching it makes calls on yesterday's picture. Keyed on the
+  // open template so the sheet on screen is refreshed too, not just the board;
+  // changing templates only resets the timer, it doesn't refetch.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadData({ silent: true });
+      if (openTemplateId) loadSheet(openTemplateId, { force: true });
+    }, 60000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTemplateId]);
 
   async function openInstance(id: string) {
     setSelectedId(id);
@@ -745,6 +993,18 @@ function WorkflowInner() {
   async function refreshSelected() {
     if (selectedId) await openInstance(selectedId);
     if (openTemplateId) await loadSheet(openTemplateId, { force: true });
+    // Completing or bouncing a step changes who is holding what, so the board
+    // above has to move with it rather than wait for the next poll.
+    await loadData({ silent: true });
+  }
+
+  /** Jump from a Live Board row straight into that run's step timeline. */
+  async function openRunFromBoard(instanceId: string, templateId: string) {
+    setOpenTemplateId(templateId);
+    setRunSearch("");
+    setVisibleRunCount(RUN_PAGE_SIZE);
+    loadSheet(templateId);
+    await openInstance(instanceId);
   }
 
   async function handleComplete(stepNo: number) {
@@ -867,6 +1127,7 @@ function WorkflowInner() {
     try {
       await api.delete(`/workflow/instances/${id}`);
       await loadSheet(templateId, { force: true });
+      await loadData({ silent: true });
       if (selectedId === id) {
         setSelectedId(null);
         setSelectedSteps([]);
@@ -932,6 +1193,11 @@ function WorkflowInner() {
             </p>
           )}
 
+          {/* Everything in flight, across every workflow — the landing view. */}
+          {isAdmin && overview && (
+            <WorkflowControlRoom overview={overview} onOpenRun={openRunFromBoard} />
+          )}
+
           {/* Templates */}
           <div className="bg-surface border-2 border-on-surface p-stack-lg">
             <h3 className="font-headline-md text-headline-md text-on-surface border-b-2 border-on-surface pb-stack-md mb-stack-md">
@@ -948,6 +1214,9 @@ function WorkflowInner() {
               <div className="border-2 border-on-surface divide-y-2 divide-on-surface">
                 {templates.map((t) => {
                   const open = openTemplateId === t.id;
+                  // Live load per template, so you can tell which workflow needs
+                  // opening without opening every one of them to find out.
+                  const stat = overview?.templates.find((x) => x.id === t.id);
                   return (
                     <div key={t.id}>
                       <button
@@ -961,10 +1230,20 @@ function WorkflowInner() {
                         }}
                         className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-surface-container transition-colors"
                       >
-                        <span className="font-body-md text-body-md text-on-surface font-semibold uppercase">
+                        <span className="font-body-md text-body-md text-on-surface font-semibold uppercase text-left">
                           {t.name}
                         </span>
-                        <span className="flex items-center gap-3 shrink-0">
+                        <span className="flex items-center gap-2 shrink-0">
+                          {stat && stat.overdueSteps > 0 && (
+                            <span className="border-2 border-error bg-error text-on-error px-1.5 py-0.5 font-label-sm text-[10px] uppercase">
+                              {stat.overdueSteps} late
+                            </span>
+                          )}
+                          {stat && stat.activeRuns > 0 && (
+                            <span className="border-2 border-on-surface px-1.5 py-0.5 font-label-sm text-[10px] uppercase text-on-surface">
+                              {stat.activeRuns} running
+                            </span>
+                          )}
                           <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
                             {t.steps.length} step{t.steps.length === 1 ? "" : "s"}
                           </span>
@@ -977,9 +1256,10 @@ function WorkflowInner() {
                       {open && (
                         <div className="border-t-2 border-on-surface bg-surface-container-lowest p-stack-md flex flex-col gap-3">
                           {isAdmin ? (
-                            sheetLoadingId === t.id ? (
-                              <p className="font-data-mono text-data-mono text-on-surface-variant text-xs">Loading…</p>
-                            ) : sheetDataByTemplate[t.id] ? (
+                            /* Data first, spinner only when there is none yet —
+                               otherwise the minute-by-minute refresh would rip
+                               the table off screen while it reloads. */
+                            sheetDataByTemplate[t.id] ? (
                               <WorkflowSheetTable
                                 data={sheetDataByTemplate[t.id]!}
                                 search={runSearch}
@@ -998,6 +1278,8 @@ function WorkflowInner() {
                                 onRowClick={openInstance}
                                 onDeleteRow={(id, title, status, e) => handleDeleteInstance(t.id, id, title, status, e)}
                               />
+                            ) : sheetLoadingId === t.id ? (
+                              <p className="font-data-mono text-data-mono text-on-surface-variant text-xs">Loading…</p>
                             ) : null
                           ) : (
                             <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
@@ -1169,6 +1451,7 @@ function WorkflowInner() {
             setRunSearch("");
             setVisibleRunCount(RUN_PAGE_SIZE);
             loadSheet(instance.templateId, { force: true });
+            loadData({ silent: true });
             openInstance(instance.id);
           }}
         />

@@ -40,6 +40,10 @@ router.get(
   workflowController.exportTemplate
 );
 
+// Cross-template live status. Management-only: it deliberately shows every
+// person's outstanding work, which is exactly what a doer's view must not.
+router.get("/overview", requirePermission(canManageWorkflow), workflowController.overview);
+
 // A doer's own steps — this is the entire Workflow page for anyone who can't
 // manage workflows, so it stays open to every signed-in user.
 router.get("/my-steps", workflowController.mySteps);

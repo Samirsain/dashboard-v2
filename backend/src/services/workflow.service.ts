@@ -374,6 +374,123 @@ export const workflowService = {
   },
 
   /**
+   * Everything currently in flight, across every template, in one pass.
+   *
+   * The per-template sheet answers "how is this workflow doing"; it cannot
+   * answer "what is late anywhere right now", which is the question whoever
+   * runs the floor actually asks. Doing that by opening each template in turn
+   * stops working the moment there are more than a handful, so this collapses
+   * the whole board into one flat, already-sorted list plus the counts needed
+   * to decide where to look — from a single read of each table rather than one
+   * round trip per template.
+   */
+  async getOverview(): Promise<{
+    totals: { activeRuns: number; overdueSteps: number; dueTodaySteps: number };
+    templates: Array<{ id: string; name: string; activeRuns: number; overdueSteps: number }>;
+    attention: Array<{
+      instanceId: string;
+      templateId: string;
+      templateName: string;
+      runTitle: string;
+      stepNo: number;
+      what: string;
+      how: string;
+      doerId: string;
+      doerName: string;
+      planned: string;
+      status: WorkflowStepStatus;
+      /** How late this step is *right now* (minutes), or null if not overdue. */
+      lateMinutes: number | null;
+    }>;
+  }> {
+    const [templateRecords, instanceRecords, eventRecords, users] = await Promise.all([
+      dataService.findAll(templatesEntity),
+      dataService.findAll(instancesEntity),
+      dataService.findAll(eventsEntity),
+      usersService.list(),
+    ]);
+
+    const doerNameById = new Map(users.map((u) => [u.id, u.name]));
+    const templates = templateRecords.map(toTemplate);
+    const templateById = new Map(templates.map((t) => [t.id, t]));
+
+    // Only in-flight runs matter here — a Complete run has nothing outstanding.
+    const activeInstances = instanceRecords.map(toInstance).filter((i) => i.status === "Active");
+    const instanceById = new Map(activeInstances.map((i) => [i.id, i]));
+
+    const activeRunsByTemplate = new Map<string, number>();
+    for (const inst of activeInstances) {
+      activeRunsByTemplate.set(inst.templateId, (activeRunsByTemplate.get(inst.templateId) ?? 0) + 1);
+    }
+
+    const now = Date.now();
+    const today = new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" });
+    const overdueByTemplate = new Map<string, number>();
+    let dueTodaySteps = 0;
+
+    const attention = eventRecords
+      .map(toEvent)
+      .filter((e) => instanceById.has(e.instanceId))
+      .map(withDerivedStatus)
+      // Whoever's turn it is right now — Pending steps have no one waiting on
+      // them yet, and Complete ones are already done.
+      .filter((e) => e.status === "Active" || e.status === "Overdue")
+      .map((step) => {
+        const instance = instanceById.get(step.instanceId)!;
+        const template = templateById.get(instance.templateId);
+        const plannedMs = step.planned ? new Date(step.planned).getTime() : NaN;
+        const late = step.status === "Overdue" && !Number.isNaN(plannedMs);
+
+        if (step.status === "Overdue") {
+          overdueByTemplate.set(instance.templateId, (overdueByTemplate.get(instance.templateId) ?? 0) + 1);
+        }
+        if (
+          !Number.isNaN(plannedMs) &&
+          new Date(plannedMs).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) === today
+        ) {
+          dueTodaySteps += 1;
+        }
+
+        return {
+          instanceId: instance.id,
+          templateId: instance.templateId,
+          templateName: template?.name ?? "",
+          // The first field (PO Number, ...) is what people actually call a run.
+          runTitle: instance.fieldValues[0]?.value || instance.title,
+          stepNo: step.stepNo,
+          what: step.what,
+          how: step.how,
+          doerId: step.doerId,
+          doerName: doerNameById.get(step.doerId) ?? step.doerId,
+          planned: step.planned,
+          status: step.status,
+          lateMinutes: late ? Math.round((now - plannedMs) / 60000) : null,
+        };
+      })
+      .sort((a, b) => {
+        // Late work first, most overdue at the top; then whatever is due soonest.
+        if ((a.lateMinutes !== null) !== (b.lateMinutes !== null)) return a.lateMinutes !== null ? -1 : 1;
+        if (a.lateMinutes !== null && b.lateMinutes !== null) return b.lateMinutes - a.lateMinutes;
+        return (a.planned || "9999").localeCompare(b.planned || "9999");
+      });
+
+    return {
+      totals: {
+        activeRuns: activeInstances.length,
+        overdueSteps: attention.filter((a) => a.lateMinutes !== null).length,
+        dueTodaySteps,
+      },
+      templates: templates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        activeRuns: activeRunsByTemplate.get(t.id) ?? 0,
+        overdueSteps: overdueByTemplate.get(t.id) ?? 0,
+      })),
+      attention,
+    };
+  },
+
+  /**
    * Every step of an in-flight run that belongs to `doerId` — what that person
    * actually needs to see. Used by the Doer's Workflow view, which shows only
    * their own steps rather than the whole template/run machinery.
