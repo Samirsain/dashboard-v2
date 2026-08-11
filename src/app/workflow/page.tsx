@@ -103,6 +103,8 @@ function MyWorkflowSteps() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  // Which workflow box is expanded — collapsed by default; tick one to open it.
+  const [openWorkflow, setOpenWorkflow] = useState<string | null>(null);
 
   async function load() {
     setError(null);
@@ -142,6 +144,14 @@ function MyWorkflowSteps() {
   const myTurn = rows.filter((r) => r.isMyTurn);
   const later = rows.filter((r) => !r.isMyTurn);
   const overdueCount = myTurn.filter((r) => r.step.status === "Overdue").length;
+
+  // Grouped by workflow so the doer picks a workflow first, then sees its
+  // steps — rather than every step from every workflow mixed in one list.
+  const myTurnByWorkflow = new Map<string, MyStep[]>();
+  for (const row of myTurn) {
+    const key = row.templateName || "Workflow";
+    myTurnByWorkflow.set(key, [...(myTurnByWorkflow.get(key) ?? []), row]);
+  }
 
   return (
     <>
@@ -192,88 +202,129 @@ function MyWorkflowSteps() {
             </div>
           )}
 
-          {myTurn.map((row) => {
-            const s = row.step;
-            const overdue = s.status === "Overdue";
-            const busy = busyKey === `${row.instanceId}:${s.stepNo}`;
+          {/* One box per workflow — tick its name to open it and see its steps. */}
+          {Array.from(myTurnByWorkflow.entries()).map(([workflowName, workflowRows]) => {
+            const open = openWorkflow === workflowName;
+            const workflowOverdueCount = workflowRows.filter((r) => r.step.status === "Overdue").length;
             return (
               <div
-                key={s.id}
-                className={`border-2 bg-surface p-3 flex flex-col gap-2 ${
-                  overdue ? "border-error" : "border-on-surface"
+                key={workflowName}
+                className={`border-2 bg-surface ${
+                  workflowOverdueCount > 0 ? "border-error" : "border-on-surface"
                 }`}
               >
-                {/* Which workflow this is — the #1 thing that was missing.
-                    The run title/step count is secondary, smaller, below it. */}
-                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-on-surface/20 pb-1.5">
-                  <div className="min-w-0">
-                    <p className="font-headline-md text-headline-md text-on-surface uppercase truncate">
-                      {row.templateName || "Workflow"}
-                    </p>
-                    <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
-                      {row.instanceTitle} · Step {s.stepNo} of {row.totalSteps}
-                    </p>
-                  </div>
-                  <StepStatusBadge status={s.status} />
-                </div>
+                <button
+                  onClick={() => setOpenWorkflow((prev) => (prev === workflowName ? null : workflowName))}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-surface-container transition-colors"
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={open}
+                      readOnly
+                      className="shrink-0 pointer-events-none"
+                    />
+                    <span className="font-headline-md text-headline-md text-on-surface uppercase truncate">
+                      {workflowName}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                      {workflowRows.length} {workflowRows.length === 1 ? "task" : "tasks"}
+                    </span>
+                    {workflowOverdueCount > 0 && (
+                      <span className="border-2 border-error bg-error text-on-error px-1.5 py-0.5 font-label-sm text-[10px] uppercase">
+                        {workflowOverdueCount} overdue
+                      </span>
+                    )}
+                    <span className="material-symbols-outlined text-on-surface-variant">
+                      {open ? "expand_less" : "expand_more"}
+                    </span>
+                  </span>
+                </button>
 
-                {/* The four things a doer needs: what to do, who does it, how, and by when. */}
-                <div className="flex flex-col gap-1">
-                  <StepFact label="What" value={s.what} />
-                  <StepFact label="Who" value={row.doerName || "You"} />
-                  <StepFact label="How" value={s.how || "—"} />
-                  <StepFact
-                    label="When"
-                    value={
-                      s.planned
-                        ? `${overdue ? "Was due " : "By "}${formatTs(s.planned)}`
-                        : "No deadline"
-                    }
-                    emphasis={overdue ? "error" : "normal"}
-                  />
-                </div>
+                {open && (
+                  <div className="border-t-2 border-on-surface p-2 flex flex-col gap-2 bg-surface-container-lowest">
+                    {workflowRows.map((row) => {
+                      const s = row.step;
+                      const overdue = s.status === "Overdue";
+                      const busy = busyKey === `${row.instanceId}:${s.stepNo}`;
+                      return (
+                        <div
+                          key={s.id}
+                          className={`border-2 bg-surface p-3 flex flex-col gap-2 ${
+                            overdue ? "border-error" : "border-on-surface"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-on-surface/20 pb-1.5">
+                            <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                              {row.instanceTitle} · Step {s.stepNo} of {row.totalSteps}
+                            </p>
+                            <StepStatusBadge status={s.status} />
+                          </div>
 
-                {/* The run's own data — what this step is actually about. */}
-                {row.fieldValues.length > 0 && (
-                  <div className="border border-on-surface/20 bg-surface-container-lowest p-2 flex flex-col gap-0.5">
-                    {row.fieldValues.map((f) => (
-                      <div key={f.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-                        <span className="w-32 shrink-0 font-label-sm text-label-sm uppercase text-on-surface-variant">
-                          {f.label}
-                        </span>
-                        <span className="font-data-mono text-data-mono text-on-surface">
-                          {f.value || "—"}
-                        </span>
-                      </div>
-                    ))}
+                          {/* The four things a doer needs: what to do, who does it, how, and by when. */}
+                          <div className="flex flex-col gap-1">
+                            <StepFact label="What" value={s.what} />
+                            <StepFact label="Who" value={row.doerName || "You"} />
+                            <StepFact label="How" value={s.how || "—"} />
+                            <StepFact
+                              label="When"
+                              value={
+                                s.planned
+                                  ? `${overdue ? "Was due " : "By "}${formatTs(s.planned)}`
+                                  : "No deadline"
+                              }
+                              emphasis={overdue ? "error" : "normal"}
+                            />
+                          </div>
+
+                          {/* The run's own data — what this step is actually about. */}
+                          {row.fieldValues.length > 0 && (
+                            <div className="border border-on-surface/20 bg-surface-container-lowest p-2 flex flex-col gap-0.5">
+                              {row.fieldValues.map((f) => (
+                                <div key={f.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+                                  <span className="w-32 shrink-0 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                                    {f.label}
+                                  </span>
+                                  <span className="font-data-mono text-data-mono text-on-surface">
+                                    {f.value || "—"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {row.instanceDetails && (
+                            <p className="font-data-mono text-data-mono text-on-surface-variant text-xs whitespace-pre-wrap">
+                              {row.instanceDetails}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-3 border-t border-on-surface/20 pt-2">
+                            <button
+                              onClick={() => act(row, "complete")}
+                              disabled={busy}
+                              className="inline-flex items-center justify-center min-h-[40px] px-5 font-label-sm text-label-sm uppercase tracking-wide border-2 border-on-surface bg-on-surface text-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40"
+                            >
+                              {busy ? "Saving…" : "Mark Done"}
+                            </button>
+                            {s.stepNo > 1 && (
+                              <button
+                                onClick={() => act(row, "reject")}
+                                disabled={busy}
+                                title="Work isn't right — send it back to the previous person"
+                                className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-error transition-colors cursor-pointer disabled:opacity-40"
+                              >
+                                Send Back
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-
-                {row.instanceDetails && (
-                  <p className="font-data-mono text-data-mono text-on-surface-variant text-xs whitespace-pre-wrap">
-                    {row.instanceDetails}
-                  </p>
-                )}
-
-                <div className="flex flex-wrap items-center gap-3 border-t border-on-surface/20 pt-2">
-                  <button
-                    onClick={() => act(row, "complete")}
-                    disabled={busy}
-                    className="inline-flex items-center justify-center min-h-[40px] px-5 font-label-sm text-label-sm uppercase tracking-wide border-2 border-on-surface bg-on-surface text-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40"
-                  >
-                    {busy ? "Saving…" : "Mark Done"}
-                  </button>
-                  {s.stepNo > 1 && (
-                    <button
-                      onClick={() => act(row, "reject")}
-                      disabled={busy}
-                      title="Work isn't right — send it back to the previous person"
-                      className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-error transition-colors cursor-pointer disabled:opacity-40"
-                    >
-                      Send Back
-                    </button>
-                  )}
-                </div>
               </div>
             );
           })}
