@@ -758,6 +758,7 @@ function MyWorkflowSteps() {
   const workflowNames = Array.from(myTurnByWorkflow.keys());
   const effectiveOpenWorkflow =
     openWorkflow === null ? (workflowNames.length === 1 ? workflowNames[0]! : null) : openWorkflow || null;
+  const openWorkflowRows = effectiveOpenWorkflow ? myTurnByWorkflow.get(effectiveOpenWorkflow) ?? null : null;
 
   return (
     <>
@@ -808,135 +809,142 @@ function MyWorkflowSteps() {
             </div>
           )}
 
-          {/* One box per workflow — tick its name to open it and see its steps.
-              With only one workflow there is nothing to choose between, so it
-              opens itself rather than making the doer click to see their only
-              list of work. */}
-          {Array.from(myTurnByWorkflow.entries()).map(([workflowName, workflowRows]) => {
-            const open = effectiveOpenWorkflow === workflowName;
-            const workflowOverdueCount = workflowRows.filter((r) => r.step.status === "Overdue").length;
-            return (
-              <div
-                key={workflowName}
-                className={`border-2 bg-surface ${
-                  workflowOverdueCount > 0 ? "border-error" : "border-on-surface"
-                }`}
-              >
-                <button
-                  onClick={() => setOpenWorkflow(open ? "" : workflowName)}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-surface-container transition-colors"
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={open}
-                      readOnly
-                      className="shrink-0 pointer-events-none"
-                    />
-                    <span className="font-headline-md text-headline-md text-on-surface uppercase truncate">
-                      {workflowName}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-2 shrink-0">
-                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                      {workflowRows.length} {workflowRows.length === 1 ? "task" : "tasks"}
-                    </span>
-                    {workflowOverdueCount > 0 && (
-                      <span className="border-2 border-error bg-error text-on-error px-1.5 py-0.5 font-label-sm text-[10px] uppercase">
-                        {workflowOverdueCount} overdue
+          {/* A tick per workflow, wrapping in one row — a full-width bar each
+              pushed the actual work off the first screen. Only shown when there
+              is more than one, since with a single workflow there is nothing to
+              choose between and it just opens. */}
+          {!loading && workflowNames.length > 1 && (
+            <div className="border-2 border-on-surface bg-surface p-2 flex flex-col gap-2">
+              <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                Pick which workflow to open
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(myTurnByWorkflow.entries()).map(([workflowName, workflowRows]) => {
+                  const open = effectiveOpenWorkflow === workflowName;
+                  const workflowOverdueCount = workflowRows.filter((r) => r.step.status === "Overdue").length;
+                  return (
+                    <label
+                      key={workflowName}
+                      className={`flex items-center gap-2 border-2 px-3 py-2 cursor-pointer transition-colors ${
+                        open
+                          ? "border-on-surface bg-surface-container"
+                          : workflowOverdueCount > 0
+                          ? "border-error hover:bg-surface-container"
+                          : "border-on-surface hover:bg-surface-container"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={open}
+                        onChange={() => setOpenWorkflow(open ? "" : workflowName)}
+                      />
+                      <span className="font-label-sm text-label-sm uppercase text-on-surface">
+                        {workflowName}
                       </span>
-                    )}
-                    <span className="material-symbols-outlined text-on-surface-variant">
-                      {open ? "expand_less" : "expand_more"}
-                    </span>
-                  </span>
-                </button>
-
-                {open && (
-                  <div className="border-t-2 border-on-surface p-2 flex flex-col gap-2 bg-surface-container-lowest">
-                    {workflowRows.map((row) => {
-                      const s = row.step;
-                      const overdue = s.status === "Overdue";
-                      const busy = busyKey === `${row.instanceId}:${s.stepNo}`;
-                      return (
-                        <div
-                          key={s.id}
-                          className={`border-2 bg-surface p-3 flex flex-col gap-2 ${
-                            overdue ? "border-error" : "border-on-surface"
-                          }`}
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-on-surface/20 pb-1.5">
-                            <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
-                              {row.instanceTitle} · Step {s.stepNo} of {row.totalSteps}
-                            </p>
-                            <StepStatusBadge status={s.status} />
-                          </div>
-
-                          {/* The four things a doer needs: what to do, who does it, how, and by when. */}
-                          <div className="flex flex-col gap-1">
-                            <StepFact label="What" value={s.what} />
-                            <StepFact label="Who" value={row.doerName || "You"} />
-                            <StepFact label="How" value={s.how || "—"} />
-                            <StepFact
-                              label="When"
-                              value={
-                                s.planned
-                                  ? `${overdue ? "Was due " : "By "}${formatTs(s.planned)}`
-                                  : "No deadline"
-                              }
-                              emphasis={overdue ? "error" : "normal"}
-                            />
-                          </div>
-
-                          {/* The run's own data — what this step is actually about. */}
-                          {row.fieldValues.length > 0 && (
-                            <div className="border border-on-surface/20 bg-surface-container-lowest p-2 flex flex-col gap-0.5">
-                              {row.fieldValues.map((f) => (
-                                <div key={f.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-                                  <span className="w-32 shrink-0 font-label-sm text-label-sm uppercase text-on-surface-variant">
-                                    {f.label}
-                                  </span>
-                                  <span className="font-data-mono text-data-mono text-on-surface">
-                                    {f.value || "—"}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {row.instanceDetails && (
-                            <p className="font-data-mono text-data-mono text-on-surface-variant text-xs whitespace-pre-wrap">
-                              {row.instanceDetails}
-                            </p>
-                          )}
-
-                          <div className="flex flex-wrap items-center gap-3 border-t border-on-surface/20 pt-2">
-                            <button
-                              onClick={() => act(row, "complete")}
-                              disabled={busy}
-                              className="inline-flex items-center justify-center min-h-[40px] px-5 font-label-sm text-label-sm uppercase tracking-wide border-2 border-on-surface bg-on-surface text-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40"
-                            >
-                              {busy ? "Saving…" : "Mark Done"}
-                            </button>
-                            {s.stepNo > 1 && (
-                              <button
-                                onClick={() => act(row, "reject")}
-                                disabled={busy}
-                                title="Work isn't right — send it back to the previous person"
-                                className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-error transition-colors cursor-pointer disabled:opacity-40"
-                              >
-                                Send Back
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      <span className="font-label-sm text-[10px] uppercase text-on-surface-variant">
+                        {workflowRows.length}
+                      </span>
+                      {workflowOverdueCount > 0 && (
+                        <span className="border-2 border-error bg-error text-on-error px-1.5 font-label-sm text-[10px] uppercase">
+                          {workflowOverdueCount} late
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          )}
+
+          {!loading && myTurn.length > 0 && !effectiveOpenWorkflow && (
+            <p className="font-data-mono text-data-mono text-on-surface-variant border-2 border-on-surface px-3 py-6 text-center uppercase">
+              Tick a workflow above to see your work.
+            </p>
+          )}
+
+          {/* The ticked workflow's tasks. */}
+          {openWorkflowRows && (
+            <div className="flex flex-col gap-2">
+              {openWorkflowRows.map((row) => {
+              const s = row.step;
+              const overdue = s.status === "Overdue";
+              const busy = busyKey === `${row.instanceId}:${s.stepNo}`;
+              return (
+                <div
+                  key={s.id}
+                  className={`border-2 bg-surface p-3 flex flex-col gap-2 ${
+                    overdue ? "border-error" : "border-on-surface"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2 border-b border-on-surface/20 pb-1.5">
+                    <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                      {row.instanceTitle} · Step {s.stepNo} of {row.totalSteps}
+                    </p>
+                    <StepStatusBadge status={s.status} />
+                  </div>
+
+                  {/* The four things a doer needs: what to do, who does it, how, and by when. */}
+                  <div className="flex flex-col gap-1">
+                    <StepFact label="What" value={s.what} />
+                    <StepFact label="Who" value={row.doerName || "You"} />
+                    <StepFact label="How" value={s.how || "—"} />
+                    <StepFact
+                      label="When"
+                      value={
+                        s.planned
+                          ? `${overdue ? "Was due " : "By "}${formatTs(s.planned)}`
+                          : "No deadline"
+                      }
+                      emphasis={overdue ? "error" : "normal"}
+                    />
+                  </div>
+
+                  {/* The run's own data — what this step is actually about. */}
+                  {row.fieldValues.length > 0 && (
+                    <div className="border border-on-surface/20 bg-surface-container-lowest p-2 flex flex-col gap-0.5">
+                      {row.fieldValues.map((f) => (
+                        <div key={f.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+                          <span className="w-32 shrink-0 font-label-sm text-label-sm uppercase text-on-surface-variant">
+                            {f.label}
+                          </span>
+                          <span className="font-data-mono text-data-mono text-on-surface">
+                            {f.value || "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {row.instanceDetails && (
+                    <p className="font-data-mono text-data-mono text-on-surface-variant text-xs whitespace-pre-wrap">
+                      {row.instanceDetails}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-3 border-t border-on-surface/20 pt-2">
+                    <button
+                      onClick={() => act(row, "complete")}
+                      disabled={busy}
+                      className="inline-flex items-center justify-center min-h-[40px] px-5 font-label-sm text-label-sm uppercase tracking-wide border-2 border-on-surface bg-on-surface text-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40"
+                    >
+                      {busy ? "Saving…" : "Mark Done"}
+                    </button>
+                    {s.stepNo > 1 && (
+                      <button
+                        onClick={() => act(row, "reject")}
+                        disabled={busy}
+                        title="Work isn't right — send it back to the previous person"
+                        className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-error transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        Send Back
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+          )}
 
           {later.length > 0 && (
             <div className="border-2 border-on-surface bg-surface">
@@ -1194,6 +1202,9 @@ function WorkflowInner() {
   }
 
   const doerName = (id: string) => doers.find((d) => d.id === id)?.name ?? id;
+  // Whichever workflow is ticked. Resolved from the list rather than held
+  // separately so a deleted workflow can't leave a stale panel behind.
+  const openTemplate = templates.find((t) => t.id === openTemplateId) ?? null;
 
   return (
     <>
@@ -1253,122 +1264,142 @@ function WorkflowInner() {
             <WorkflowControlRoom overview={overview} onOpenRun={openRunFromBoard} />
           )}
 
-          {/* Templates */}
-          <div className="bg-surface border-2 border-on-surface p-stack-lg">
-            <h3 className="font-headline-md text-headline-md text-on-surface border-b-2 border-on-surface pb-stack-md mb-stack-md">
-              Templates
+          {/*
+            Workflows as a wrapping row of tick-boxes rather than one full-width
+            row each: the names are short, so a row apiece burns most of the
+            screen before any actual work is on it. Ticking one opens its sheet
+            underneath — and only one at a time, since each sheet is a wide
+            table and stacking them would put the space straight back.
+          */}
+          <div className="bg-surface border-2 border-on-surface p-stack-lg flex flex-col gap-stack-md">
+            <h3 className="font-headline-md text-headline-md text-on-surface border-b-2 border-on-surface pb-stack-md">
+              Workflows
             </h3>
             {loading ? (
               <p className="font-data-mono text-data-mono text-on-surface-variant">Loading…</p>
             ) : templates.length === 0 ? (
               <p className="font-data-mono text-data-mono text-on-surface-variant">
-                No workflow templates yet.
+                No workflows yet.
                 {isAdmin ? ' Use "+ New Template" above.' : ""}
               </p>
             ) : (
-              <div className="border-2 border-on-surface divide-y-2 divide-on-surface">
-                {templates.map((t) => {
-                  const open = openTemplateId === t.id;
-                  // Live load per template, so you can tell which workflow needs
-                  // opening without opening every one of them to find out.
-                  const stat = overview?.templates.find((x) => x.id === t.id);
-                  return (
-                    <div key={t.id}>
-                      <button
-                        onClick={() => {
-                          const next = open ? null : t.id;
-                          setOpenTemplateId(next);
-                          setRunSearch("");
-                          setSheetStatusFilter("Active");
-                          setVisibleRunCount(RUN_PAGE_SIZE);
-                          if (next && isAdmin) loadSheet(next);
-                        }}
-                        className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-surface-container transition-colors"
+              <>
+                <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Pick which workflow to open
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {templates.map((t) => {
+                    const open = openTemplateId === t.id;
+                    // Live load per workflow, so you can tell which one needs
+                    // opening without opening every one of them to find out.
+                    const stat = overview?.templates.find((x) => x.id === t.id);
+                    return (
+                      <label
+                        key={t.id}
+                        className={`flex items-center gap-2 border-2 px-3 py-2 cursor-pointer transition-colors ${
+                          open
+                            ? "border-on-surface bg-surface-container"
+                            : stat && stat.overdueSteps > 0
+                            ? "border-error hover:bg-surface-container"
+                            : "border-on-surface hover:bg-surface-container"
+                        }`}
                       >
-                        <span className="font-body-md text-body-md text-on-surface font-semibold uppercase text-left">
+                        <input
+                          type="checkbox"
+                          checked={open}
+                          onChange={() => {
+                            const next = open ? null : t.id;
+                            setOpenTemplateId(next);
+                            setRunSearch("");
+                            setSheetStatusFilter("Active");
+                            setVisibleRunCount(RUN_PAGE_SIZE);
+                            if (next && isAdmin) loadSheet(next);
+                          }}
+                        />
+                        <span className="font-label-sm text-label-sm uppercase text-on-surface">
                           {t.name}
                         </span>
-                        <span className="flex items-center gap-2 shrink-0">
-                          {stat && stat.overdueSteps > 0 && (
-                            <span className="border-2 border-error bg-error text-on-error px-1.5 py-0.5 font-label-sm text-[10px] uppercase">
-                              {stat.overdueSteps} late
-                            </span>
-                          )}
-                          {stat && stat.activeRuns > 0 && (
-                            <span className="border-2 border-on-surface px-1.5 py-0.5 font-label-sm text-[10px] uppercase text-on-surface">
-                              {stat.activeRuns} running
-                            </span>
-                          )}
-                          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                            {t.steps.length} step{t.steps.length === 1 ? "" : "s"}
+                        {stat && stat.overdueSteps > 0 && (
+                          <span className="border-2 border-error bg-error text-on-error px-1.5 font-label-sm text-[10px] uppercase">
+                            {stat.overdueSteps} late
                           </span>
-                          <span className="material-symbols-outlined text-on-surface-variant">
-                            {open ? "expand_less" : "expand_more"}
+                        )}
+                        {stat && stat.activeRuns > 0 && (
+                          <span className="font-label-sm text-[10px] uppercase text-on-surface-variant">
+                            {stat.activeRuns} running
                           </span>
-                        </span>
-                      </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
 
-                      {open && (
-                        <div className="border-t-2 border-on-surface bg-surface-container-lowest p-stack-md flex flex-col gap-3">
-                          {isAdmin ? (
-                            /* Data first, spinner only when there is none yet —
-                               otherwise the minute-by-minute refresh would rip
-                               the table off screen while it reloads. */
-                            sheetDataByTemplate[t.id] ? (
-                              <WorkflowSheetTable
-                                data={sheetDataByTemplate[t.id]!}
-                                search={runSearch}
-                                onSearchChange={(v) => {
-                                  setRunSearch(v);
-                                  setVisibleRunCount(RUN_PAGE_SIZE);
-                                }}
-                                statusFilter={sheetStatusFilter}
-                                onStatusFilterChange={(v) => {
-                                  setSheetStatusFilter(v);
-                                  setVisibleRunCount(RUN_PAGE_SIZE);
-                                }}
-                                visibleCount={visibleRunCount}
-                                onShowMore={() => setVisibleRunCount((prev) => prev + RUN_PAGE_SIZE)}
-                                selectedId={selectedId}
-                                onRowClick={openInstance}
-                                onDeleteRow={(id, title, status, e) => handleDeleteInstance(t.id, id, title, status, e)}
-                              />
-                            ) : sheetLoadingId === t.id ? (
-                              <p className="font-data-mono text-data-mono text-on-surface-variant text-xs">Loading…</p>
-                            ) : null
-                          ) : (
-                            <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
-                              {t.steps.map((s) => (
-                                <li key={s.id}>
-                                  {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
-                                </li>
-                              ))}
-                            </ol>
-                          )}
-                          {isAdmin && (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleExportTemplate(t.id)}
-                                disabled={exportingId === t.id}
-                                title="Download every run of this workflow as a spreadsheet — steps across the top, one row per run"
-                                className="self-start border-2 border-on-surface text-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
-                              >
-                                {exportingId === t.id ? "Exporting…" : "Export"}
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTemplate(t.id)}
-                                className="self-start border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                {!openTemplate && (
+                  <p className="font-data-mono text-data-mono text-on-surface-variant border-2 border-on-surface px-3 py-6 text-center uppercase">
+                    Tick a workflow above to see its work.
+                  </p>
+                )}
+
+                {openTemplate && (
+                  <div className="flex flex-col gap-3">
+                    {isAdmin ? (
+                      /* Data first, spinner only when there is none yet —
+                         otherwise the minute-by-minute refresh would rip
+                         the table off screen while it reloads. */
+                      sheetDataByTemplate[openTemplate.id] ? (
+                        <WorkflowSheetTable
+                          data={sheetDataByTemplate[openTemplate.id]!}
+                          search={runSearch}
+                          onSearchChange={(v) => {
+                            setRunSearch(v);
+                            setVisibleRunCount(RUN_PAGE_SIZE);
+                          }}
+                          statusFilter={sheetStatusFilter}
+                          onStatusFilterChange={(v) => {
+                            setSheetStatusFilter(v);
+                            setVisibleRunCount(RUN_PAGE_SIZE);
+                          }}
+                          visibleCount={visibleRunCount}
+                          onShowMore={() => setVisibleRunCount((prev) => prev + RUN_PAGE_SIZE)}
+                          selectedId={selectedId}
+                          onRowClick={openInstance}
+                          onDeleteRow={(id, title, status, e) =>
+                            handleDeleteInstance(openTemplate.id, id, title, status, e)
+                          }
+                        />
+                      ) : sheetLoadingId === openTemplate.id ? (
+                        <p className="font-data-mono text-data-mono text-on-surface-variant text-xs">Loading…</p>
+                      ) : null
+                    ) : (
+                      <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
+                        {openTemplate.steps.map((s) => (
+                          <li key={s.id}>
+                            {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    {isAdmin && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleExportTemplate(openTemplate.id)}
+                          disabled={exportingId === openTemplate.id}
+                          title="Download every run of this workflow as a spreadsheet — steps across the top, one row per run"
+                          className="self-start border-2 border-on-surface text-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
+                        >
+                          {exportingId === openTemplate.id ? "Exporting…" : "Export"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTemplate(openTemplate.id)}
+                          className="self-start border-2 border-error text-error px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
