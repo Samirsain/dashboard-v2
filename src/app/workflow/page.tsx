@@ -522,8 +522,8 @@ function WorkflowInner() {
   const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
   // Template id currently being exported, so its button disables briefly.
   const [exportingId, setExportingId] = useState<string | null>(null);
-  // Which template's live sheet view is open, and its fetched/cached data.
-  const [sheetOpenId, setSheetOpenId] = useState<string | null>(null);
+  // Sheet data for each template, fetched the moment its box opens — this IS
+  // the template's expanded view now, not an optional extra.
   const [sheetLoadingId, setSheetLoadingId] = useState<string | null>(null);
   const [sheetDataByTemplate, setSheetDataByTemplate] = useState<Record<string, WorkflowTemplateExport>>({});
 
@@ -676,12 +676,7 @@ function WorkflowInner() {
   }
 
   /** Same data as the export, shown live on-screen instead of downloaded. */
-  async function toggleSheet(templateId: string) {
-    if (sheetOpenId === templateId) {
-      setSheetOpenId(null);
-      return;
-    }
-    setSheetOpenId(templateId);
+  async function loadSheet(templateId: string) {
     if (sheetDataByTemplate[templateId]) return;
     setSheetLoadingId(templateId);
     try {
@@ -689,7 +684,6 @@ function WorkflowInner() {
       setSheetDataByTemplate((prev) => ({ ...prev, [templateId]: data }));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to load this workflow's sheet.");
-      setSheetOpenId(null);
     } finally {
       setSheetLoadingId(null);
     }
@@ -787,7 +781,11 @@ function WorkflowInner() {
                   return (
                     <div key={t.id}>
                       <button
-                        onClick={() => setOpenTemplateId((prev) => (prev === t.id ? null : t.id))}
+                        onClick={() => {
+                          const next = open ? null : t.id;
+                          setOpenTemplateId(next);
+                          if (next && isAdmin) loadSheet(next);
+                        }}
                         className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-surface-container transition-colors"
                       >
                         <span className="font-body-md text-body-md text-on-surface font-semibold uppercase">
@@ -805,27 +803,23 @@ function WorkflowInner() {
 
                       {open && (
                         <div className="border-t-2 border-on-surface bg-surface-container-lowest p-stack-md flex flex-col gap-3">
-                          <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
-                            {t.steps.map((s) => (
-                              <li key={s.id}>
-                                {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
-                              </li>
-                            ))}
-                          </ol>
+                          {isAdmin ? (
+                            sheetLoadingId === t.id ? (
+                              <p className="font-data-mono text-data-mono text-on-surface-variant text-xs">Loading…</p>
+                            ) : sheetDataByTemplate[t.id] ? (
+                              <WorkflowSheetTable data={sheetDataByTemplate[t.id]!} />
+                            ) : null
+                          ) : (
+                            <ol className="font-data-mono text-data-mono text-on-surface-variant text-xs flex flex-col gap-0.5">
+                              {t.steps.map((s) => (
+                                <li key={s.id}>
+                                  {s.stepNo}. {s.what} — {doerName(s.doerId)} ({s.tat})
+                                </li>
+                              ))}
+                            </ol>
+                          )}
                           {isAdmin && (
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => toggleSheet(t.id)}
-                                disabled={sheetLoadingId === t.id}
-                                title="View every run of this workflow as a spreadsheet, right here — steps across the top, one row per run"
-                                className="self-start border-2 border-on-surface text-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
-                              >
-                                {sheetLoadingId === t.id
-                                  ? "Loading…"
-                                  : sheetOpenId === t.id
-                                  ? "Hide Sheet"
-                                  : "View Sheet"}
-                              </button>
                               <button
                                 onClick={() => handleExportTemplate(t.id)}
                                 disabled={exportingId === t.id}
@@ -841,10 +835,6 @@ function WorkflowInner() {
                                 Delete
                               </button>
                             </div>
-                          )}
-
-                          {isAdmin && sheetOpenId === t.id && sheetDataByTemplate[t.id] && (
-                            <WorkflowSheetTable data={sheetDataByTemplate[t.id]!} />
                           )}
                         </div>
                       )}
