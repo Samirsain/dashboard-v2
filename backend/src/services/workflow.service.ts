@@ -3,7 +3,7 @@ import { dataService, type SheetRecord } from "./data.service";
 import { activityService } from "./activity.service";
 import { usersService } from "./users.service";
 import { generateId, generateUuid } from "../utils/id";
-import { addTAT, delayMinutes } from "../utils/tatEngine";
+import { addTAT, deadlineAt, delayMinutes } from "../utils/tatEngine";
 import { AppError } from "../utils/AppError";
 import type {
   WorkflowFieldType,
@@ -129,6 +129,20 @@ function assertOwnStep(
 ): void {
   if (canManageAnyStep || step.doerId === actorId) return;
   throw AppError.forbidden(`Only the doer this step is assigned to can ${action} it.`);
+}
+
+/** Matches an event's TAT when a manual date was picked for a Whenever-Needed step. */
+const MANUAL_DEADLINE_RE = /^WHENEVER_NEEDED:(\d{4}-\d{2}-\d{2})$/i;
+
+/**
+ * Resolves a step event's deadline: a manually-picked date (stored as
+ * "WHENEVER_NEEDED:2026-08-15") wins outright; otherwise it's the normal
+ * TAT-from-`from` calculation, which returns null for a plain
+ * "WHENEVER_NEEDED" that was left with no date.
+ */
+function resolveDeadline(tat: string, from: Date): Date | null {
+  const manual = tat.match(MANUAL_DEADLINE_RE);
+  return manual ? deadlineAt(manual[1]!) : addTAT(from, tat);
 }
 
 async function getStepsForTemplate(templateId: string): Promise<WorkflowStep[]> {
@@ -341,6 +355,12 @@ export const workflowService = {
     details?: string;
     /** Values for the template's fields, in the template's own field order. */
     fieldValues?: string[];
+    /**
+     * For any step whose TAT is "Whenever Needed" — a target date (YYYY-MM-DD)
+     * to do it by, keyed by step number. Optional per step; a step left out
+     * simply has no deadline, as before.
+     */
+    stepDeadlines?: Record<string, string>;
     requestedBy: string;
   }): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
     const [templateSteps, templateFields] = await Promise.all([
@@ -386,7 +406,15 @@ export const workflowService = {
     const events: WorkflowStepEvent[] = [];
     for (const step of templateSteps) {
       const isFirst = step.stepNo === 1;
-      const planned = isFirst ? addTAT(startedAt, step.tat) : null;
+      // A picked date for a Whenever-Needed step rides along on the event's
+      // own TAT (not the template's), so it survives to whenever this step
+      // actually activates — which for step 2+ is well after this loop.
+      const manualDate =
+        step.tat.trim().toUpperCase() === "WHENEVER_NEEDED"
+          ? input.stepDeadlines?.[String(step.stepNo)]?.trim()
+          : undefined;
+      const eventTat = manualDate ? `WHENEVER_NEEDED:${manualDate}` : step.tat;
+      const planned = isFirst ? resolveDeadline(eventTat, startedAt) : null;
       const saved = await dataService.append(eventsEntity, {
         "Event ID": generateUuid(),
         "Instance ID": instanceId,
@@ -394,7 +422,7 @@ export const workflowService = {
         What: step.what,
         "Doer ID": step.doerId,
         How: step.how,
-        TAT: step.tat,
+        TAT: eventTat,
         Planned: planned ? planned.toISOString() : "",
         Actual: "",
         Status: isFirst ? "Active" : "Pending",
@@ -446,7 +474,7 @@ export const workflowService = {
 
     const next = events.find((e) => e.stepNo === stepNo + 1);
     if (next) {
-      const planned = addTAT(now, next.tat);
+      const planned = resolveDeadline(next.tat, now);
       await dataService.updateById(eventsEntity, next.id, {
         Planned: planned ? planned.toISOString() : "",
         Status: "Active",

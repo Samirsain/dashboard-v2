@@ -38,6 +38,8 @@ export const startWorkflowInstanceSchema = z.object({
   details: z.string().default(""),
   /** Values for the template's fields, in the template's field order. */
   fieldValues: z.array(z.string()).default([]),
+  /** For "Whenever Needed" steps: target date (YYYY-MM-DD) keyed by step number. */
+  stepDeadlines: z.record(z.string(), z.string()).default({}),
 });
 
 export const stepNoParamSchema = z.object({

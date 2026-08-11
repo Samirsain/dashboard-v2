@@ -216,9 +216,9 @@ function MyWorkflowSteps() {
                   <StepFact
                     label="When"
                     value={
-                      s.tat.toUpperCase() === "WHENEVER_NEEDED"
-                        ? "No deadline"
-                        : `${overdue ? "Was due " : "By "}${formatTs(s.planned)}`
+                      s.planned
+                        ? `${overdue ? "Was due " : "By "}${formatTs(s.planned)}`
+                        : "No deadline"
                     }
                     emphasis={overdue ? "error" : "normal"}
                   />
@@ -594,7 +594,7 @@ function WorkflowInner() {
                           <td className="py-3 px-3">{s.what}</td>
                           <td className="py-3 px-3 text-on-surface-variant">{doerName(s.doerId)}</td>
                           <td className="py-3 px-3 font-data-mono text-data-mono text-on-surface-variant">
-                            {s.tat.toUpperCase() === "WHENEVER_NEEDED" ? "—" : formatTs(s.planned)}
+                            {s.planned ? formatTs(s.planned) : "—"}
                           </td>
                           <td className="py-3 px-3 font-data-mono text-data-mono text-on-surface-variant">
                             {formatTs(s.actual)}

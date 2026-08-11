@@ -156,6 +156,21 @@ export function addTAT(start: Date, tat: string): Date | null {
   throw new Error(`Unrecognized TAT value: "${tat}"`);
 }
 
+/**
+ * A "Whenever Needed" step still needs a target so the doer isn't left with
+ * no idea when it's due. Rather than a duration, MD/PC picks an actual
+ * calendar date when starting the run — stored on that step's event as
+ * "WHENEVER_NEEDED:2026-08-15" — and this resolves it to 18:30 IST on that
+ * exact date. Unlike TAT durations, a manually chosen date is NOT rolled
+ * forward off a Sunday: it's the date the person picked, not a computed one.
+ */
+export function deadlineAt(dateStr: string): Date {
+  // Anchoring at noon UTC keeps the date inside the same IST calendar day
+  // regardless of DST-free India's fixed +5:30 offset.
+  const anchor = new Date(`${dateStr}T12:00:00.000Z`);
+  return endOfWorkDay(anchor);
+}
+
 /** Business-hours delay between actual and planned completion, in minutes. Positive = late. */
 export function delayMinutes(planned: Date | null, actual: Date | null): number | null {
   if (!planned || !actual) return null;

@@ -19,12 +19,18 @@ export default function StartWorkflowInstanceModal({
   // Keyed by template so switching templates mid-entry doesn't carry one
   // template's answers into another's differently-shaped fields.
   const [valuesByTemplate, setValuesByTemplate] = useState<Record<string, string[]>>({});
+  // Target dates for this template's "Whenever Needed" steps, keyed by step number.
+  const [deadlinesByTemplate, setDeadlinesByTemplate] = useState<Record<string, Record<number, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const template = templates.find((t) => t.id === templateId);
   const fields = template?.fields ?? [];
   const values = valuesByTemplate[templateId] ?? [];
+  const deadlines = deadlinesByTemplate[templateId] ?? {};
+  const whenNeededSteps = (template?.steps ?? []).filter(
+    (s) => s.tat.trim().toUpperCase() === "WHENEVER_NEEDED"
+  );
 
   function setValue(index: number, value: string) {
     setValuesByTemplate((prev) => {
@@ -32,6 +38,13 @@ export default function StartWorkflowInstanceModal({
       next[index] = value;
       return { ...prev, [templateId]: next };
     });
+  }
+
+  function setDeadline(stepNo: number, value: string) {
+    setDeadlinesByTemplate((prev) => ({
+      ...prev,
+      [templateId]: { ...(prev[templateId] ?? {}), [stepNo]: value },
+    }));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -48,6 +61,7 @@ export default function StartWorkflowInstanceModal({
           fieldValues: fields.map((_, i) => values[i] ?? ""),
           // Only templates without fields need a typed-in name.
           ...(fields.length === 0 ? { title } : {}),
+          stepDeadlines: deadlines,
         }
       );
       onStarted(result);
@@ -129,6 +143,30 @@ export default function StartWorkflowInstanceModal({
                 )}
               </div>
             ))
+          )}
+
+          {/* "Whenever Needed" steps have no automatic deadline — pick one
+              per step now so the doer isn't left with no target at all. */}
+          {whenNeededSteps.length > 0 && (
+            <div className="border-2 border-on-surface p-stack-md flex flex-col gap-2">
+              <div>
+                <span className={label}>Target Dates (Optional)</span>
+                <p className="mt-0.5 font-data-mono text-[10px] text-on-surface-variant uppercase">
+                  These steps have no fixed turnaround — give them a date if one applies
+                </p>
+              </div>
+              {whenNeededSteps.map((s) => (
+                <div key={s.id}>
+                  <label className={label}>{s.what}</label>
+                  <input
+                    type="date"
+                    value={deadlines[s.stepNo] ?? ""}
+                    onChange={(e) => setDeadline(s.stepNo, e.target.value)}
+                    className={`${field} font-data-mono`}
+                  />
+                </div>
+              ))}
+            </div>
           )}
 
           <div>
