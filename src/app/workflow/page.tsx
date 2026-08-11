@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
@@ -98,6 +98,95 @@ function formatTs(ts: string): string {
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+}
+
+/**
+ * Live, on-screen version of handleExportTemplate's CSV — same What/Who/How/
+ * When header blocks (via colSpan, so they visually merge like the sheet),
+ * one row per run underneath. Reuses the same export endpoint and data.
+ */
+function WorkflowSheetTable({ data }: { data: WorkflowTemplateExport }) {
+  return (
+    <div className="border-2 border-on-surface overflow-x-auto bg-surface-container-lowest">
+      <table className="border-collapse text-left" style={{ minWidth: `${480 + data.steps.length * 480}px` }}>
+        <thead className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+          {(["What", "Who", "How", "When"] as const).map((label) => (
+            <tr key={label} className="border-b border-surface-variant">
+              <th className="py-1.5 px-3 border-r border-surface-variant text-left" colSpan={1 + data.fieldLabels.length}>
+                {label}
+              </th>
+              {data.steps.map((s) => (
+                <th
+                  key={s.stepNo}
+                  colSpan={4}
+                  className="py-1.5 px-3 border-r border-surface-variant text-left font-normal normal-case text-on-surface"
+                >
+                  {label === "What" && s.what}
+                  {label === "Who" && s.doerName}
+                  {label === "How" && s.how}
+                  {label === "When" && describeTat(s.tat)}
+                </th>
+              ))}
+            </tr>
+          ))}
+          <tr className="border-b-2 border-on-surface bg-surface-container">
+            <th className="py-2 px-3 border-r border-surface-variant">Timestamp</th>
+            {data.fieldLabels.map((label) => (
+              <th key={label} className="py-2 px-3 border-r border-surface-variant">
+                {label}
+              </th>
+            ))}
+            {data.steps.map((s) =>
+              ["Planned", "Actual", "Status", "Time Delay"].map((h) => (
+                <th key={`${s.stepNo}-${h}`} className="py-2 px-3 border-r border-surface-variant">
+                  {h}
+                </th>
+              ))
+            )}
+          </tr>
+        </thead>
+        <tbody className="font-data-mono text-data-mono text-xs text-on-surface">
+          {data.runs.length === 0 ? (
+            <tr>
+              <td
+                colSpan={1 + data.fieldLabels.length + data.steps.length * 4}
+                className="py-4 px-3 text-center text-on-surface-variant"
+              >
+                No runs yet.
+              </td>
+            </tr>
+          ) : (
+            data.runs.map((run, i) => (
+              <tr key={i} className="border-b border-surface-variant last:border-b-0">
+                <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">{formatTs(run.startedAt)}</td>
+                {run.fieldValues.map((v, j) => (
+                  <td key={j} className="py-1.5 px-3 border-r border-surface-variant">
+                    {v || "—"}
+                  </td>
+                ))}
+                {run.steps.map((s) => (
+                  <Fragment key={s.stepNo}>
+                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
+                      {s.planned ? formatTs(s.planned) : "—"}
+                    </td>
+                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
+                      {s.actual ? formatTs(s.actual) : "—"}
+                    </td>
+                    <td className="py-1.5 px-3 border-r border-surface-variant">
+                      {s.status}
+                    </td>
+                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
+                      {formatDelayMinutes(s.delayMinutes)}
+                    </td>
+                  </Fragment>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 /** One of the signed-in doer's own steps, as returned by /workflow/my-steps. */
@@ -433,6 +522,10 @@ function WorkflowInner() {
   const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
   // Template id currently being exported, so its button disables briefly.
   const [exportingId, setExportingId] = useState<string | null>(null);
+  // Which template's live sheet view is open, and its fetched/cached data.
+  const [sheetOpenId, setSheetOpenId] = useState<string | null>(null);
+  const [sheetLoadingId, setSheetLoadingId] = useState<string | null>(null);
+  const [sheetDataByTemplate, setSheetDataByTemplate] = useState<Record<string, WorkflowTemplateExport>>({});
 
   async function loadData() {
     setLoading(true);
@@ -582,6 +675,26 @@ function WorkflowInner() {
     }
   }
 
+  /** Same data as the export, shown live on-screen instead of downloaded. */
+  async function toggleSheet(templateId: string) {
+    if (sheetOpenId === templateId) {
+      setSheetOpenId(null);
+      return;
+    }
+    setSheetOpenId(templateId);
+    if (sheetDataByTemplate[templateId]) return;
+    setSheetLoadingId(templateId);
+    try {
+      const data = await api.get<WorkflowTemplateExport>(`/workflow/templates/${templateId}/export`);
+      setSheetDataByTemplate((prev) => ({ ...prev, [templateId]: data }));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to load this workflow's sheet.");
+      setSheetOpenId(null);
+    } finally {
+      setSheetLoadingId(null);
+    }
+  }
+
   async function handleDeleteInstance(inst: WorkflowInstance, e?: { stopPropagation: () => void }) {
     e?.stopPropagation(); // don't also trigger the row's openInstance click
     const warning =
@@ -702,6 +815,18 @@ function WorkflowInner() {
                           {isAdmin && (
                             <div className="flex gap-2">
                               <button
+                                onClick={() => toggleSheet(t.id)}
+                                disabled={sheetLoadingId === t.id}
+                                title="View every run of this workflow as a spreadsheet, right here — steps across the top, one row per run"
+                                className="self-start border-2 border-on-surface text-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
+                              >
+                                {sheetLoadingId === t.id
+                                  ? "Loading…"
+                                  : sheetOpenId === t.id
+                                  ? "Hide Sheet"
+                                  : "View Sheet"}
+                              </button>
+                              <button
                                 onClick={() => handleExportTemplate(t.id)}
                                 disabled={exportingId === t.id}
                                 title="Download every run of this workflow as a spreadsheet — steps across the top, one row per run"
@@ -716,6 +841,10 @@ function WorkflowInner() {
                                 Delete
                               </button>
                             </div>
+                          )}
+
+                          {isAdmin && sheetOpenId === t.id && sheetDataByTemplate[t.id] && (
+                            <WorkflowSheetTable data={sheetDataByTemplate[t.id]!} />
                           )}
                         </div>
                       )}
