@@ -58,6 +58,8 @@ type MyStep = {
   instanceId: string;
   instanceTitle: string;
   instanceDetails: string;
+  /** Which workflow this actually is (the template name) — not just this run's title. */
+  templateName: string;
   fieldValues: WorkflowFieldValue[];
   totalSteps: number;
   isMyTurn: boolean;
@@ -151,7 +153,7 @@ function MyWorkflowSteps() {
           <h2 className="font-headline-md text-headline-md text-on-surface uppercase">My Workflow</h2>
         </header>
 
-        <main className="flex-1 p-4 md:p-container-padding flex flex-col gap-stack-lg">
+        <main className="flex-1 p-3 md:p-4 flex flex-col gap-2">
           {error && (
             <p className="font-label-sm text-sm text-error border border-error px-3 py-2">{error}</p>
           )}
@@ -197,19 +199,26 @@ function MyWorkflowSteps() {
             return (
               <div
                 key={s.id}
-                className={`border-2 bg-surface p-stack-lg flex flex-col gap-3 ${
+                className={`border-2 bg-surface p-3 flex flex-col gap-2 ${
                   overdue ? "border-error" : "border-on-surface"
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-on-surface/20 pb-2">
-                  <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
-                    {row.instanceTitle} · Step {s.stepNo} of {row.totalSteps}
-                  </p>
+                {/* Which workflow this is — the #1 thing that was missing.
+                    The run title/step count is secondary, smaller, below it. */}
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-on-surface/20 pb-1.5">
+                  <div className="min-w-0">
+                    <p className="font-headline-md text-headline-md text-on-surface uppercase truncate">
+                      {row.templateName || "Workflow"}
+                    </p>
+                    <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                      {row.instanceTitle} · Step {s.stepNo} of {row.totalSteps}
+                    </p>
+                  </div>
                   <StepStatusBadge status={s.status} />
                 </div>
 
                 {/* The four things a doer needs: what to do, who does it, how, and by when. */}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   <StepFact label="What" value={s.what} />
                   <StepFact label="Who" value={row.doerName || "You"} />
                   <StepFact label="How" value={s.how || "—"} />
@@ -226,7 +235,7 @@ function MyWorkflowSteps() {
 
                 {/* The run's own data — what this step is actually about. */}
                 {row.fieldValues.length > 0 && (
-                  <div className="border border-on-surface/20 bg-surface-container-lowest p-3 flex flex-col gap-1">
+                  <div className="border border-on-surface/20 bg-surface-container-lowest p-2 flex flex-col gap-0.5">
                     {row.fieldValues.map((f) => (
                       <div key={f.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
                         <span className="w-32 shrink-0 font-label-sm text-label-sm uppercase text-on-surface-variant">
@@ -246,11 +255,11 @@ function MyWorkflowSteps() {
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-3 border-t border-on-surface/20 pt-3">
+                <div className="flex flex-wrap items-center gap-3 border-t border-on-surface/20 pt-2">
                   <button
                     onClick={() => act(row, "complete")}
                     disabled={busy}
-                    className="inline-flex items-center justify-center min-h-[44px] px-6 font-label-sm text-label-sm uppercase tracking-wide border-2 border-on-surface bg-on-surface text-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40"
+                    className="inline-flex items-center justify-center min-h-[40px] px-5 font-label-sm text-label-sm uppercase tracking-wide border-2 border-on-surface bg-on-surface text-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40"
                   >
                     {busy ? "Saving…" : "Mark Done"}
                   </button>
@@ -271,16 +280,17 @@ function MyWorkflowSteps() {
 
           {later.length > 0 && (
             <div className="border-2 border-on-surface bg-surface">
-              <p className="border-b-2 border-on-surface bg-surface-container-low px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface-variant">
+              <p className="border-b-2 border-on-surface bg-surface-container-low px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface-variant">
                 Coming up for you ({later.length})
               </p>
               {later.map((row) => (
                 <div
                   key={row.step.id}
-                  className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant px-4 py-3 last:border-b-0"
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant px-3 py-2 last:border-b-0"
                 >
                   <span className="font-body-md text-body-md text-on-surface">{row.step.what}</span>
                   <span className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                    {row.templateName ? `${row.templateName} · ` : ""}
                     {row.instanceTitle} · waiting on step {row.step.stepNo - 1}
                   </span>
                 </div>
@@ -634,6 +644,17 @@ function WorkflowInner() {
                         <div className="flex items-center gap-2">
                           {inst.title}
                         </div>
+                        {/* The title alone can repeat — e.g. two runs with the
+                            same PO Number — so show whatever else the run
+                            carries (Vendor, Qty, ...) to tell them apart. */}
+                        {inst.fieldValues.length > 1 && (
+                          <div className="font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5 truncate max-w-xs">
+                            {inst.fieldValues
+                              .slice(1)
+                              .map((f) => `${f.label}: ${f.value || "—"}`)
+                              .join(" · ")}
+                          </div>
+                        )}
                         {inst.details && (
                           <div className="font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5 truncate max-w-xs">
                             {inst.details}

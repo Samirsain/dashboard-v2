@@ -305,6 +305,8 @@ export const workflowService = {
       instanceId: string;
       instanceTitle: string;
       instanceDetails: string;
+      /** The template this run belongs to — which workflow this actually is. */
+      templateName: string;
       /** The run's data (PO Number, Vendor, ...) so the doer knows what this is about. */
       fieldValues: WorkflowFieldValue[];
       totalSteps: number;
@@ -314,14 +316,16 @@ export const workflowService = {
       step: WorkflowStepEvent;
     }>
   > {
-    const [instanceRecords, eventRecords, doer] = await Promise.all([
+    const [instanceRecords, eventRecords, templateRecords, doer] = await Promise.all([
       dataService.findAll(instancesEntity),
       dataService.findAll(eventsEntity),
+      dataService.findAll(templatesEntity),
       usersService.getById(doerId).catch(() => null),
     ]);
 
     const activeInstances = instanceRecords.map(toInstance).filter((i) => i.status === "Active");
     const instanceById = new Map(activeInstances.map((i) => [i.id, i]));
+    const templateNameById = new Map(templateRecords.map(toTemplate).map((t) => [t.id, t.name]));
 
     const events = eventRecords.map(toEvent);
     const stepCountByInstance = new Map<string, number>();
@@ -340,6 +344,7 @@ export const workflowService = {
           instanceId: instance.id,
           instanceTitle: instance.title,
           instanceDetails: instance.details,
+          templateName: templateNameById.get(instance.templateId) ?? "",
           fieldValues: instance.fieldValues,
           totalSteps: stepCountByInstance.get(step.instanceId) ?? 0,
           isMyTurn: step.status === "Active" || step.status === "Overdue",
