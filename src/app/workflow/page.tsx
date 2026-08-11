@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
@@ -103,8 +103,29 @@ function formatTs(ts: string): string {
   return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
 
-/** Fixed width (px) of each sticky identity column (Timestamp + each field). */
-const IDENTITY_COL_WIDTH = 168;
+/** Same instant as formatTs but without the year — fits inside a table cell. */
+function formatTsShort(ts: string): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Column widths (px). These are declared on a <colgroup> and the table is
+ * `table-fixed`, so the browser actually honours them — which is what makes
+ * the one pinned column's `left: 0` line up instead of drifting.
+ */
+const COL_IDENTITY = 170;
+const COL_STARTED = 140;
+const COL_FIELD = 140;
+const COL_STEP = 172;
+const COL_ACTION = 96;
 /** At 100+ runs the plain list stops being scannable — page it instead. */
 const RUN_PAGE_SIZE = 20;
 
@@ -144,41 +165,20 @@ function WorkflowSheetTable({
     return run.title.toLowerCase().includes(q) || run.fieldValues.some((v) => v.toLowerCase().includes(q));
   });
   const visibleRuns = filteredRuns.slice(0, visibleCount);
-  const colCount = 1 + data.fieldLabels.length + data.steps.length * 4 + 1;
+
+  // The first field (PO Number, ...) is what actually identifies a run, so it
+  // takes the pinned column and the rest follow. With no fields defined at all
+  // the run's own title stands in.
+  const identityLabel = data.fieldLabels[0] ?? "Run";
+  const extraLabels = data.fieldLabels.slice(1);
+  const colCount = 1 + 1 + extraLabels.length + data.steps.length + 1;
+  const tableWidth =
+    COL_IDENTITY + COL_STARTED + extraLabels.length * COL_FIELD + data.steps.length * COL_STEP + COL_ACTION;
 
   return (
     <div className="flex flex-col gap-0">
-      {/* Step pipeline: the What/Who/How/When of the chain, read left to right once. */}
-      <div className="flex items-stretch overflow-x-auto border-2 border-on-surface bg-surface">
-        {data.steps.map((s, i) => (
-          <Fragment key={s.stepNo}>
-            <div className="flex-shrink-0 w-52 p-3 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 flex items-center justify-center border-2 border-on-surface bg-on-surface text-surface font-label-sm text-[10px] shrink-0">
-                  {s.stepNo}
-                </span>
-                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant truncate">
-                  {describeTat(s.tat)}
-                </span>
-              </div>
-              <p className="font-body-md text-body-md text-on-surface font-semibold leading-tight" title={s.what}>
-                {s.what}
-              </p>
-              <p className="font-label-sm text-label-sm text-on-surface-variant truncate" title={`${s.doerName} · ${s.how}`}>
-                {s.doerName} · {s.how}
-              </p>
-            </div>
-            {i < data.steps.length - 1 && (
-              <div className="flex items-center justify-center w-7 flex-shrink-0 text-on-surface-variant border-l-2 border-on-surface bg-surface-container-lowest">
-                <span className="material-symbols-outlined text-base">arrow_forward</span>
-              </div>
-            )}
-          </Fragment>
-        ))}
-      </div>
-
       {/* Search + Active/Complete tabs — this run list is what "Ongoing Work" used to be. */}
-      <div className="flex flex-wrap items-center gap-2 border-2 border-t-0 border-on-surface bg-surface-container-low p-2">
+      <div className="flex flex-wrap items-center gap-2 border-2 border-on-surface bg-surface-container-low p-2">
         <input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -202,22 +202,43 @@ function WorkflowSheetTable({
         </div>
       </div>
 
-      {/* Run data: pinned Timestamp + fields on the left, steps scroll on the right. */}
+      {/*
+        One table, one scroller. The step's What/Who/How/When lives in that
+        step's own header cell, so the chain reads across the top exactly above
+        the data it describes — the original sheet's shape, aligned by
+        construction rather than by two scrollers that have to agree.
+        border-separate (not collapse) is required: collapsed borders and
+        position:sticky fight each other and the lines smear while scrolling.
+      */}
       <div className="border-2 border-t-0 border-on-surface overflow-auto max-h-[65vh] bg-surface-container-lowest">
-        <table className="border-collapse text-left w-full">
+        <table className="table-fixed border-separate border-spacing-0 text-left" style={{ width: tableWidth }}>
+          <colgroup>
+            <col style={{ width: COL_IDENTITY }} />
+            <col style={{ width: COL_STARTED }} />
+            {/* Keyed by position, not label: two fields may legitimately share
+                a label (nothing enforces uniqueness), and these columns are
+                purely positional anyway. */}
+            {extraLabels.map((label, i) => (
+              <col key={i} style={{ width: COL_FIELD }} />
+            ))}
+            {data.steps.map((s) => (
+              <col key={s.stepNo} style={{ width: COL_STEP }} />
+            ))}
+            <col style={{ width: COL_ACTION }} />
+          </colgroup>
           <thead>
-            <tr className="bg-surface-container">
-              <th
-                className="sticky top-0 left-0 z-30 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase whitespace-nowrap"
-                style={{ width: IDENTITY_COL_WIDTH }}
-              >
-                Timestamp
+            <tr>
+              <th className="sticky top-0 left-0 z-30 bg-surface-container align-bottom py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase truncate">
+                {identityLabel}
               </th>
-              {data.fieldLabels.map((label, i) => (
+              <th className="sticky top-0 z-20 bg-surface-container align-bottom py-2 px-3 border-r border-b-2 border-on-surface font-label-sm text-label-sm uppercase truncate">
+                Started
+              </th>
+              {extraLabels.map((label, i) => (
                 <th
-                  key={label}
-                  className="sticky top-0 z-20 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase whitespace-nowrap"
-                  style={{ left: (i + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
+                  key={i}
+                  className="sticky top-0 z-20 bg-surface-container align-bottom py-2 px-3 border-r border-b-2 border-on-surface font-label-sm text-label-sm uppercase truncate"
+                  title={label}
                 >
                   {label}
                 </th>
@@ -225,37 +246,31 @@ function WorkflowSheetTable({
               {data.steps.map((s) => (
                 <th
                   key={s.stepNo}
-                  colSpan={4}
-                  className="sticky top-0 z-10 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-center"
+                  className="sticky top-0 z-20 bg-surface-container align-top py-2 px-3 border-r border-b-2 border-on-surface border-l-2 font-normal"
                 >
-                  Step {s.stepNo}
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-4 flex items-center justify-center bg-on-surface text-surface font-label-sm text-[10px] shrink-0">
+                      {s.stepNo}
+                    </span>
+                    <span className="font-label-sm text-[10px] uppercase text-on-surface-variant truncate">
+                      {describeTat(s.tat)}
+                    </span>
+                  </div>
+                  <div
+                    className="mt-1 font-body-md text-body-md text-on-surface font-semibold leading-tight truncate"
+                    title={s.what}
+                  >
+                    {s.what}
+                  </div>
+                  <div
+                    className="font-label-sm text-label-sm text-on-surface-variant truncate"
+                    title={`${s.doerName} · ${s.how}`}
+                  >
+                    {s.doerName} · {s.how}
+                  </div>
                 </th>
               ))}
-              <th className="sticky top-0 z-10 bg-surface-container py-2 px-3 border-b-2 border-on-surface w-24" />
-            </tr>
-            <tr className="bg-surface-container">
-              <th
-                className="sticky top-9 left-0 z-30 bg-surface-container border-r-2 border-b-2 border-on-surface"
-                style={{ width: IDENTITY_COL_WIDTH }}
-              />
-              {data.fieldLabels.map((label, i) => (
-                <th
-                  key={label}
-                  className="sticky top-9 z-20 bg-surface-container border-r-2 border-b-2 border-on-surface"
-                  style={{ left: (i + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
-                />
-              ))}
-              {data.steps.map((s) =>
-                ["Planned", "Actual", "Status", "Delay"].map((h) => (
-                  <th
-                    key={`${s.stepNo}-${h}`}
-                    className="sticky top-9 z-10 bg-surface-container-low py-1.5 px-3 border-r border-b-2 border-on-surface font-label-sm text-[10px] uppercase text-on-surface-variant whitespace-nowrap"
-                  >
-                    {h}
-                  </th>
-                ))
-              )}
-              <th className="sticky top-9 z-10 bg-surface-container-low border-b-2 border-on-surface" />
+              <th className="sticky top-0 z-20 bg-surface-container border-b-2 border-on-surface" />
             </tr>
           </thead>
           <tbody className="font-body-md text-body-md text-on-surface">
@@ -266,64 +281,78 @@ function WorkflowSheetTable({
                 </td>
               </tr>
             ) : (
-              visibleRuns.map((run) => (
-                <tr
-                  key={run.id}
-                  onClick={() => onRowClick(run.id)}
-                  className={`cursor-pointer transition-colors ${
-                    selectedId === run.id ? "bg-primary-container" : "odd:bg-surface even:bg-surface-container-lowest hover:bg-surface-container-low"
-                  }`}
-                >
-                  <td
-                    className="sticky left-0 z-10 bg-inherit py-2 px-3 border-r-2 border-b border-on-surface font-label-sm text-label-sm whitespace-nowrap"
-                    style={{ width: IDENTITY_COL_WIDTH }}
+              visibleRuns.map((run, rowIndex) => {
+                const selected = selectedId === run.id;
+                // The pinned cell needs its own opaque background — a sticky
+                // cell paints over scrolled content, so it can't rely on the
+                // row's stripe showing through.
+                const rowBg = selected
+                  ? "bg-primary-container"
+                  : rowIndex % 2 === 0
+                  ? "bg-surface"
+                  : "bg-surface-container-lowest";
+                const identity = run.fieldValues[0] || run.title;
+                return (
+                  <tr
+                    key={run.id}
+                    onClick={() => onRowClick(run.id)}
+                    className={`group cursor-pointer ${rowBg} ${selected ? "" : "hover:bg-surface-container-low"}`}
                   >
-                    {formatTs(run.startedAt)}
-                  </td>
-                  {run.fieldValues.map((v, j) => (
                     <td
-                      key={j}
-                      className="sticky z-10 bg-inherit py-2 px-3 border-r-2 border-b border-on-surface font-semibold truncate"
-                      style={{ left: (j + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
-                      title={v}
+                      className={`sticky left-0 z-10 ${rowBg} ${
+                        selected ? "" : "group-hover:bg-surface-container-low"
+                      } py-2 px-3 border-r-2 border-b border-on-surface font-semibold truncate`}
+                      title={identity}
                     >
-                      {v || "—"}
+                      {identity || "—"}
                     </td>
-                  ))}
-                  {run.steps.map((s) => (
-                    <Fragment key={s.stepNo}>
-                      <td className="py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs text-on-surface-variant">
-                        {s.planned ? formatTs(s.planned) : "—"}
-                      </td>
-                      <td className="py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs text-on-surface-variant">
-                        {s.actual ? formatTs(s.actual) : "—"}
-                      </td>
-                      <td className="py-2 px-3 border-r border-b border-on-surface">
-                        <StepStatusBadge status={s.status} />
-                      </td>
+                    <td className="py-2 px-3 border-r border-b border-on-surface font-label-sm text-label-sm text-on-surface-variant truncate">
+                      {formatTsShort(run.startedAt)}
+                    </td>
+                    {extraLabels.map((_label, j) => (
                       <td
-                        className={`py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs font-semibold ${
-                          s.delayMinutes === null
-                            ? "text-on-surface-variant"
-                            : s.delayMinutes > 0
-                            ? "text-error"
-                            : "text-primary"
+                        key={j}
+                        className="py-2 px-3 border-r border-b border-on-surface truncate"
+                        title={run.fieldValues[j + 1] ?? ""}
+                      >
+                        {run.fieldValues[j + 1] || "—"}
+                      </td>
+                    ))}
+                    {run.steps.map((s) => (
+                      <td
+                        key={s.stepNo}
+                        className="py-2 px-3 border-r border-l-2 border-b border-on-surface align-top"
+                        title={`Planned: ${s.planned ? formatTs(s.planned) : "—"}\nActual: ${
+                          s.actual ? formatTs(s.actual) : "—"
                         }`}
                       >
-                        {formatDelayMinutes(s.delayMinutes)}
+                        <StepStatusBadge status={s.status} />
+                        <div className="mt-1 font-label-sm text-[10px] text-on-surface-variant truncate">
+                          {s.actual ? formatTsShort(s.actual) : s.planned ? `by ${formatTsShort(s.planned)}` : "—"}
+                        </div>
+                        {s.delayMinutes !== null && (
+                          <div
+                            className={`font-label-sm text-[10px] font-semibold truncate ${
+                              s.delayMinutes > 0 ? "text-error" : "text-primary"
+                            }`}
+                          >
+                            {formatDelayMinutes(s.delayMinutes)}
+                          </div>
+                        )}
                       </td>
-                    </Fragment>
-                  ))}
-                  <td className="py-2 px-3 border-b border-on-surface text-right">
-                    <button
-                      onClick={(e) => onDeleteRow(run.id, run.title, run.status, e)}
-                      className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-[10px] uppercase hover:bg-error hover:text-on-error transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    ))}
+                    <td className="py-2 px-2 border-b border-on-surface text-right align-top">
+                      <button
+                        onClick={(e) => onDeleteRow(run.id, run.title, run.status, e)}
+                        title="Delete this work"
+                        className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-[10px] uppercase hover:bg-error hover:text-on-error transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
