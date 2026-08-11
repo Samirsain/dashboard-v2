@@ -100,161 +100,91 @@ function formatTs(ts: string): string {
   return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
 
-/** Fixed width (px) of each sticky identity column (Timestamp + each field). */
-const IDENTITY_COL_WIDTH = 168;
-
 /**
- * Premium live view of a template: a step pipeline strip up top (what/who/
- * how/tat per step, at a glance, once — not repeated as four table rows),
- * then a clean data table below with one row per run. The Timestamp + field
- * columns stay pinned on scroll so a wide chain of steps never loses its
- * "which run is this" anchor — built for someone managing many workflows
- * with many steps at once.
+ * Live, on-screen version of handleExportTemplate's CSV — same What/Who/How/
+ * When header blocks (via colSpan, so they visually merge like the sheet),
+ * one row per run underneath. Reuses the same export endpoint and data.
  */
 function WorkflowSheetTable({ data }: { data: WorkflowTemplateExport }) {
-  const identityCols = 1 + data.fieldLabels.length;
-
   return (
-    <div className="flex flex-col gap-0">
-      {/* Step pipeline: the What/Who/How/When of the chain, read left to right once. */}
-      <div className="flex items-stretch overflow-x-auto border-2 border-on-surface bg-surface">
-        {data.steps.map((s, i) => (
-          <Fragment key={s.stepNo}>
-            <div className="flex-shrink-0 w-52 p-3 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 flex items-center justify-center border-2 border-on-surface bg-on-surface text-surface font-label-sm text-[10px] shrink-0">
-                  {s.stepNo}
-                </span>
-                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant truncate">
-                  {describeTat(s.tat)}
-                </span>
-              </div>
-              <p className="font-body-md text-body-md text-on-surface font-semibold leading-tight" title={s.what}>
-                {s.what}
-              </p>
-              <p className="font-label-sm text-label-sm text-on-surface-variant truncate" title={`${s.doerName} · ${s.how}`}>
-                {s.doerName} · {s.how}
-              </p>
-            </div>
-            {i < data.steps.length - 1 && (
-              <div className="flex items-center justify-center w-7 flex-shrink-0 text-on-surface-variant border-l-2 border-on-surface bg-surface-container-lowest">
-                <span className="material-symbols-outlined text-base">arrow_forward</span>
-              </div>
-            )}
-          </Fragment>
-        ))}
-      </div>
-
-      {/* Run data: pinned Timestamp + fields on the left, steps scroll on the right. */}
-      <div className="border-2 border-t-0 border-on-surface overflow-auto max-h-[65vh] bg-surface-container-lowest">
-        <table className="border-collapse text-left w-full">
-          <thead>
-            <tr className="bg-surface-container">
-              <th
-                className="sticky top-0 left-0 z-30 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase whitespace-nowrap"
-                style={{ width: IDENTITY_COL_WIDTH }}
-              >
-                Timestamp
+    <div className="border-2 border-on-surface overflow-x-auto bg-surface-container-lowest">
+      <table className="border-collapse text-left" style={{ minWidth: `${480 + data.steps.length * 480}px` }}>
+        <thead className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+          {(["What", "Who", "How", "When"] as const).map((label) => (
+            <tr key={label} className="border-b border-surface-variant">
+              <th className="py-1.5 px-3 border-r border-surface-variant text-left" colSpan={1 + data.fieldLabels.length}>
+                {label}
               </th>
-              {data.fieldLabels.map((label, i) => (
-                <th
-                  key={label}
-                  className="sticky top-0 z-20 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase whitespace-nowrap"
-                  style={{ left: (i + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
-                >
-                  {label}
-                </th>
-              ))}
               {data.steps.map((s) => (
                 <th
                   key={s.stepNo}
                   colSpan={4}
-                  className="sticky top-0 z-10 bg-surface-container py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-center"
+                  className="py-1.5 px-3 border-r border-surface-variant text-left font-normal normal-case text-on-surface"
                 >
-                  Step {s.stepNo}
+                  {label === "What" && s.what}
+                  {label === "Who" && s.doerName}
+                  {label === "How" && s.how}
+                  {label === "When" && describeTat(s.tat)}
                 </th>
               ))}
             </tr>
-            <tr className="bg-surface-container">
-              <th
-                className="sticky top-9 left-0 z-30 bg-surface-container border-r-2 border-b-2 border-on-surface"
-                style={{ width: IDENTITY_COL_WIDTH }}
-              />
-              {data.fieldLabels.map((label, i) => (
-                <th
-                  key={label}
-                  className="sticky top-9 z-20 bg-surface-container border-r-2 border-b-2 border-on-surface"
-                  style={{ left: (i + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
-                />
-              ))}
-              {data.steps.map((s) =>
-                ["Planned", "Actual", "Status", "Delay"].map((h) => (
-                  <th
-                    key={`${s.stepNo}-${h}`}
-                    className="sticky top-9 z-10 bg-surface-container-low py-1.5 px-3 border-r border-b-2 border-on-surface font-label-sm text-[10px] uppercase text-on-surface-variant whitespace-nowrap"
-                  >
-                    {h}
-                  </th>
-                ))
-              )}
-            </tr>
-          </thead>
-          <tbody className="font-body-md text-body-md text-on-surface">
-            {data.runs.length === 0 ? (
-              <tr>
-                <td colSpan={identityCols + data.steps.length * 4} className="py-6 px-3 text-center text-on-surface-variant">
-                  No runs yet.
-                </td>
-              </tr>
-            ) : (
-              data.runs.map((run, i) => (
-                <tr key={i} className={i % 2 === 0 ? "bg-surface" : "bg-surface-container-lowest"}>
-                  <td
-                    className="sticky left-0 z-10 bg-inherit py-2 px-3 border-r-2 border-b border-on-surface font-label-sm text-label-sm whitespace-nowrap"
-                    style={{ width: IDENTITY_COL_WIDTH }}
-                  >
-                    {formatTs(run.startedAt)}
-                  </td>
-                  {run.fieldValues.map((v, j) => (
-                    <td
-                      key={j}
-                      className="sticky z-10 bg-inherit py-2 px-3 border-r-2 border-b border-on-surface font-semibold truncate"
-                      style={{ left: (j + 1) * IDENTITY_COL_WIDTH, width: IDENTITY_COL_WIDTH }}
-                      title={v}
-                    >
-                      {v || "—"}
-                    </td>
-                  ))}
-                  {run.steps.map((s) => (
-                    <Fragment key={s.stepNo}>
-                      <td className="py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs text-on-surface-variant">
-                        {s.planned ? formatTs(s.planned) : "—"}
-                      </td>
-                      <td className="py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs text-on-surface-variant">
-                        {s.actual ? formatTs(s.actual) : "—"}
-                      </td>
-                      <td className="py-2 px-3 border-r border-b border-on-surface">
-                        <StepStatusBadge status={s.status} />
-                      </td>
-                      <td
-                        className={`py-2 px-3 border-r border-b border-on-surface whitespace-nowrap text-xs font-semibold ${
-                          s.delayMinutes === null
-                            ? "text-on-surface-variant"
-                            : s.delayMinutes > 0
-                            ? "text-error"
-                            : "text-primary"
-                        }`}
-                      >
-                        {formatDelayMinutes(s.delayMinutes)}
-                      </td>
-                    </Fragment>
-                  ))}
-                </tr>
+          ))}
+          <tr className="border-b-2 border-on-surface bg-surface-container">
+            <th className="py-2 px-3 border-r border-surface-variant">Timestamp</th>
+            {data.fieldLabels.map((label) => (
+              <th key={label} className="py-2 px-3 border-r border-surface-variant">
+                {label}
+              </th>
+            ))}
+            {data.steps.map((s) =>
+              ["Planned", "Actual", "Status", "Time Delay"].map((h) => (
+                <th key={`${s.stepNo}-${h}`} className="py-2 px-3 border-r border-surface-variant">
+                  {h}
+                </th>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+        </thead>
+        <tbody className="font-data-mono text-data-mono text-xs text-on-surface">
+          {data.runs.length === 0 ? (
+            <tr>
+              <td
+                colSpan={1 + data.fieldLabels.length + data.steps.length * 4}
+                className="py-4 px-3 text-center text-on-surface-variant"
+              >
+                No runs yet.
+              </td>
+            </tr>
+          ) : (
+            data.runs.map((run, i) => (
+              <tr key={i} className="border-b border-surface-variant last:border-b-0">
+                <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">{formatTs(run.startedAt)}</td>
+                {run.fieldValues.map((v, j) => (
+                  <td key={j} className="py-1.5 px-3 border-r border-surface-variant">
+                    {v || "—"}
+                  </td>
+                ))}
+                {run.steps.map((s) => (
+                  <Fragment key={s.stepNo}>
+                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
+                      {s.planned ? formatTs(s.planned) : "—"}
+                    </td>
+                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
+                      {s.actual ? formatTs(s.actual) : "—"}
+                    </td>
+                    <td className="py-1.5 px-3 border-r border-surface-variant">
+                      {s.status}
+                    </td>
+                    <td className="py-1.5 px-3 border-r border-surface-variant whitespace-nowrap">
+                      {formatDelayMinutes(s.delayMinutes)}
+                    </td>
+                  </Fragment>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
