@@ -26,6 +26,14 @@ const eventsEntity = sheetsConfig.workflowStepEvents;
 /** A step is rejected back to the previous step this many times before escalating instead of looping again. */
 const MAX_REWORK = 3;
 
+/**
+ * How many individual runs the overview carries per (workflow, step, person)
+ * group. The group's `total` is always exact; this only bounds how many get
+ * listed, so one workflow with a thousand backed-up runs can't blow up the
+ * response.
+ */
+const BUCKET_SAMPLE_SIZE = 10;
+
 function toTemplate(r: SheetRecord): WorkflowTemplate {
   return { id: r["Template ID"] ?? "", name: r["Name"] ?? "", createdAt: r["CreatedAt"] ?? "" };
 }
@@ -386,20 +394,28 @@ export const workflowService = {
   async getOverview(): Promise<{
     totals: { activeRuns: number; overdueSteps: number; dueTodaySteps: number };
     templates: Array<{ id: string; name: string; activeRuns: number; overdueSteps: number }>;
-    attention: Array<{
-      instanceId: string;
+    /** Exact per-person load across every outstanding step, not just sampled ones. */
+    people: Array<{ doerId: string; doerName: string; total: number; overdue: number }>;
+    buckets: Array<{
+      key: string;
       templateId: string;
       templateName: string;
-      runTitle: string;
       stepNo: number;
       what: string;
       how: string;
       doerId: string;
       doerName: string;
-      planned: string;
-      status: WorkflowStepStatus;
-      /** How late this step is *right now* (minutes), or null if not overdue. */
-      lateMinutes: number | null;
+      total: number;
+      overdue: number;
+      nextDue: string;
+      runs: Array<{
+        instanceId: string;
+        runTitle: string;
+        planned: string;
+        status: WorkflowStepStatus;
+        /** How late this step is *right now* (minutes), or null if not overdue. */
+        lateMinutes: number | null;
+      }>;
     }>;
   }> {
     // Only in-flight runs matter here — a Complete run has nothing outstanding,
@@ -481,6 +497,94 @@ export const workflowService = {
         return (a.planned || "9999").localeCompare(b.planned || "9999");
       });
 
+    // Who is holding what, counted over *every* outstanding step — these totals
+    // must stay exact even though the buckets below only carry a sample.
+    const peopleById = new Map<string, { doerId: string; doerName: string; total: number; overdue: number }>();
+    for (const a of attention) {
+      const p = peopleById.get(a.doerId) ?? { doerId: a.doerId, doerName: a.doerName, total: 0, overdue: 0 };
+      p.total += 1;
+      if (a.lateMinutes !== null) p.overdue += 1;
+      peopleById.set(a.doerId, p);
+    }
+
+    /*
+     * One template can carry a thousand runs, and they pile up at the same
+     * step under the same person — so a flat list is a thousand near-identical
+     * rows nobody can act on, and a payload that grows with the backlog.
+     *
+     * Grouping by (workflow, step, person) turns that pile into the one fact
+     * it actually represents: "Samir has 1000 POs sitting on Generate PO, 12 of
+     * them late." Each group carries exact counts but only its most urgent
+     * handful of runs, so the response is bounded by how the workflows are
+     * configured rather than by how much work is outstanding.
+     */
+    const bucketMap = new Map<string, (typeof buckets)[number]>();
+    const buckets: Array<{
+      key: string;
+      templateId: string;
+      templateName: string;
+      stepNo: number;
+      what: string;
+      how: string;
+      doerId: string;
+      doerName: string;
+      /** Exact number of runs waiting at this step for this person. */
+      total: number;
+      overdue: number;
+      /** Earliest deadline in the group — when this group next needs attention. */
+      nextDue: string;
+      /** The most urgent few only; `total` says how many there really are. */
+      runs: Array<{
+        instanceId: string;
+        runTitle: string;
+        planned: string;
+        status: WorkflowStepStatus;
+        lateMinutes: number | null;
+      }>;
+    }> = [];
+
+    for (const a of attention) {
+      const key = `${a.templateId}:${a.stepNo}:${a.doerId}`;
+      let bucket = bucketMap.get(key);
+      if (!bucket) {
+        bucket = {
+          key,
+          templateId: a.templateId,
+          templateName: a.templateName,
+          stepNo: a.stepNo,
+          what: a.what,
+          how: a.how,
+          doerId: a.doerId,
+          doerName: a.doerName,
+          total: 0,
+          overdue: 0,
+          nextDue: "",
+          runs: [],
+        };
+        bucketMap.set(key, bucket);
+        buckets.push(bucket);
+      }
+      bucket.total += 1;
+      if (a.lateMinutes !== null) bucket.overdue += 1;
+      if (a.planned && (!bucket.nextDue || a.planned < bucket.nextDue)) bucket.nextDue = a.planned;
+      // `attention` is already most-urgent-first, so the first ones in are the
+      // ones worth keeping.
+      if (bucket.runs.length < BUCKET_SAMPLE_SIZE) {
+        bucket.runs.push({
+          instanceId: a.instanceId,
+          runTitle: a.runTitle,
+          planned: a.planned,
+          status: a.status,
+          lateMinutes: a.lateMinutes,
+        });
+      }
+    }
+
+    buckets.sort((a, b) => {
+      if (a.overdue !== b.overdue) return b.overdue - a.overdue;
+      return (a.nextDue || "9999").localeCompare(b.nextDue || "9999");
+    });
+
     return {
       totals: {
         activeRuns: activeInstances.length,
@@ -493,7 +597,8 @@ export const workflowService = {
         activeRuns: activeRunsByTemplate.get(t.id) ?? 0,
         overdueSteps: overdueByTemplate.get(t.id) ?? 0,
       })),
-      attention,
+      people: Array.from(peopleById.values()).sort((a, b) => b.total - a.total),
+      buckets,
     };
   },
 

@@ -40,23 +40,35 @@ type WorkflowTemplateExport = {
   }>;
 };
 
-/** GET /workflow/overview — everything in flight, across every template. */
+/**
+ * GET /workflow/overview — everything in flight, across every template,
+ * grouped by (workflow, step, person). Counts are exact; `runs` holds only the
+ * most urgent few of each group, so a workflow with a thousand backed-up runs
+ * stays one row here instead of a thousand.
+ */
 type WorkflowOverview = {
   totals: { activeRuns: number; overdueSteps: number; dueTodaySteps: number };
   templates: Array<{ id: string; name: string; activeRuns: number; overdueSteps: number }>;
-  attention: Array<{
-    instanceId: string;
+  people: Array<{ doerId: string; doerName: string; total: number; overdue: number }>;
+  buckets: Array<{
+    key: string;
     templateId: string;
     templateName: string;
-    runTitle: string;
     stepNo: number;
     what: string;
     how: string;
     doerId: string;
     doerName: string;
-    planned: string;
-    status: WorkflowStepStatus;
-    lateMinutes: number | null;
+    total: number;
+    overdue: number;
+    nextDue: string;
+    runs: Array<{
+      instanceId: string;
+      runTitle: string;
+      planned: string;
+      status: WorkflowStepStatus;
+      lateMinutes: number | null;
+    }>;
   }>;
 };
 
@@ -180,14 +192,18 @@ function StatTile({ label, value, tone }: { label: string; value: number; tone: 
 }
 
 /**
- * The manager's landing view: every step that is somebody's turn right now,
- * across every template, most-overdue first.
+ * The manager's landing view: where work is piled up right now, across every
+ * template, worst first.
  *
  * A per-template sheet answers "how is this workflow doing". It cannot answer
- * "what is late anywhere", which is the question actually asked each morning —
- * and answering it by opening each template in turn stops working as soon as
- * there are more than a few. This stays one flat list however many workflows
- * exist, so the cost of adding a workflow is a row, not another place to look.
+ * "what is late anywhere", which is the question actually asked each morning.
+ *
+ * Listing every outstanding step individually doesn't survive real volume: a
+ * thousand POs waiting on the same person at the same step is a thousand rows
+ * that all say the same thing. So the board shows the *pile* — one row per
+ * (workflow, step, person) with an exact count — and opens up to the most
+ * urgent few inside it. That keeps the screen the same size whether there are
+ * ten runs or ten thousand.
  */
 function WorkflowControlRoom({
   overview,
@@ -198,40 +214,29 @@ function WorkflowControlRoom({
 }) {
   const [search, setSearch] = useState("");
   const [doerFilter, setDoerFilter] = useState<string | null>(null);
+  const [openBucket, setOpenBucket] = useState<string | null>(null);
   const [visible, setVisible] = useState(ATTENTION_PAGE_SIZE);
 
-  // Who currently holds work, with their load — so "Sandeep ke paas kya hai?"
-  // is one click, and an overloaded person is visible without asking.
-  const byDoer = new Map<string, { name: string; count: number; overdue: number }>();
-  for (const a of overview.attention) {
-    const prev = byDoer.get(a.doerId) ?? { name: a.doerName, count: 0, overdue: 0 };
-    byDoer.set(a.doerId, {
-      name: a.doerName,
-      count: prev.count + 1,
-      overdue: prev.overdue + (a.lateMinutes !== null ? 1 : 0),
-    });
-  }
-  const people = Array.from(byDoer.entries()).sort((a, b) => b[1].count - a[1].count);
-
   const q = search.trim().toLowerCase();
-  const rows = overview.attention.filter((a) => {
-    if (doerFilter && a.doerId !== doerFilter) return false;
+  const groups = overview.buckets.filter((b) => {
+    if (doerFilter && b.doerId !== doerFilter) return false;
     if (!q) return true;
     return (
-      a.runTitle.toLowerCase().includes(q) ||
-      a.what.toLowerCase().includes(q) ||
-      a.templateName.toLowerCase().includes(q) ||
-      a.doerName.toLowerCase().includes(q)
+      b.what.toLowerCase().includes(q) ||
+      b.templateName.toLowerCase().includes(q) ||
+      b.doerName.toLowerCase().includes(q) ||
+      b.runs.some((r) => r.runTitle.toLowerCase().includes(q))
     );
   });
-  const shown = rows.slice(0, visible);
+  const shown = groups.slice(0, visible);
+  const totalWaiting = overview.people.reduce((sum, p) => sum + p.total, 0);
 
   return (
     <div className="bg-surface border-2 border-on-surface p-stack-lg flex flex-col gap-stack-md">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-on-surface pb-stack-md">
         <h3 className="font-headline-md text-headline-md text-on-surface">Live Board</h3>
         <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
-          Everything waiting on someone, right now
+          Where work is stuck, right now
         </p>
       </div>
 
@@ -242,8 +247,9 @@ function WorkflowControlRoom({
       </div>
 
       {/* Filter by person — chips rather than a dropdown so the load per
-          person is visible without opening anything. */}
-      {people.length > 1 && (
+          person is visible without opening anything. Counts come from the
+          server and cover every step, not just the ones listed below. */}
+      {overview.people.length > 1 && (
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => {
@@ -256,24 +262,24 @@ function WorkflowControlRoom({
                 : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
             }
           >
-            Everyone ({overview.attention.length})
+            Everyone ({totalWaiting})
           </button>
-          {people.map(([id, p]) => (
+          {overview.people.map((p) => (
             <button
-              key={id}
+              key={p.doerId}
               onClick={() => {
-                setDoerFilter((prev) => (prev === id ? null : id));
+                setDoerFilter((prev) => (prev === p.doerId ? null : p.doerId));
                 setVisible(ATTENTION_PAGE_SIZE);
               }}
               className={`px-3 py-1 font-label-sm text-label-sm uppercase border-2 transition-colors ${
-                doerFilter === id
+                doerFilter === p.doerId
                   ? "border-on-surface bg-on-surface text-surface"
                   : p.overdue > 0
                   ? "border-error text-error hover:bg-error/10"
                   : "border-on-surface text-on-surface hover:bg-surface-container"
               }`}
             >
-              {p.name} ({p.count}
+              {p.doerName} ({p.total}
               {p.overdue > 0 ? ` · ${p.overdue} late` : ""})
             </button>
           ))}
@@ -286,63 +292,105 @@ function WorkflowControlRoom({
           setSearch(e.target.value);
           setVisible(ATTENTION_PAGE_SIZE);
         }}
-        placeholder="Search any run, step, workflow or person..."
+        placeholder="Filter the board by workflow, step or person..."
         className="min-h-[38px] w-full border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-sm text-on-surface focus:outline-none"
       />
 
       {shown.length === 0 ? (
         <p className="border-2 border-on-surface bg-surface-container-lowest px-4 py-8 text-center font-body-md text-body-md text-on-surface-variant">
-          {overview.attention.length === 0
+          {overview.buckets.length === 0
             ? "Nothing is waiting on anyone. All caught up."
             : "Nothing matches this filter."}
         </p>
       ) : (
-        <div className="border-2 border-on-surface divide-y divide-outline-variant">
-          {shown.map((a) => {
-            const late = a.lateMinutes !== null;
+        <div className="border-2 border-on-surface divide-y-2 divide-on-surface">
+          {shown.map((b) => {
+            const open = openBucket === b.key;
             return (
-              <button
-                key={`${a.instanceId}:${a.stepNo}`}
-                onClick={() => onOpenRun(a.instanceId, a.templateId)}
-                className={`w-full text-left flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 transition-colors ${
-                  late ? "bg-error/5 hover:bg-error/10" : "hover:bg-surface-container-low"
-                }`}
-              >
-                <span className="flex-1 min-w-[200px]">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-body-md text-body-md text-on-surface font-semibold">{a.runTitle}</span>
-                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                      {a.templateName}
+              <div key={b.key} className={b.overdue > 0 ? "bg-error/5" : ""}>
+                <button
+                  onClick={() => setOpenBucket((prev) => (prev === b.key ? null : b.key))}
+                  className="w-full text-left flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 hover:bg-surface-container-low transition-colors"
+                >
+                  <span className="flex-1 min-w-[220px]">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-body-md text-body-md text-on-surface font-semibold">
+                        {b.what}
+                      </span>
+                      <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                        {b.templateName} · Step {b.stepNo}
+                      </span>
+                    </span>
+                    <span className="block font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5">
+                      {b.doerName}
+                      {b.nextDue ? ` · next due ${formatTsShort(b.nextDue)}` : " · no deadline"}
                     </span>
                   </span>
-                  <span className="block font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5">
-                    Step {a.stepNo} · {a.what} · {a.doerName}
+                  <span className="flex items-center gap-2 shrink-0">
+                    {b.overdue > 0 && (
+                      <span className="border-2 border-error bg-error text-on-error px-2 py-0.5 font-label-sm text-label-sm uppercase">
+                        {b.overdue} late
+                      </span>
+                    )}
+                    <span className="border-2 border-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase text-on-surface">
+                      {b.total} waiting
+                    </span>
+                    <span className="material-symbols-outlined text-on-surface-variant">
+                      {open ? "expand_less" : "expand_more"}
+                    </span>
                   </span>
-                </span>
-                <span className="flex items-center gap-2 shrink-0">
-                  <span
-                    className={`font-label-sm text-label-sm ${late ? "text-error font-bold" : "text-on-surface-variant"}`}
-                  >
-                    {late
-                      ? formatLateness(a.lateMinutes!)
-                      : a.planned
-                      ? `by ${formatTsShort(a.planned)}`
-                      : "no deadline"}
-                  </span>
-                  <StepStatusBadge status={a.status} />
-                </span>
-              </button>
+                </button>
+
+                {open && (
+                  <div className="border-t-2 border-on-surface bg-surface-container-lowest divide-y divide-outline-variant">
+                    {b.runs.map((r) => {
+                      const late = r.lateMinutes !== null;
+                      return (
+                        <button
+                          key={r.instanceId}
+                          onClick={() => onOpenRun(r.instanceId, b.templateId)}
+                          className="w-full text-left flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 hover:bg-surface-container-low transition-colors"
+                        >
+                          <span className="font-body-md text-body-md text-on-surface font-semibold">
+                            {r.runTitle}
+                          </span>
+                          <span className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`font-label-sm text-label-sm ${
+                                late ? "text-error font-bold" : "text-on-surface-variant"
+                              }`}
+                            >
+                              {late
+                                ? formatLateness(r.lateMinutes!)
+                                : r.planned
+                                ? `by ${formatTsShort(r.planned)}`
+                                : "no deadline"}
+                            </span>
+                            <StepStatusBadge status={r.status} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {b.total > b.runs.length && (
+                      <p className="px-3 py-2 font-data-mono text-data-mono text-on-surface-variant text-xs">
+                        Showing the {b.runs.length} most urgent of {b.total}. Open{" "}
+                        <span className="uppercase">{b.templateName}</span> below to work through all of them.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       )}
 
-      {rows.length > shown.length && (
+      {groups.length > shown.length && (
         <button
           onClick={() => setVisible((prev) => prev + ATTENTION_PAGE_SIZE)}
           className="border-2 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
         >
-          Show {Math.min(ATTENTION_PAGE_SIZE, rows.length - shown.length)} more ({rows.length - shown.length} left)
+          Show {Math.min(ATTENTION_PAGE_SIZE, groups.length - shown.length)} more ({groups.length - shown.length} left)
         </button>
       )}
     </div>
