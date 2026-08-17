@@ -159,16 +159,6 @@ function formatTsShort(ts: string): string {
   });
 }
 
-/**
- * Column widths (px). These are declared on a <colgroup> and the table is
- * `table-fixed`, so the browser actually honours them — which is what makes
- * the one pinned column's `left: 0` line up instead of drifting.
- */
-const COL_IDENTITY = 170;
-const COL_STARTED = 140;
-const COL_FIELD = 140;
-const COL_STEP = 172;
-const COL_ACTION = 96;
 /** At 100+ runs the plain list stops being scannable — page it instead. */
 const RUN_PAGE_SIZE = 20;
 
@@ -397,13 +387,78 @@ function WorkflowControlRoom({
   );
 }
 
+/** Which step of a run is somebody's turn right now, if any. */
+function currentStepOf(run: WorkflowTemplateExport["runs"][number]) {
+  return run.steps.find((s) => s.status === "Active" || s.status === "Overdue") ?? null;
+}
+
+/** One step inside an opened run: What / Who / How / When, then its timing. */
+function RunStepRow({
+  step,
+  def,
+}: {
+  step: WorkflowTemplateExport["runs"][number]["steps"][number];
+  def: WorkflowTemplateExport["steps"][number] | undefined;
+}) {
+  const late = step.status === "Overdue" || (step.delayMinutes !== null && step.delayMinutes > 0);
+  return (
+    <div
+      className={`border-2 p-3 flex flex-col gap-1.5 ${
+        late ? "border-error bg-error/5" : "border-on-surface bg-surface"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-on-surface text-surface font-label-sm text-[10px]">
+            {step.stepNo}
+          </span>
+          <span className="font-body-md text-body-md text-on-surface font-semibold">
+            {def?.what ?? `Step ${step.stepNo}`}
+          </span>
+        </span>
+        <StepStatusBadge status={step.status as WorkflowStepStatus} />
+      </div>
+
+      <div className="font-data-mono text-data-mono text-on-surface-variant text-xs">
+        {def?.doerName ?? "—"}
+        {def?.how ? ` · ${def.how}` : ""}
+        {def?.tat ? ` · ${describeTat(def.tat)}` : ""}
+      </div>
+
+      {/* Planned and actual stacked, never side by side — this whole view has
+          to stay one column wide. */}
+      <div className="flex flex-col gap-0.5 font-data-mono text-data-mono text-xs">
+        <span className={late ? "text-error font-bold" : "text-on-surface-variant"}>
+          Due {step.planned ? formatTs(step.planned) : "—"}
+        </span>
+        {step.actual && <span className="text-on-surface-variant">Done {formatTs(step.actual)}</span>}
+        {step.delayMinutes !== null && (
+          <span
+            className={
+              step.delayMinutes > 0 ? "text-error font-semibold" : "text-on-surface-variant"
+            }
+          >
+            {formatDelayMinutes(step.delayMinutes)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
- * The full home for one workflow's runs — search, Active/Complete tabs,
- * paging, opening a run's Step Timeline, and deleting a run, all inside the
- * same sheet layout the original tracking sheet used. Nothing about managing
- * a workflow's runs happens outside this box anymore.
+ * The full home for one workflow's runs — search, Active/Complete tabs, paging,
+ * opening a run, and deleting one.
+ *
+ * Laid out as a single column on purpose. The spreadsheet this replaced put a
+ * block of columns per step, which meant a four-step workflow was already wider
+ * than the screen and every extra step pushed it further — you scrolled
+ * sideways to answer "who has this now?". Here each run is one row that opens
+ * downward, so the answer is always in front of you and nothing ever runs off
+ * the right edge, on a phone or a monitor. The column-per-step grid still
+ * exists for anyone who wants it — that is what Export produces.
  */
-function WorkflowSheetTable({
+function WorkflowRunList({
   data,
   search,
   onSearchChange,
@@ -426,6 +481,8 @@ function WorkflowSheetTable({
   onRowClick: (id: string) => void;
   onDeleteRow: (id: string, title: string, status: WorkflowInstanceStatus, e: { stopPropagation: () => void }) => void;
 }) {
+  const [openRunId, setOpenRunId] = useState<string | null>(null);
+
   const q = search.trim().toLowerCase();
   const filteredRuns = data.runs.filter((run) => {
     if (run.status !== statusFilter) return false;
@@ -433,24 +490,16 @@ function WorkflowSheetTable({
     return run.title.toLowerCase().includes(q) || run.fieldValues.some((v) => v.toLowerCase().includes(q));
   });
   const visibleRuns = filteredRuns.slice(0, visibleCount);
-
-  // The template's first field is what actually identifies a run, so it
-  // takes the pinned column and the rest follow. With no fields defined at all
-  // the run's own title stands in.
-  const identityLabel = data.fieldLabels[0] ?? "Run";
-  const extraLabels = data.fieldLabels.slice(1);
-  const colCount = 1 + 1 + extraLabels.length + data.steps.length + 1;
-  const tableWidth =
-    COL_IDENTITY + COL_STARTED + extraLabels.length * COL_FIELD + data.steps.length * COL_STEP + COL_ACTION;
+  const stepDefByNo = new Map(data.steps.map((s) => [s.stepNo, s]));
 
   return (
-    <div className="flex flex-col gap-0">
-      {/* Search + Active/Complete tabs — this run list is what "Ongoing Work" used to be. */}
+    <div className="flex flex-col gap-2">
+      {/* Search + Active/Complete tabs */}
       <div className="flex flex-wrap items-center gap-2 border-2 border-on-surface bg-surface-container-low p-2">
         <input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search title or any field value..."
+          placeholder="Search by name or any detail..."
           className="min-h-[36px] flex-1 min-w-[180px] border-2 border-on-surface bg-surface px-3 py-1 font-data-mono text-sm text-on-surface focus:outline-none"
         />
         <div className="flex gap-2">
@@ -470,173 +519,112 @@ function WorkflowSheetTable({
         </div>
       </div>
 
-      {/*
-        One table, one scroller. The step's What/Who/How/When lives in that
-        step's own header cell, so the chain reads across the top exactly above
-        the data it describes — the original sheet's shape, aligned by
-        construction rather than by two scrollers that have to agree.
-        border-separate (not collapse) is required: collapsed borders and
-        position:sticky fight each other and the lines smear while scrolling.
-      */}
-      <div className="border-2 border-t-0 border-on-surface overflow-auto max-h-[65vh] bg-surface-container-lowest">
-        <table className="table-fixed border-separate border-spacing-0 text-left" style={{ width: tableWidth }}>
-          <colgroup>
-            <col style={{ width: COL_IDENTITY }} />
-            <col style={{ width: COL_STARTED }} />
-            {/* Keyed by position, not label: two fields may legitimately share
-                a label (nothing enforces uniqueness), and these columns are
-                purely positional anyway. */}
-            {extraLabels.map((label, i) => (
-              <col key={i} style={{ width: COL_FIELD }} />
-            ))}
-            {data.steps.map((s) => (
-              <col key={s.stepNo} style={{ width: COL_STEP }} />
-            ))}
-            <col style={{ width: COL_ACTION }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th className="sticky top-0 left-0 z-30 bg-surface-container align-bottom py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase truncate">
-                {identityLabel}
-              </th>
-              <th className="sticky top-0 z-20 bg-surface-container align-bottom py-2 px-3 border-r border-b-2 border-on-surface font-label-sm text-label-sm uppercase truncate">
-                Started
-              </th>
-              {extraLabels.map((label, i) => (
-                <th
-                  key={i}
-                  className="sticky top-0 z-20 bg-surface-container align-bottom py-2 px-3 border-r border-b-2 border-on-surface font-label-sm text-label-sm uppercase truncate"
-                  title={label}
-                >
-                  {label}
-                </th>
-              ))}
-              {data.steps.map((s) => (
-                <th
-                  key={s.stepNo}
-                  className="sticky top-0 z-20 bg-surface-container align-top py-2 px-3 border-r border-b-2 border-on-surface border-l-2 font-normal"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-4 h-4 flex items-center justify-center bg-on-surface text-surface font-label-sm text-[10px] shrink-0">
-                      {s.stepNo}
+      {visibleRuns.length === 0 ? (
+        <p className="border-2 border-on-surface bg-surface-container-lowest px-4 py-8 text-center font-body-md text-body-md text-on-surface-variant">
+          {data.runs.length === 0 ? "No work yet." : `No ${statusFilter.toLowerCase()} work matches this search.`}
+        </p>
+      ) : (
+        visibleRuns.map((run) => {
+          const open = openRunId === run.id;
+          const current = currentStepOf(run);
+          const currentDef = current ? stepDefByNo.get(current.stepNo) : undefined;
+          const lateCount = run.steps.filter(
+            (s) => s.status === "Overdue" || (s.delayMinutes !== null && s.delayMinutes > 0)
+          ).length;
+          const doneCount = run.steps.filter((s) => s.status === "Complete").length;
+          const identity = run.fieldValues[0] || run.title;
+          const selected = selectedId === run.id;
+
+          return (
+            <div
+              key={run.id}
+              className={`border-2 ${lateCount > 0 ? "border-error" : "border-on-surface"} ${
+                selected ? "bg-primary-fixed" : "bg-surface"
+              }`}
+            >
+              <button
+                onClick={() => setOpenRunId((prev) => (prev === run.id ? null : run.id))}
+                className="w-full text-left flex flex-col gap-1 px-3 py-2.5 hover:bg-surface-container transition-colors"
+              >
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-body-md text-body-md text-on-surface font-semibold">
+                    {identity}
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    {lateCount > 0 && (
+                      <span className="border-2 border-error bg-error text-on-error px-1.5 font-label-sm text-[10px] uppercase">
+                        {lateCount} late
+                      </span>
+                    )}
+                    <span className="font-label-sm text-[10px] uppercase text-on-surface-variant">
+                      {doneCount}/{run.steps.length} done
                     </span>
-                    <span className="font-label-sm text-[10px] uppercase text-on-surface-variant truncate">
-                      {describeTat(s.tat)}
+                    <span className="material-symbols-outlined text-on-surface-variant">
+                      {open ? "expand_less" : "expand_more"}
                     </span>
-                  </div>
-                  <div
-                    className="mt-1 font-body-md text-body-md text-on-surface font-semibold leading-tight truncate"
-                    title={s.what}
-                  >
-                    {s.what}
-                  </div>
-                  <div
-                    className="font-label-sm text-label-sm text-on-surface-variant truncate"
-                    title={`${s.doerName} · ${s.how}`}
-                  >
-                    {s.doerName} · {s.how}
-                  </div>
-                </th>
-              ))}
-              <th className="sticky top-0 z-20 bg-surface-container border-b-2 border-on-surface" />
-            </tr>
-          </thead>
-          <tbody className="font-body-md text-body-md text-on-surface">
-            {visibleRuns.length === 0 ? (
-              <tr>
-                <td colSpan={colCount} className="py-6 px-3 text-center text-on-surface-variant">
-                  {data.runs.length === 0 ? "No runs yet." : `No ${statusFilter.toLowerCase()} runs match this search.`}
-                </td>
-              </tr>
-            ) : (
-              visibleRuns.map((run, rowIndex) => {
-                const selected = selectedId === run.id;
-                // The pinned cell needs its own opaque background — a sticky
-                // cell paints over scrolled content, so it can't rely on the
-                // row's stripe showing through.
-                //
-                // Selection uses primary-*fixed* (a light tint), not
-                // primary-container: the latter is near-black navy, and the
-                // row's text stays on-surface, so it would paint dark on dark
-                // and the row would go blank the moment it was picked.
-                const rowBg = selected
-                  ? "bg-primary-fixed"
-                  : rowIndex % 2 === 0
-                  ? "bg-surface"
-                  : "bg-surface-container-lowest";
-                const identity = run.fieldValues[0] || run.title;
-                return (
-                  <tr
-                    key={run.id}
-                    onClick={() => onRowClick(run.id)}
-                    className={`group cursor-pointer ${rowBg} ${selected ? "" : "hover:bg-surface-container-low"}`}
-                  >
-                    <td
-                      className={`sticky left-0 z-10 ${rowBg} ${
-                        selected ? "" : "group-hover:bg-surface-container-low"
-                      } py-2 px-3 border-r-2 border-b border-on-surface font-semibold truncate`}
-                      title={identity}
-                    >
-                      {identity || "—"}
-                    </td>
-                    <td className="py-2 px-3 border-r border-b border-on-surface font-label-sm text-label-sm text-on-surface-variant truncate">
+                  </span>
+                </span>
+
+                {/* The run's own details, wrapping rather than spread across
+                    columns, so a workflow with ten fields still reads down. */}
+                {run.fieldValues.length > 1 && (
+                  <span className="font-data-mono text-data-mono text-on-surface-variant text-xs">
+                    {run.fieldValues
+                      .slice(1)
+                      .map((v, i) => `${data.fieldLabels[i + 1] ?? ""}: ${v || "—"}`)
+                      .join(" · ")}
+                  </span>
+                )}
+
+                {/* Whose turn it is — the one thing worth seeing without opening. */}
+                <span className="font-data-mono text-data-mono text-xs">
+                  {current ? (
+                    <span className={current.status === "Overdue" ? "text-error font-bold" : "text-on-surface-variant"}>
+                      Now with {currentDef?.doerName ?? "—"} · {currentDef?.what ?? `Step ${current.stepNo}`}
+                      {current.planned ? ` · due ${formatTsShort(current.planned)}` : ""}
+                    </span>
+                  ) : (
+                    <span className="text-on-surface-variant">
+                      {run.status === "Complete" ? "Finished" : "Not started"} · started{" "}
                       {formatTsShort(run.startedAt)}
-                    </td>
-                    {extraLabels.map((_label, j) => (
-                      <td
-                        key={j}
-                        className="py-2 px-3 border-r border-b border-on-surface truncate"
-                        title={run.fieldValues[j + 1] ?? ""}
-                      >
-                        {run.fieldValues[j + 1] || "—"}
-                      </td>
-                    ))}
-                    {run.steps.map((s) => (
-                      <td
-                        key={s.stepNo}
-                        className="py-2 px-3 border-r border-l-2 border-b border-on-surface align-top"
-                        title={`Planned: ${s.planned ? formatTs(s.planned) : "—"}\nActual: ${
-                          s.actual ? formatTs(s.actual) : "—"
-                        }`}
-                      >
-                        <StepStatusBadge status={s.status} />
-                        <div className="mt-1 font-label-sm text-[10px] text-on-surface-variant truncate">
-                          {s.actual ? formatTsShort(s.actual) : s.planned ? `by ${formatTsShort(s.planned)}` : "—"}
-                        </div>
-                        {/* Only lateness is worth colouring — on-time is the
-                            normal case and reads fine as plain text. */}
-                        {s.delayMinutes !== null && (
-                          <div
-                            className={`font-label-sm text-[10px] font-semibold truncate ${
-                              s.delayMinutes > 0 ? "text-error" : "text-on-surface-variant"
-                            }`}
-                          >
-                            {formatDelayMinutes(s.delayMinutes)}
-                          </div>
-                        )}
-                      </td>
-                    ))}
-                    <td className="py-2 px-2 border-b border-on-surface text-right align-top">
-                      <button
-                        onClick={(e) => onDeleteRow(run.id, run.title, run.status, e)}
-                        title="Delete this work"
-                        className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-[10px] uppercase hover:bg-error hover:text-on-error transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                    </span>
+                  )}
+                </span>
+              </button>
+
+              {open && (
+                <div className="border-t-2 border-on-surface bg-surface-container-lowest p-2 flex flex-col gap-2">
+                  <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
+                    Started {formatTs(run.startedAt)}
+                  </p>
+                  {run.steps.map((s) => (
+                    <RunStepRow key={s.stepNo} step={s} def={stepDefByNo.get(s.stepNo)} />
+                  ))}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      onClick={() => onRowClick(run.id)}
+                      className="border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase hover:opacity-90 transition-colors"
+                    >
+                      Open Timeline
+                    </button>
+                    <button
+                      onClick={(e) => onDeleteRow(run.id, run.title, run.status, e)}
+                      className="border-2 border-error text-error px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
 
       {filteredRuns.length > visibleRuns.length && (
         <button
           onClick={onShowMore}
-          className="border-2 border-t-0 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+          className="border-2 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
         >
           Show {Math.min(RUN_PAGE_SIZE, filteredRuns.length - visibleRuns.length)} more ({filteredRuns.length - visibleRuns.length} left)
         </button>
@@ -1347,7 +1335,7 @@ function WorkflowInner() {
                          otherwise the minute-by-minute refresh would rip
                          the table off screen while it reloads. */
                       sheetDataByTemplate[openTemplate.id] ? (
-                        <WorkflowSheetTable
+                        <WorkflowRunList
                           data={sheetDataByTemplate[openTemplate.id]!}
                           search={runSearch}
                           onSearchChange={(v) => {
@@ -1441,74 +1429,76 @@ function WorkflowInner() {
                   </p>
                 )}
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1000px]">
-                  <thead>
-                    <tr className="bg-surface-container-low border-b-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface">
-                      <th className="py-2 px-3">#</th>
-                      <th className="py-2 px-3">What</th>
-                      <th className="py-2 px-3">Who</th>
-                      <th className="py-2 px-3">How</th>
-                      <th className="py-2 px-3">Planned</th>
-                      <th className="py-2 px-3">Actual</th>
-                      <th className="py-2 px-3">Delay</th>
-                      <th className="py-2 px-3">Status</th>
-                      <th className="py-2 px-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="font-body-md text-body-md text-on-surface">
-                    {selectedSteps.map((s) => {
-                      const canAct =
-                        (s.status === "Active" || s.status === "Overdue") &&
-                        (s.doerId === user?.id || isAdmin);
-                      return (
-                        <tr key={s.id} className="border-b border-outline-variant last:border-b-0">
-                          <td className="py-3 px-3 font-data-mono text-data-mono">{s.stepNo}</td>
-                          <td className="py-3 px-3">{s.what}</td>
-                          <td className="py-3 px-3 text-on-surface-variant">{doerName(s.doerId)}</td>
-                          <td className="py-3 px-3 text-on-surface-variant">{s.how || "—"}</td>
-                          <td className="py-3 px-3 font-data-mono text-data-mono text-on-surface-variant">
-                            {s.planned ? formatTs(s.planned) : "—"}
-                          </td>
-                          <td className="py-3 px-3 font-data-mono text-data-mono text-on-surface-variant">
-                            {formatTs(s.actual)}
-                          </td>
-                          <td className="py-3 px-3 font-data-mono text-data-mono text-on-surface-variant">
-                            {formatDelay(s.planned, s.actual)}
-                          </td>
-                          <td className="py-3 px-3">
-                            <StepStatusBadge status={s.status} />
-                            {s.reworkCount > 0 && (
-                              <span className="ml-2 font-label-sm text-label-sm text-on-surface-variant">
-                                (rework x{s.reworkCount})
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            {canAct && (
-                              <div className="flex gap-2 justify-end">
-                                <button
-                                  onClick={() => handleComplete(s.stepNo)}
-                                  className="border-2 border-on-surface bg-on-surface text-surface px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
-                                >
-                                  Done
-                                </button>
-                                {s.stepNo > 1 && (
-                                  <button
-                                    onClick={() => handleReject(s.stepNo)}
-                                    className="border-2 border-error text-error px-2 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                                  >
-                                    Reject
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              {/* One card per step, stacked — not a wide table. Answering "what's
+                  next and when" shouldn't need scrolling sideways. */}
+              <div className="flex flex-col gap-2">
+                {selectedSteps.map((s) => {
+                  const canAct =
+                    (s.status === "Active" || s.status === "Overdue") &&
+                    (s.doerId === user?.id || isAdmin);
+                  const late = s.status === "Overdue";
+                  return (
+                    <div
+                      key={s.id}
+                      className={`border-2 p-3 flex flex-col gap-1.5 ${
+                        late ? "border-error bg-error/5" : "border-on-surface bg-surface"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-on-surface text-surface font-label-sm text-[10px]">
+                            {s.stepNo}
+                          </span>
+                          <span className="font-body-md text-body-md text-on-surface font-semibold">
+                            {s.what}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-2 shrink-0">
+                          <StepStatusBadge status={s.status} />
+                          {s.reworkCount > 0 && (
+                            <span className="font-label-sm text-[10px] text-on-surface-variant">
+                              rework x{s.reworkCount}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="font-data-mono text-data-mono text-on-surface-variant text-xs">
+                        {doerName(s.doerId)}
+                        {s.how ? ` · ${s.how}` : ""}
+                      </div>
+
+                      <div className="flex flex-col gap-0.5 font-data-mono text-data-mono text-xs">
+                        <span className={late ? "text-error font-bold" : "text-on-surface-variant"}>
+                          Planned {s.planned ? formatTs(s.planned) : "—"}
+                        </span>
+                        {s.actual && (
+                          <span className="text-on-surface-variant">Actual {formatTs(s.actual)}</span>
+                        )}
+                        <span className="text-on-surface-variant">Delay {formatDelay(s.planned, s.actual)}</span>
+                      </div>
+
+                      {canAct && (
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => handleComplete(s.stepNo)}
+                            className="border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                          >
+                            Done
+                          </button>
+                          {s.stepNo > 1 && (
+                            <button
+                              onClick={() => handleReject(s.stepNo)}
+                              className="border-2 border-error text-error px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
+                            >
+                              Reject
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
