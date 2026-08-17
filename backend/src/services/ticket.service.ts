@@ -7,6 +7,9 @@ export type TicketStatus = "Pending" | "Waiting for Employee" | "Reopened" | "Co
 export interface TicketData {
   employee_id: string;
   employee_name: string;
+  /** Who the ticket is addressed to — always an MD or PC, never the raiser. */
+  assigned_to_id: string;
+  assigned_to_name: string;
   department?: string;
   title: string;
   description: string;
@@ -49,16 +52,30 @@ export class TicketService {
     return data;
   }
 
-  async getTicketsByUser(userId: string) {
+  /**
+   * The tickets `userId` is party to: the ones they raised, plus the ones
+   * addressed to them. Both halves matter now that tickets travel in every
+   * direction — a PC needs to see what a doer sent them *and* what they
+   * themselves sent the MD.
+   */
+  async getTicketsForUser(userId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("tickets")
-      .select("*")
-      .eq("employee_id", userId)
-      .order("created_at", { ascending: false });
-    
-    if (error) throw new AppError(error.message);
-    return data;
+    // Two equality lookups rather than one `.or(...)`: PostgREST's or-filter
+    // takes an interpolated string, so an id carrying a comma or bracket would
+    // rewrite the filter. Both halves are indexed, and merging here is cheap.
+    const [raised, addressed] = await Promise.all([
+      supabase.from("tickets").select("*").eq("employee_id", userId),
+      supabase.from("tickets").select("*").eq("assigned_to_id", userId),
+    ]);
+    if (raised.error) throw new AppError(raised.error.message);
+    if (addressed.error) throw new AppError(addressed.error.message);
+
+    // A ticket can't be both, but dedupe anyway so a bad row can't double up.
+    const byId = new Map<string, any>();
+    for (const t of [...(raised.data ?? []), ...(addressed.data ?? [])]) byId.set(t.id, t);
+    return Array.from(byId.values()).sort((a, b) =>
+      String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
+    );
   }
 
   async getTicketById(id: string) {
@@ -106,37 +123,29 @@ export class TicketService {
     return data;
   }
 
-  async getDashboardStats() {
-    const supabase = getSupabase();
-    const { data, error } = await supabase.from("tickets").select("status");
-    if (error) throw new AppError(error.message);
-
+  /**
+   * Counts over exactly the tickets `tickets` contains — the caller passes the
+   * same set the user is allowed to list, so the headline numbers can never
+   * advertise tickets that person cannot open.
+   */
+  getDashboardStats(tickets: any[]) {
+    const today = new Date().toISOString().split("T")[0];
     const stats = {
-      total: data.length,
+      total: tickets.length,
       pending: 0,
       waiting: 0,
       reopened: 0,
       completedToday: 0,
     };
 
-    const today = new Date().toISOString().split("T")[0];
-
-    data.forEach((t: any) => {
+    for (const t of tickets) {
       if (t.status === "Pending") stats.pending++;
       else if (t.status === "Waiting for Employee") stats.waiting++;
       else if (t.status === "Reopened") stats.reopened++;
-      // We don't have completed_at, but we can check if it's completed and updated today
-      // Wait, we need to fetch updated_at to check completed today. Let's fetch it.
-    });
-
-    // Let's do a better fetch for dashboard stats
-    const { data: fullData, error: err2 } = await supabase.from("tickets").select("status, updated_at");
-    if (err2) throw new AppError(err2.message);
-
-    stats.completedToday = fullData.filter((t: any) => 
-      t.status === "Completed" && t.updated_at?.startsWith(today)
-    ).length;
-
+      else if (t.status === "Completed" && String(t.updated_at ?? "").startsWith(today!)) {
+        stats.completedToday++;
+      }
+    }
     return stats;
   }
 }

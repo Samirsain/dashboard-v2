@@ -333,6 +333,9 @@ export interface Ticket {
   id: string;
   employee_id: string;
   employee_name: string;
+  /** Who this ticket was raised with — always an MD or PC. Empty on pre-routing tickets. */
+  assigned_to_id: string;
+  assigned_to_name: string;
   department: string;
   title: string;
   description: string;

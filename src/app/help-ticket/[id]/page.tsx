@@ -9,8 +9,6 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import type { Ticket } from "@/lib/types";
 
-const PREDEFINED_SOLUTIONS: string[] = []; // Not used anymore
-
 function StatusBadge({ status }: { status: Ticket["status"] }) {
   const colors = {
     Pending: "bg-yellow-400 text-black",
@@ -29,7 +27,6 @@ function TicketDetailsInner() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const { user } = useAuth();
-  const isAdmin = user?.role === "MD" || user?.role === "PC";
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,6 +61,13 @@ function TicketDetailsInner() {
       clearInterval(timer);
     };
   }, [id]);
+
+  // Who does what is decided by this person's part in *this* ticket, not by
+  // their role in general: a PC raising a ticket with the MD is the raiser
+  // here, and needs the accept/reopen buttons like anyone else would.
+  const isRaiser = !!ticket && ticket.employee_id === user?.id;
+  const canAnswer =
+    !!ticket && !isRaiser && (ticket.assigned_to_id === user?.id || user?.role === "MD");
 
   async function handleAdminSubmitSolution() {
     let finalSolution = customSol;
@@ -153,8 +157,16 @@ function TicketDetailsInner() {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 font-body-md text-body-md">
                   <div>
-                    <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Employee</p>
-                    <p className="font-medium text-on-surface">{ticket.employee_name}</p>
+                    <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Raised By</p>
+                    <p className="font-medium text-on-surface">
+                      {ticket.employee_id === user?.id ? "You" : ticket.employee_name || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">Raised With</p>
+                    <p className="font-medium text-on-surface">
+                      {ticket.assigned_to_id === user?.id ? "You" : ticket.assigned_to_name || "—"}
+                    </p>
                   </div>
                   {ticket.solution_option1 && (
                     <div className="col-span-2">
@@ -181,13 +193,13 @@ function TicketDetailsInner() {
               {/* Solution Section */}
               {ticket.solution && (
                 <div className="border-2 border-primary bg-primary/5 p-6 flex flex-col gap-4">
-                  <h4 className="font-headline-md text-headline-md text-primary uppercase">MD Solution</h4>
+                  <h4 className="font-headline-md text-headline-md text-primary uppercase">Solution</h4>
                   <div className="bg-surface p-4 border border-primary/20 text-on-surface whitespace-pre-wrap font-body-lg text-body-lg">
                     {ticket.solution}
                   </div>
                   
                   {/* Employee Action Buttons */}
-                  {!isAdmin && ticket.status === "Waiting for Employee" && (
+                  {isRaiser && ticket.status === "Waiting for Employee" && (
                     <div className="flex gap-4 mt-2">
                       <button
                         onClick={() => handleEmployeeStatus("Completed")}
@@ -209,7 +221,7 @@ function TicketDetailsInner() {
               )}
 
               {/* MD Input Form */}
-              {isAdmin && (ticket.status === "Pending" || ticket.status === "Reopened") && (
+              {canAnswer && (ticket.status === "Pending" || ticket.status === "Reopened") && (
                 <div className="border-2 border-on-surface bg-surface p-6 flex flex-col gap-6">
                   <h4 className="font-headline-md text-headline-md text-on-surface uppercase">Provide Solution</h4>
                   

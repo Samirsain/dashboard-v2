@@ -158,7 +158,8 @@ function HelpTicketInner() {
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant w-32">Ticket ID</th>
                   <th className="py-3 px-4 border-r border-surface-variant">Title</th>
-                  {isAdmin && <th className="py-3 px-4 border-r border-surface-variant w-40">Employee</th>}
+                  <th className="py-3 px-4 border-r border-surface-variant w-40">From</th>
+                  <th className="py-3 px-4 border-r border-surface-variant w-40">To</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-40">Created</th>
                   <th className="py-3 px-4 border-r border-surface-variant w-40 text-center">Status</th>
                   <th className="py-3 px-4 w-32 text-center">Action</th>
@@ -167,14 +168,14 @@ function HelpTicketInner() {
               <tbody className="font-body-md text-body-md text-on-surface">
                 {loading && (
                   <tr>
-                    <td colSpan={isAdmin ? 7 : 6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && filteredTickets.length === 0 && (
                   <tr>
-                    <td colSpan={isAdmin ? 7 : 6} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
+                    <td colSpan={7} className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant">
                       No {viewMode} tickets found.
                     </td>
                   </tr>
@@ -187,11 +188,12 @@ function HelpTicketInner() {
                     <td className="py-3 px-4 border-r border-surface-variant font-medium">
                       {t.title}
                     </td>
-                    {isAdmin && (
-                      <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
-                        {t.employee_name}
-                      </td>
-                    )}
+                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
+                      {t.employee_id === user?.id ? "You" : t.employee_name || "—"}
+                    </td>
+                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
+                      {t.assigned_to_id === user?.id ? "You" : t.assigned_to_name || "—"}
+                    </td>
                     <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono text-[12px]">
                       {t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : "—"}
                     </td>

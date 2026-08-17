@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import type { TicketPriority } from "@/lib/types";
+import type { Doer } from "@/lib/types";
 
 function NewTicketInner() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,11 +19,36 @@ function NewTicketInner() {
   const [description, setDescription] = useState("");
   const [solutionOpt1, setSolutionOpt1] = useState("");
   const [solutionOpt2, setSolutionOpt2] = useState("");
+  // Tickets are raised *with* management, so the choices are the MDs and PCs —
+  // minus yourself, since a PC raising one with the MD and the MD raising one
+  // with a PC both go through this same form.
+  const [recipients, setRecipients] = useState<Doer[]>([]);
+  const [assignedTo, setAssignedTo] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await api.get<Doer[]>("/users");
+        if (cancelled) return;
+        setRecipients(all.filter((u) => (u.role === "MD" || u.role === "PC") && u.id !== user?.id));
+      } catch {
+        if (!cancelled) setError("Could not load who you can raise this with.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
       setError("Title and Description are required.");
+      return;
+    }
+    if (!assignedTo) {
+      setError("Choose who this ticket is for.");
       return;
     }
 
@@ -31,6 +58,7 @@ function NewTicketInner() {
       await api.post("/tickets", {
         title: title.trim(),
         description: description.trim(),
+        assigned_to_id: assignedTo,
         priority: "Normal", // Default priority so DB constraints don't fail if any
         solution_option1: solutionOpt1,
         solution_option2: solutionOpt2,
@@ -74,6 +102,41 @@ function NewTicketInner() {
           )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <label className="font-label-md text-label-md uppercase text-on-surface">Raise This With *</label>
+              {recipients.length === 0 ? (
+                <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase border-2 border-on-surface px-3 py-3">
+                  Nobody available to raise a ticket with.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {recipients.map((r) => (
+                    <label
+                      key={r.id}
+                      className={`flex items-center gap-2 border-2 px-3 py-2 cursor-pointer transition-colors ${
+                        assignedTo === r.id
+                          ? "border-on-surface bg-surface-container"
+                          : "border-on-surface hover:bg-surface-container"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="assignedTo"
+                        checked={assignedTo === r.id}
+                        onChange={() => setAssignedTo(r.id)}
+                      />
+                      <span className="font-label-sm text-label-sm uppercase text-on-surface">
+                        {r.name}
+                      </span>
+                      <span className="font-label-sm text-[10px] uppercase text-on-surface-variant">
+                        {r.role}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-col gap-2">
               <label className="font-label-md text-label-md uppercase text-on-surface">Ticket Title *</label>
               <input
