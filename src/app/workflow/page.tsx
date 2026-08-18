@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
@@ -387,8 +387,13 @@ function WorkflowControlRoom({
   );
 }
 
+/** Which step of a run is somebody's turn right now, if any. */
+function currentStepOf(run: WorkflowTemplateExport["runs"][number]) {
+  return run.steps.find((s) => s.status === "Active" || s.status === "Overdue") ?? null;
+}
+
 /** Column widths (px), declared on a <colgroup> so `table-fixed` actually honours them. */
-const COL_IDENTITY = 190;
+const COL_IDENTITY = 220;
 const COL_STEP = 190;
 const COL_ACTION = 84;
 
@@ -439,7 +444,7 @@ function WorkflowRunList({
   });
   const visibleRuns = filteredRuns.slice(0, visibleCount);
   const identityLabel = data.fieldLabels[0] ?? "Run";
-  const colCount = 1 + data.steps.length + 1;
+  const stepDefByNo = new Map(data.steps.map((s) => [s.stepNo, s]));
 
   return (
     <div className="flex flex-col gap-2">
@@ -466,6 +471,13 @@ function WorkflowRunList({
             </button>
           ))}
         </div>
+        {/* Fixed in the toolbar (not below the rows) so it's visible before
+            you've scrolled anywhere, not just after scrolling past everything. */}
+        {data.steps.length > 3 && (
+          <p className="w-full font-label-sm text-[10px] uppercase text-on-surface-variant">
+            {data.steps.length} steps — scroll the sheet sideways to see them all →
+          </p>
+        )}
       </div>
 
       {visibleRuns.length === 0 ? (
@@ -526,24 +538,58 @@ function WorkflowRunList({
                   ? "bg-surface"
                   : "bg-surface-container-lowest";
                 const identity = run.fieldValues[0] || run.title;
-                const secondary = run.fieldValues.slice(1).filter(Boolean).join(" · ");
+                // Labelled, not raw values — "hmh" means nothing on its own;
+                // "City: hmh" does.
+                const secondary = run.fieldValues
+                  .slice(1)
+                  .map((v, i) => (v ? `${data.fieldLabels[i + 1] ?? ""}: ${v}` : null))
+                  .filter((v): v is string => v !== null)
+                  .join(" · ");
+                const current = currentStepOf(run);
+                const currentDef = current ? stepDefByNo.get(current.stepNo) : undefined;
+                const lateCount = run.steps.filter(
+                  (s) => s.status === "Overdue" || (s.delayMinutes !== null && s.delayMinutes > 0)
+                ).length;
                 return (
                   <tr key={run.id} onClick={() => onRowClick(run.id)} className={`group cursor-pointer ${rowBg}`}>
+                    {/*
+                      The one column you never scroll away from has to answer
+                      "is this row fine?" on its own — otherwise pinning it is
+                      pointless, since you'd still have to scroll right on
+                      every single row just to find out. So it also carries
+                      whose turn it is and how many steps are late, not just
+                      the row's name.
+                    */}
                     <td
                       className={`sticky left-0 z-10 ${rowBg} ${
                         selected ? "" : "group-hover:bg-surface-container-low"
                       } py-2 px-3 border-r-2 border-b border-on-surface align-top`}
                     >
-                      <p className="font-semibold truncate" title={identity}>
-                        {identity || "—"}
-                      </p>
+                      <span className="flex items-start justify-between gap-1">
+                        <p className="font-semibold truncate" title={identity}>
+                          {identity || "—"}
+                        </p>
+                        {lateCount > 0 && (
+                          <span className="shrink-0 border-2 border-error bg-error text-on-error px-1 font-label-sm text-[9px] uppercase">
+                            {lateCount} late
+                          </span>
+                        )}
+                      </span>
                       {secondary && (
                         <p className="font-label-sm text-[10px] text-on-surface-variant truncate" title={secondary}>
                           {secondary}
                         </p>
                       )}
-                      <p className="font-label-sm text-[10px] text-on-surface-variant">
-                        {formatTsShort(run.startedAt)}
+                      <p
+                        className={`font-label-sm text-[10px] truncate ${
+                          current?.status === "Overdue" ? "text-error font-semibold" : "text-on-surface-variant"
+                        }`}
+                      >
+                        {current
+                          ? `Now: ${currentDef?.doerName ?? "—"} · ${currentDef?.what ?? `Step ${current.stepNo}`}`
+                          : run.status === "Complete"
+                          ? "Finished"
+                          : "Not started"}
                       </p>
                     </td>
                     {run.steps.map((s) => {
@@ -583,9 +629,6 @@ function WorkflowRunList({
               })}
             </tbody>
           </table>
-          <p className="px-3 py-1.5 font-label-sm text-[10px] uppercase text-on-surface-variant bg-surface-container-low border-t border-on-surface">
-            {colCount > 4 ? "Scroll right for more steps →" : " "}
-          </p>
         </div>
       )}
 
@@ -956,6 +999,10 @@ function WorkflowInner() {
   // the template's expanded view now, not an optional extra.
   const [sheetLoadingId, setSheetLoadingId] = useState<string | null>(null);
   const [sheetDataByTemplate, setSheetDataByTemplate] = useState<Record<string, WorkflowTemplateExport>>({});
+  // Clicking a run has to visibly do something: the Step Timeline it opens
+  // renders well below the sheet, so without this a click looks like it did
+  // nothing until you happen to scroll down past it yourself.
+  const detailRef = useRef<HTMLDivElement>(null);
 
   async function loadData(opts?: { silent?: boolean }) {
     if (!opts?.silent) setLoading(true);
@@ -995,6 +1042,12 @@ function WorkflowInner() {
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTemplateId]);
+
+  // Runs after the detail panel actually mounts for this id, not before —
+  // scrolling inside openInstance itself would race the render.
+  useEffect(() => {
+    if (selectedId) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedId]);
 
   async function openInstance(id: string) {
     setSelectedId(id);
@@ -1361,7 +1414,7 @@ function WorkflowInner() {
 
           {/* Selected instance detail */}
           {selectedId && (
-            <div className="bg-surface border-2 border-on-surface p-stack-lg">
+            <div ref={detailRef} className="bg-surface border-2 border-on-surface p-stack-lg scroll-mt-20">
               <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
