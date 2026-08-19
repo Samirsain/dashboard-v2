@@ -20,6 +20,11 @@ export const workflowController = {
     created(res, await workflowService.createTemplate(input));
   }),
 
+  updateTemplate: asyncHandler(async (req: Request, res: Response) => {
+    const input = req.body as CreateWorkflowTemplateInput;
+    ok(res, await workflowService.updateTemplate(req.params.id as string, input));
+  }),
+
   removeTemplate: asyncHandler(async (req: Request, res: Response) => {
     await workflowService.removeTemplate(req.params.id as string);
     ok(res, { deleted: true });

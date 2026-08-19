@@ -868,6 +868,7 @@ function WorkflowInner() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
   const [showStartInstance, setShowStartInstance] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   // Which template's step list is currently expanded — collapsed by default
   // so the section reads as a name list, not a wall of every chain at once.
   const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
@@ -1199,6 +1200,13 @@ function WorkflowInner() {
                     {isAdmin && (
                       <div className="flex gap-2">
                         <button
+                          onClick={() => setEditingTemplateId(openTemplate.id)}
+                          title="Edit this workflow's steps — What/Who/How/When, add or remove steps. Work already in progress keeps its own steps as they were."
+                          className="self-start border-2 border-on-surface text-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
                           onClick={() => handleExportTemplate(openTemplate.id)}
                           disabled={exportingId === openTemplate.id}
                           title="Download every run of this workflow as a spreadsheet — steps across the top, one row per run"
@@ -1230,6 +1238,28 @@ function WorkflowInner() {
           onCreated={(t) => {
             setTemplates((prev) => [...prev, t]);
             setShowCreateTemplate(false);
+          }}
+        />
+      )}
+
+      {editingTemplateId && (
+        <CreateWorkflowTemplateModal
+          doers={doers}
+          template={templates.find((t) => t.id === editingTemplateId)}
+          onClose={() => setEditingTemplateId(null)}
+          onCreated={(t) => {
+            setTemplates((prev) => prev.map((x) => (x.id === t.id ? t : x)));
+            // The sheet already loaded for this template is now stale (its
+            // step headers came from the old chain) — drop it so reopening
+            // re-fetches against the edited template, and refresh it right
+            // away if it's the one currently open.
+            setSheetDataByTemplate((prev) => {
+              const next = { ...prev };
+              delete next[t.id];
+              return next;
+            });
+            if (openTemplateId === t.id) loadSheet(t.id, { force: true });
+            setEditingTemplateId(null);
           }}
         />
       )}

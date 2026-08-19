@@ -30,6 +30,11 @@ export const createWorkflowTemplateSchema = z.object({
     .min(1, "At least one step is required"),
 });
 
+// Editing replaces the whole name/fields/steps set, same shape as creating —
+// active runs keep their own copied step data, so this only shapes runs
+// started after the edit.
+export const updateWorkflowTemplateSchema = createWorkflowTemplateSchema;
+
 export const startWorkflowInstanceSchema = z.object({
   templateId: z.string().min(1),
   // Only used by templates with no fields — otherwise the first field names

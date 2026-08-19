@@ -10,6 +10,7 @@ import {
   rejectStepSchema,
   startWorkflowInstanceSchema,
   stepNoParamSchema,
+  updateWorkflowTemplateSchema,
 } from "../validation/workflow.schema";
 
 const router = Router();
@@ -24,6 +25,12 @@ router.post(
   requirePermission(canManageWorkflow),
   validate({ body: createWorkflowTemplateSchema }),
   workflowController.createTemplate
+);
+router.patch(
+  "/templates/:id",
+  requirePermission(canManageWorkflow),
+  validate({ params: idParamSchema, body: updateWorkflowTemplateSchema }),
+  workflowController.updateTemplate
 );
 router.delete(
   "/templates/:id",

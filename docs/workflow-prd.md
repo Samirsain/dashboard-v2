@@ -52,10 +52,9 @@ The same applies to field values: each stores its own `label` alongside its
 |---|---|
 | **MD** | Everything. Always. |
 | **PC** | Same as MD, **only if** granted the `canManageWorkflow` permission in PC Management. Off by default per-PC. |
-| **Doer** | Sees only their own steps. Can mark their own step done, or send it back. Cannot see templates, other people's work, or the Live Board. |
+| **Doer** | Sees only their own steps, both on the Workflow page and merged into the Dashboard's "Pending Tasks & Checklists" table. Can mark their own step done, or send it back with a reason. Cannot see templates or other people's work. |
 
-**Manage** means: create/delete templates, start runs, delete runs, export, and
-view the Live Board.
+**Manage** means: create/edit/delete templates, start runs, delete runs, and export.
 
 Server-side enforcement (not just hidden UI):
 - A doer can only act on a step where `doerId` matches them. Anyone with manage
@@ -135,10 +134,14 @@ Last step completed → run status = Complete
 
 ### Sending work back (rework)
 
-A doer whose step is Active can **send it back** to the previous step:
+A doer whose step is Active can **send it back** to the previous step, and must
+type a reason for doing so:
 
 - Current step → `Blocked`, its rework counter increments
-- Previous step → reopens as `Active`, its `Actual` is cleared
+- Previous step → reopens as `Active`, its `Actual` is cleared, and it carries
+  the typed reason (`rejectReason`) so whoever picks it back up sees exactly
+  why it bounced. The reason is shown on the reopened step's card until it's
+  completed again.
 - Step 1 cannot be sent back (there is nothing behind it)
 
 **Rework cap:** after **3** send-backs, the step is no longer auto-reopened.
@@ -150,23 +153,11 @@ cycling.
 
 ## 6. Screens
 
-### 6.1 Live Board (MD / permitted PC)
+### 6.1 Workflows section (MD / permitted PC)
 
-The landing view. Answers "what needs attention right now, across everything?"
-
-- **Three counters:** Running Work, Overdue Steps, Due Today
-- **Person chips:** every person holding work, with their exact load and how
-  much of it is late. One click filters the board to them. Chips rather than a
-  dropdown so an overloaded person is visible without opening anything.
-- **Pile rows:** grouped by **(workflow, step, person)** — see §7 for why.
-  Sorted most-overdue first. Each row expands to the most urgent runs inside it;
-  clicking one opens its Step Timeline.
-- **Search** filters the board by workflow, step or person.
-
-### 6.2 Workflows section (MD / permitted PC)
-
-A wrapping row of tick-chips, one per workflow, each showing live "N late" /
-"N running" badges so you can tell which one needs opening without opening it.
+The landing view. A wrapping row of tick-chips, one per workflow, each showing
+live "N late" / "N running" badges — grouped server-side by (workflow, step,
+person), see §7 — so you can tell which one needs opening without opening it.
 A workflow with late work carries a red border.
 
 Ticking one opens its **sheet** below — one at a time, since each sheet is a
@@ -179,15 +170,22 @@ wide table.
   visible while scrolling sideways), when it started, its other field values,
   then each step's status, timing and delay
 - Search, Active/Complete tabs, and paging (20 at a time)
-- Per-row delete, plus Export and Delete for the workflow itself
+- Clicking a row highlights it in place — there is no separate detail panel
+- Per-row delete, plus Edit, Export and Delete for the workflow itself
 
-### 6.3 Step Timeline
+### 6.2 Editing a template
 
-Opens when a run is clicked from either the Live Board or a sheet. Full
-step-by-step detail: What / Who / How / Planned / Actual / Delay / Status, with
-Done and Send Back buttons where applicable, and Delete This Work.
+Any template — including one with active runs — can be edited: its name, its
+data fields, and its step chain (What/Who/How/TAT per step, with steps
+addable and removable). This reuses the same modal as creating a template,
+pre-filled with the template's current shape.
 
-### 6.4 My Workflow (doer)
+Editing is safe on a live workflow because of the copy-on-start guarantee in
+§2: runs already started keep the step events they were copied with, so an
+edit only shapes runs started after the save. The edit modal says this
+explicitly while editing.
+
+### 6.3 My Workflow (doer)
 
 Deliberately minimal — no templates, no other people's work.
 
@@ -195,13 +193,21 @@ Deliberately minimal — no templates, no other people's work.
 - Workflow tick-chips (only shown when they have more than one; with a single
   workflow it just opens)
 - One card per step: **What / Who / How / When**, the run's own field values so
-  they know what the job is about, and Mark Done / Send Back
+  they know what the job is about, and Mark Done / Send Back. If the step was
+  sent back to them for rework, the reason is shown on the card.
 - Overdue cards turn red
 - "Coming up for you" — steps not yet their turn, so they can see what's heading
   their way
 - Refreshes itself every 60 seconds
 
-### 6.5 Export
+The same steps also appear on the **Dashboard**, merged into the existing
+"Pending Tasks & Checklists" table alongside ordinary tasks and checklist
+items, with the same Mark Done / Send Back actions — so a doer doesn't need to
+open the Workflow page just to see what's waiting on them. The Dashboard's
+Create Task flow also has a "Workflow" option to start a new run of an
+existing template, entering its data fields.
+
+### 6.4 Export
 
 Downloads a workflow's entire history as CSV in the original sheet layout:
 What / Who / How / When header blocks per step, then one row per run. New runs
@@ -218,22 +224,21 @@ same step under the same person. Listing every outstanding step gives a thousand
 near-identical rows that all say the same thing — and a response that grows with
 the backlog.
 
-**Solution:** the Live Board groups by **(workflow, step, person)**. A thousand
-backed-up runs become *one row*: "this person has 1000 runs sitting on this
-step, 12 of them late."
+**Solution:** `GET /workflow/overview` groups by **(workflow, step, person)**.
+A thousand backed-up runs become *one row*: "this person has 1000 runs sitting
+on this step, 12 of them late" — which is what powers the per-template
+"N late" / "N running" badges in §6.1.
 
 - **Counts are always exact** — computed server-side over every outstanding step
 - **Only the 10 most urgent runs per group are sent**, with the row stating
   "showing the 10 most urgent of 1000"
-- **Person chip totals are computed server-side too**, so sampling can never
-  make them lie
 
 Result: the response is bounded by *how the workflows are configured*, not by
 how much work is outstanding. Measured: 1000 outstanding runs → 1 row →
 ~1.6 KB payload.
 
 **Database reads** are filtered in Postgres rather than fetched-then-filtered:
-the Live Board and the doer view read only `Active` runs, and a doer reads only
+the overview and the doer view read only `Active` runs, and a doer reads only
 their own step events. Since finished work becomes the bulk of the table over
 time, both stay roughly flat as history accumulates.
 
@@ -267,6 +272,7 @@ Step events duplicate `what` / `doer_id` / `how` / `tat` from the template step
 | GET | `/workflow/templates` | Any signed-in user |
 | GET | `/workflow/templates/:id` | Any signed-in user |
 | POST | `/workflow/templates` | Manage |
+| PATCH | `/workflow/templates/:id` | Manage |
 | DELETE | `/workflow/templates/:id` | Manage |
 | GET | `/workflow/templates/:id/export` | Manage |
 | GET | `/workflow/overview` | Manage |
@@ -290,9 +296,6 @@ Things left out on purpose, not by oversight:
 - **No holiday calendar.** Sunday-off only.
 - **No notifications.** The board and the doer's screen are pull-based, both
   self-refreshing every 60s.
-- **No template editing.** Templates are created and deleted, not edited —
-  editing a live template would silently change what people are working on.
-  Create a new one instead.
 - **No file attachments on runs.** The `details` free-text field carries extra
   context.
 - **No per-run reassignment.** Who does a step is fixed by the template. If the

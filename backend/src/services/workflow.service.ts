@@ -255,6 +255,72 @@ export const workflowService = {
     return { id: templateId, name: input.name, createdAt, steps, fields };
   },
 
+  /**
+   * Replaces a template's name, fields and step chain wholesale. Safe to do
+   * even while runs are in flight: a run's steps are copied into its own
+   * events the moment it starts (see startInstance), so editing the template
+   * afterward only shapes runs started *after* the edit — nothing already
+   * running or finished silently changes underneath it.
+   */
+  async updateTemplate(
+    id: string,
+    input: {
+      name: string;
+      fields?: Array<{ label: string; type: WorkflowFieldType }>;
+      steps: Array<{ what: string; doerId: string; how: string; tat: string }>;
+    }
+  ): Promise<WorkflowTemplate & { steps: WorkflowStep[]; fields: WorkflowTemplateField[] }> {
+    if (input.steps.length === 0) {
+      throw AppError.badRequest("A workflow template needs at least one step");
+    }
+    const existing = await dataService.findById(templatesEntity, id);
+    if (!existing) throw AppError.notFound(`Workflow template "${id}" not found`);
+
+    await dataService.updateById(templatesEntity, id, { Name: input.name });
+
+    const [oldSteps, oldFields] = await Promise.all([
+      getStepsForTemplate(id),
+      getFieldsForTemplate(id),
+    ]);
+    for (const step of oldSteps) {
+      await dataService.deleteById(stepsEntity, step.id);
+    }
+    for (const field of oldFields) {
+      await dataService.deleteById(fieldsEntity, field.id);
+    }
+
+    const fields: WorkflowTemplateField[] = [];
+    for (let i = 0; i < (input.fields ?? []).length; i++) {
+      const f = input.fields![i]!;
+      const saved = await dataService.append(fieldsEntity, {
+        "Field ID": generateId("WFF"),
+        "Template ID": id,
+        "Field No": String(i + 1),
+        Label: f.label,
+        Type: f.type,
+      });
+      fields.push(toField(saved));
+    }
+
+    const steps: WorkflowStep[] = [];
+    for (let i = 0; i < input.steps.length; i++) {
+      const s = input.steps[i]!;
+      const stepNo = i + 1;
+      const saved = await dataService.append(stepsEntity, {
+        "Step ID": generateId("WFS"),
+        "Template ID": id,
+        "Step No": String(stepNo),
+        What: s.what,
+        "Doer ID": s.doerId,
+        How: s.how,
+        TAT: s.tat,
+      });
+      steps.push(toStep(saved));
+    }
+
+    return { ...toTemplate(existing), name: input.name, steps, fields };
+  },
+
   async removeTemplate(id: string): Promise<void> {
     const [steps, fields] = await Promise.all([
       getStepsForTemplate(id),
