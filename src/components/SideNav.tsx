@@ -69,11 +69,20 @@ export const RAIL_W = 64;
 
 export default function SideNav({ active }: { active: NavKey }) {
   const { user } = useAuth();
-  // Collapsed by default — a full name-per-row nav spends most of the screen
-  // on nothing when all anyone needs most of the time is "which icon is
-  // Workflow". Expanding is one click away and doesn't cost anything else on
-  // the page, since it overlays rather than reflowing.
-  const [expanded, setExpanded] = useState(false);
+  // Two independent reasons the rail can be open: someone clicked the toggle
+  // (stays open until they click it again or pick a link), or the mouse is
+  // just sitting over it (open only as long as it's hovered). Either one is
+  // enough — a mouse user never has to click at all, and the toggle still
+  // gives keyboard/touch a way in.
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const expanded = pinned || hovered;
+  // After picking a link, close fully rather than leaving it pinned open —
+  // hovering will reopen it the moment the mouse is back over the rail.
+  function closeNav() {
+    setPinned(false);
+    setHovered(false);
+  }
 
   return (
     <>
@@ -81,33 +90,43 @@ export default function SideNav({ active }: { active: NavKey }) {
       {expanded && (
         <button
           aria-label="Close navigation"
-          onClick={() => setExpanded(false)}
+          onClick={() => setPinned(false)}
           className="hidden md:block fixed inset-0 z-30 cursor-default bg-transparent"
         />
       )}
 
       <nav
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         className={`hidden md:flex fixed left-0 top-0 h-full flex-col z-40 border-r-2 border-on-surface bg-surface transition-[width] duration-150 ${
           expanded ? "w-64" : "w-16"
         }`}
       >
-        {/* Brand + expand toggle */}
-        <div className={`border-b-2 border-on-surface flex items-center ${expanded ? "justify-between p-4" : "justify-center py-4"}`}>
+        {/*
+          Brand + toggle. Collapsed, there's only room for the square "30"
+          mark, not the full wordmark — so it swaps to the icon-only crop
+          rather than trying to shrink the wide logo and having it bleed
+          past the rail's edge. Stacked vertically when collapsed (logo, then
+          the toggle below it) since there's no horizontal room for both.
+        */}
+        <div
+          className={`border-b-2 border-on-surface flex items-center ${
+            expanded ? "h-16 justify-between px-4" : "flex-col gap-1.5 py-3"
+          }`}
+        >
           {expanded ? (
-            <Link href="/" className="flex items-center gap-3 text-on-surface min-w-0">
-              <BrandLogo className="h-9 w-auto shrink-0" />
+            <Link href="/" className="flex items-center gap-3 text-on-surface min-w-0 overflow-hidden">
+              <BrandLogo className="h-8 w-auto shrink-0" />
             </Link>
           ) : (
             <Link href="/" className="text-on-surface" title="Thirty Milestones">
-              <BrandLogo className="h-8 w-auto shrink-0" />
+              <BrandLogo iconOnly className="h-7 w-auto shrink-0" />
             </Link>
           )}
           <button
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => setPinned((v) => !v)}
             title={expanded ? "Collapse menu" : "Expand menu"}
-            className={`shrink-0 flex items-center justify-center w-8 h-8 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors ${
-              expanded ? "" : "mt-2"
-            }`}
+            className="shrink-0 flex items-center justify-center w-8 h-8 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
           >
             <span className="material-symbols-outlined">{expanded ? "chevron_left" : "menu"}</span>
           </button>
@@ -119,7 +138,7 @@ export default function SideNav({ active }: { active: NavKey }) {
             href="/"
             active={active === "dashboard"}
             expanded={expanded}
-            onNavigate={() => setExpanded(false)}
+            onNavigate={closeNav}
             label="Dashboard"
             icon={
               <span className="material-symbols-outlined" data-icon="dashboard">
@@ -132,7 +151,7 @@ export default function SideNav({ active }: { active: NavKey }) {
             href="/forms"
             active={active === "forms"}
             expanded={expanded}
-            onNavigate={() => setExpanded(false)}
+            onNavigate={closeNav}
             label="Google Forms"
             icon={<GoogleFormsIcon className="w-6 h-6 shrink-0" />}
           />
@@ -141,7 +160,7 @@ export default function SideNav({ active }: { active: NavKey }) {
             href="/master-sheet"
             active={active === "master-sheet"}
             expanded={expanded}
-            onNavigate={() => setExpanded(false)}
+            onNavigate={closeNav}
             label="Master Sheet"
             icon={
               <span className="material-symbols-outlined" data-icon="table_chart">
@@ -156,7 +175,7 @@ export default function SideNav({ active }: { active: NavKey }) {
               href="/ims"
               active={active === "ims"}
               expanded={expanded}
-              onNavigate={() => setExpanded(false)}
+              onNavigate={closeNav}
               label="Inventory"
               icon={
                 <span className="material-symbols-outlined" data-icon="inventory_2">
@@ -170,7 +189,7 @@ export default function SideNav({ active }: { active: NavKey }) {
             href="/workflow"
             active={active === "workflow"}
             expanded={expanded}
-            onNavigate={() => setExpanded(false)}
+            onNavigate={closeNav}
             label="Workflow"
             icon={
               <span className="material-symbols-outlined" data-icon="account_tree">
@@ -185,7 +204,7 @@ export default function SideNav({ active }: { active: NavKey }) {
               href="/all-tasks"
               active={active === "all-tasks"}
               expanded={expanded}
-              onNavigate={() => setExpanded(false)}
+              onNavigate={closeNav}
               label="All Tasks"
               icon={
                 <span className="material-symbols-outlined" data-icon="fact_check">
@@ -199,7 +218,7 @@ export default function SideNav({ active }: { active: NavKey }) {
             href="/attendance"
             active={active === "attendance"}
             expanded={expanded}
-            onNavigate={() => setExpanded(false)}
+            onNavigate={closeNav}
             label="Attendance"
             icon={
               <span className="material-symbols-outlined" data-icon="badge">
@@ -214,7 +233,7 @@ export default function SideNav({ active }: { active: NavKey }) {
               href="/team-performance"
               active={active === "team-performance"}
               expanded={expanded}
-              onNavigate={() => setExpanded(false)}
+              onNavigate={closeNav}
               label="Team Performance"
               icon={
                 <span className="material-symbols-outlined" data-icon="insights">
