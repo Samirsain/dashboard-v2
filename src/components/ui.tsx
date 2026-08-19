@@ -134,7 +134,7 @@ export function PageHeader({
 /** The standard page shell: sits beside the desktop nav, pads for mobile. */
 export function PageBody({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <main className={`md:ml-64 min-h-screen bg-background ${className}`}>
+    <main className={`md:ml-16 min-h-screen bg-background ${className}`}>
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 p-4 md:p-6">{children}</div>
     </main>
   );

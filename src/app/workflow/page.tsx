@@ -857,7 +857,7 @@ function MyWorkflowSteps() {
       <MobileHeader />
       <SideNav active="workflow" />
 
-      <div className="md:ml-64 flex flex-col min-h-screen bg-background">
+      <div className="md:ml-16 flex flex-col min-h-screen bg-background">
         <header className="flex w-full items-center border-b border-on-surface bg-surface p-3 z-30 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <h2 className="font-headline-md text-headline-md text-on-surface uppercase">My Workflow</h2>
         </header>
@@ -1258,7 +1258,7 @@ function WorkflowInner() {
       <MobileHeader />
       <SideNav active="workflow" />
 
-      <div className="md:ml-64 flex flex-col min-h-screen bg-background">
+      <div className="md:ml-16 flex flex-col min-h-screen bg-background">
         <header className="flex flex-col gap-2 w-full border-b border-on-surface bg-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <h2 className="font-headline-md text-headline-md text-on-surface uppercase">Workflow</h2>
           <div className="flex flex-wrap items-center gap-2">

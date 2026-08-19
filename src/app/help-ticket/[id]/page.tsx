@@ -115,7 +115,7 @@ function TicketDetailsInner() {
       <MobileHeader />
       <SideNav active="help-ticket" />
 
-      <div className="md:ml-64 flex-1 flex flex-col min-h-screen bg-background">
+      <div className="md:ml-16 flex-1 flex flex-col min-h-screen bg-background">
         <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Ticket Details
