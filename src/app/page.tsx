@@ -39,7 +39,20 @@ import type {
   List,
   Task,
   Ticket,
+  WorkflowFieldValue,
+  WorkflowStepEvent,
 } from "@/lib/types";
+
+/** One of the signed-in user's own workflow steps, from GET /workflow/my-steps. */
+type MyWorkflowStep = {
+  instanceId: string;
+  instanceTitle: string;
+  templateName: string;
+  fieldValues: WorkflowFieldValue[];
+  isMyTurn: boolean;
+  doerName: string;
+  step: WorkflowStepEvent;
+};
 
 /** Builds and downloads a CSV of the given tasks (client-side, no server round-trip). */
 function exportTasksToCsv(tasks: Task[]) {
@@ -95,6 +108,11 @@ function DashboardInner() {
   const [doers, setDoers] = useState<Doer[]>([]);
   const [taskToRevise, setTaskToRevise] = useState<Task | null>(null);
   const [hasPendingTickets, setHasPendingTickets] = useState(false);
+  // A workflow step is a different shape from a TASKLIST row (no dueDate/
+  // priority — it has Planned/Actual/Status instead), so it gets its own
+  // section here rather than being forced into the Pending Tasks table.
+  const [myWorkflowSteps, setMyWorkflowSteps] = useState<MyWorkflowStep[]>([]);
+  const [workflowBusyKey, setWorkflowBusyKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Pending Tasks filter: "all" = every open item (past/today/future);
@@ -113,17 +131,19 @@ function DashboardInner() {
     setError(null);
     try {
       await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
-      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData] = await Promise.all([
-        api.get<FullDashboard>("/dashboard"),
-        api.get<Task[]>("/tasks"),
-        api.get<List[]>("/lists").catch(() => [] as List[]),
-        api
-          .get<ChecklistInstance[]>("/checklist/instances?status=Pending")
-          .catch(() => [] as ChecklistInstance[]),
-        api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
-        api.get<Doer[]>("/users").catch(() => [] as Doer[]),
-        api.get<Ticket[]>("/tickets").catch(() => [] as Ticket[]),
-      ]);
+      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData, workflowSteps] =
+        await Promise.all([
+          api.get<FullDashboard>("/dashboard"),
+          api.get<Task[]>("/tasks"),
+          api.get<List[]>("/lists").catch(() => [] as List[]),
+          api
+            .get<ChecklistInstance[]>("/checklist/instances?status=Pending")
+            .catch(() => [] as ChecklistInstance[]),
+          api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
+          api.get<Doer[]>("/users").catch(() => [] as Doer[]),
+          api.get<Ticket[]>("/tickets").catch(() => [] as Ticket[]),
+          api.get<MyWorkflowStep[]>("/workflow/my-steps").catch(() => [] as MyWorkflowStep[]),
+        ]);
       setDashboard(dash);
       setLists(listsData);
       setAllTasks(tasks);
@@ -131,6 +151,7 @@ function DashboardInner() {
       setTemplates(templateData);
       setDoers(doerData);
       setHasPendingTickets((ticketData ?? []).some((t) => t.status !== "Completed"));
+      setMyWorkflowSteps(workflowSteps);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load dashboard.");
     } finally {
@@ -163,6 +184,29 @@ function DashboardInner() {
       alert(err instanceof ApiError ? err.message : "Failed to complete checklist item.");
     }
   }
+
+  async function handleWorkflowAction(row: MyWorkflowStep, action: "complete" | "reject") {
+    if (
+      action === "reject" &&
+      !confirm(`Send "${row.step.what}" back to the previous person for rework?`)
+    ) {
+      return;
+    }
+    const key = `${row.instanceId}:${row.step.stepNo}`;
+    setWorkflowBusyKey(key);
+    try {
+      await api.post(`/workflow/instances/${row.instanceId}/steps/${row.step.stepNo}/${action}`);
+      const refreshed = await api.get<MyWorkflowStep[]>("/workflow/my-steps").catch(() => myWorkflowSteps);
+      setMyWorkflowSteps(refreshed);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Could not update this step.");
+    } finally {
+      setWorkflowBusyKey(null);
+    }
+  }
+
+  const myWorkflowTurn = myWorkflowSteps.filter((r) => r.isMyTurn);
+  const myWorkflowOverdueCount = myWorkflowTurn.filter((r) => r.step.status === "Overdue").length;
 
   const isPrivileged = user?.role === "MD" || user?.role === "PC";
   const canCreateTasks = canAccessAllTasks(user);
@@ -414,6 +458,79 @@ function DashboardInner() {
             </table>
           </TableWrap>
         </Card>
+
+        {/* My Workflow — a step from the Workflow feature is a different
+            shape than a TASKLIST row (Planned/Actual/Status, no due date or
+            priority), so it can't just be merged into the table above.
+            Only shown when there's actually something waiting, same as the
+            Help Ticket blink above — no point in an empty section for
+            everyone who isn't part of any workflow. */}
+        {myWorkflowTurn.length > 0 && (
+          <Card
+            title={`My Workflow (${myWorkflowTurn.length})`}
+            actions={
+              myWorkflowOverdueCount > 0 ? (
+                <span className="border-2 border-red-600 bg-red-600 px-2 py-1 text-xs font-bold uppercase text-white">
+                  {myWorkflowOverdueCount} overdue
+                </span>
+              ) : undefined
+            }
+          >
+            <div className="flex flex-col gap-2">
+              {myWorkflowTurn.map((row) => {
+                const s = row.step;
+                const overdue = s.status === "Overdue";
+                const busy = workflowBusyKey === `${row.instanceId}:${s.stepNo}`;
+                return (
+                  <div
+                    key={s.id}
+                    className={`border-2 p-3 flex flex-col gap-1.5 ${
+                      overdue ? "border-red-600 bg-red-50" : "border-on-surface bg-surface"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                        {row.templateName} · {row.instanceTitle}
+                      </span>
+                      {overdue && (
+                        <span className="font-label-sm text-[10px] uppercase text-red-600 font-bold">
+                          Overdue
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-body-md text-body-md text-on-surface font-semibold">{s.what}</p>
+                    {s.planned && (
+                      <p className={`font-data-mono text-data-mono text-xs ${overdue ? "text-red-600" : "text-on-surface-variant"}`}>
+                        {overdue ? "Was due " : "By "}
+                        {new Date(s.planned).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                      <Button size="sm" onClick={() => handleWorkflowAction(row, "complete")} disabled={busy}>
+                        {busy ? "Saving…" : "Mark Done"}
+                      </Button>
+                      {s.stepNo > 1 && (
+                        <button
+                          onClick={() => handleWorkflowAction(row, "reject")}
+                          disabled={busy}
+                          className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-red-600 transition-colors disabled:opacity-40"
+                        >
+                          Send Back
+                        </button>
+                      )}
+                      <Link
+                        href="/workflow"
+                        className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-on-surface transition-colors"
+                      >
+                        View in Workflow
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
       </PageBody>
 
       {taskToRevise && (
