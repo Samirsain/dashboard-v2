@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
@@ -392,26 +392,87 @@ function currentStepOf(run: WorkflowTemplateExport["runs"][number]) {
   return run.steps.find((s) => s.status === "Active" || s.status === "Overdue") ?? null;
 }
 
-/** Column widths (px), declared on a <colgroup> so `table-fixed` actually honours them. */
-const COL_IDENTITY = 220;
-const COL_STEP = 190;
-const COL_ACTION = 84;
+/** Display text + colour for a step's status, styled as spreadsheet text — not a badge. */
+function statusText(status: WorkflowStepStatus | "Pending"): { text: string; className: string } {
+  switch (status) {
+    case "Complete":
+      return { text: "Done", className: "text-[#188038] font-medium" };
+    case "Overdue":
+      return { text: "Delayed", className: "text-[#c5221f] font-semibold" };
+    case "Blocked":
+      return { text: "Blocked", className: "text-[#c5221f] italic" };
+    case "Active":
+      return { text: "In Progress", className: "text-[#b06000] font-medium" };
+    case "Pending":
+    default:
+      return { text: "Not Started", className: "text-[#80868b] italic" };
+  }
+}
+
+/** Delay text coloured the way a spreadsheet would: red if late, grey dash otherwise. */
+function delayText(minutes: number | null): { text: string; className: string } {
+  if (minutes === null || minutes === 0) return { text: "-", className: "text-[#80868b]" };
+  return minutes > 0
+    ? { text: formatDelayMinutes(minutes), className: "text-[#c5221f] font-medium" }
+    : { text: formatDelayMinutes(minutes), className: "text-[#80868b]" };
+}
+
+/** Row height (px) the header's sticky offsets are computed from — see the note below. */
+const SHEET_ROW_H = 26;
+const SHEET_COL_IDENTITY = 170;
+const SHEET_COL_STARTED = 118;
+const SHEET_COL_FIELD = 130;
+const SHEET_COL_PLANNED = 116;
+const SHEET_COL_ACTUAL = 116;
+const SHEET_COL_STATUS = 96;
+const SHEET_COL_DELAY = 92;
+const SHEET_COL_ACTION = 76;
+const SHEET_STEP_W = SHEET_COL_PLANNED + SHEET_COL_ACTUAL + SHEET_COL_STATUS + SHEET_COL_DELAY;
+
+/** A dense cell shared by every header row — fixed height so 5 stacked sticky rows line up exactly. */
+function SheetTh({
+  children,
+  rowIndex,
+  colSpan,
+  divider = false,
+  pinned = false,
+  className = "",
+}: {
+  children?: React.ReactNode;
+  rowIndex: number;
+  colSpan?: number;
+  divider?: boolean;
+  pinned?: boolean;
+  className?: string;
+}) {
+  return (
+    <th
+      colSpan={colSpan}
+      className={`sticky z-20 bg-white overflow-hidden whitespace-nowrap border-[#e0e0e0] border-r border-b font-normal text-left text-[13px] px-1.5 ${
+        divider ? "border-l-2 border-l-[#999999]" : ""
+      } ${pinned ? "left-0 z-30" : ""} ${className}`}
+      style={{ top: rowIndex * SHEET_ROW_H, height: SHEET_ROW_H }}
+    >
+      {children}
+    </th>
+  );
+}
 
 /**
- * The full home for one workflow's runs, laid out as an actual spreadsheet
- * grid — one row per run, one column per step — because that is the tool
- * people already know how to read: it's what they ran this on before.
+ * The workflow's runs, rendered as an actual spreadsheet grid — the same
+ * shape as the Google Sheet this feature replaced: five stacked header rows
+ * (What / Who / How / When, merged per step, then the real leaf columns),
+ * 1px hairline borders, a thick divider between step groups, dense 13px
+ * Arial-ish text, and status shown as coloured text rather than a badge.
+ * Real data throughout — nothing here is mocked, it's the same
+ * `/workflow/templates/:id/export` payload the rest of the page uses.
  *
- * The bug in doing that naively is what broke last time: sticky positioning
- * on more than one column drifts unless the browser is forced to honour exact
- * widths, and stacking two sticky header rows needs their heights to actually
- * match. This version pins exactly ONE column (row A — whichever field names
- * the run) via `table-fixed` + `<colgroup>`, and gives every step a single
- * header row and a single data cell instead of four apiece, so there's
- * nothing left to drift out of alignment.
- *
- * A real Google Sheet scrolls sideways once there are more columns than fit —
- * so does this, on purpose, rather than hiding steps to avoid it.
+ * Exactly one column is pinned (the field that names the run) — matching
+ * every other grid on this page and the one lesson learned the hard way
+ * earlier: pinning more than one column only works if every sticky offset is
+ * computed, never guessed. Group headers (What/Who/How/When, and each step's
+ * merged cell) are sticky to the *top* only, never to the left, so there's no
+ * multi-column sticky math anywhere in this component.
  */
 function WorkflowRunList({
   data,
@@ -443,36 +504,41 @@ function WorkflowRunList({
     return run.title.toLowerCase().includes(q) || run.fieldValues.some((v) => v.toLowerCase().includes(q));
   });
   const visibleRuns = filteredRuns.slice(0, visibleCount);
-  const identityLabel = data.fieldLabels[0] ?? "Run";
   const stepDefByNo = new Map(data.steps.map((s) => [s.stepNo, s]));
+  const identityLabel = data.fieldLabels[0] ?? "Run";
+  const extraLabels = data.fieldLabels.slice(1);
+
+  const tableWidth =
+    SHEET_COL_IDENTITY + SHEET_COL_STARTED + extraLabels.length * SHEET_COL_FIELD +
+    data.steps.length * SHEET_STEP_W + SHEET_COL_ACTION;
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Search + Active/Complete tabs */}
+      {/* Toolbar: small, bordered, unstyled — this is the one place the app's
+          usual controls show through the sheet. */}
       <div className="flex flex-wrap items-center gap-2 border-2 border-on-surface bg-surface-container-low p-2">
         <input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search by name or any detail..."
-          className="min-h-[36px] flex-1 min-w-[180px] border-2 border-on-surface bg-surface px-3 py-1 font-data-mono text-sm text-on-surface focus:outline-none"
+          className="h-8 flex-1 min-w-[180px] border border-on-surface bg-white px-2 text-[13px] text-on-surface focus:outline-none"
+          style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
         />
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {(["Active", "Complete"] as WorkflowInstanceStatus[]).map((s) => (
             <button
               key={s}
               onClick={() => onStatusFilterChange(s)}
-              className={
+              className={`h-8 px-2.5 border font-label-sm text-[11px] uppercase transition-colors ${
                 statusFilter === s
-                  ? "border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase"
-                  : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-              }
+                  ? "border-on-surface bg-on-surface text-surface"
+                  : "border-on-surface text-on-surface hover:bg-surface-container"
+              }`}
             >
               {s} ({data.runs.filter((r) => r.status === s).length})
             </button>
           ))}
         </div>
-        {/* Fixed in the toolbar (not below the rows) so it's visible before
-            you've scrolled anywhere, not just after scrolling past everything. */}
         {data.steps.length > 3 && (
           <p className="w-full font-label-sm text-[10px] uppercase text-on-surface-variant">
             {data.steps.length} steps — scroll the sheet sideways to see them all →
@@ -485,141 +551,168 @@ function WorkflowRunList({
           {data.runs.length === 0 ? "No work yet." : `No ${statusFilter.toLowerCase()} work matches this search.`}
         </p>
       ) : (
-        <div className="border-2 border-on-surface overflow-auto max-h-[65vh] bg-surface-container-lowest">
+        // Google Sheets scrolls both ways once a grid outgrows the window —
+        // this is meant to too, rather than hide columns to dodge it.
+        <div
+          className="border-2 border-on-surface overflow-auto max-h-[70vh] bg-white"
+          style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+        >
           <table
-            className="table-fixed border-separate border-spacing-0 text-left"
-            style={{ width: COL_IDENTITY + data.steps.length * COL_STEP + COL_ACTION }}
+            className="table-fixed border-separate border-spacing-0 text-[13px]"
+            style={{ width: tableWidth }}
           >
             <colgroup>
-              <col style={{ width: COL_IDENTITY }} />
-              {data.steps.map((s) => (
-                <col key={s.stepNo} style={{ width: COL_STEP }} />
+              <col style={{ width: SHEET_COL_IDENTITY }} />
+              <col style={{ width: SHEET_COL_STARTED }} />
+              {extraLabels.map((l, i) => (
+                <col key={i} style={{ width: SHEET_COL_FIELD }} />
               ))}
-              <col style={{ width: COL_ACTION }} />
+              {data.steps.map((s) => (
+                <Fragment key={s.stepNo}>
+                  <col style={{ width: SHEET_COL_PLANNED }} />
+                  <col style={{ width: SHEET_COL_ACTUAL }} />
+                  <col style={{ width: SHEET_COL_STATUS }} />
+                  <col style={{ width: SHEET_COL_DELAY }} />
+                </Fragment>
+              ))}
+              <col style={{ width: SHEET_COL_ACTION }} />
             </colgroup>
             <thead>
+              {/* Rows 1-4: What / Who / How / When — merged once per step,
+                  exactly like the sheet's own header. The pinned identity
+                  column carries the row's own label instead, since it can't
+                  be part of a wide merge and stay pinned at the same time. */}
+              {(["What", "Who", "How", "When"] as const).map((rowLabel, rowIndex) => (
+                <tr key={rowLabel}>
+                  <SheetTh rowIndex={rowIndex} pinned className="font-medium text-on-surface-variant">
+                    {rowIndex === 0 ? identityLabel : rowLabel}
+                  </SheetTh>
+                  <SheetTh rowIndex={rowIndex} colSpan={1 + extraLabels.length} />
+                  {data.steps.map((s) => (
+                    <SheetTh key={s.stepNo} rowIndex={rowIndex} colSpan={4} divider>
+                      {rowLabel === "What" && s.what}
+                      {rowLabel === "Who" && s.doerName}
+                      {rowLabel === "How" && s.how}
+                      {rowLabel === "When" && describeTat(s.tat)}
+                    </SheetTh>
+                  ))}
+                  <SheetTh rowIndex={rowIndex} />
+                </tr>
+              ))}
+              {/* Row 5: the real leaf columns. */}
               <tr>
-                <th
-                  className="sticky top-0 left-0 z-20 bg-surface-container align-bottom py-2 px-3 border-r-2 border-b-2 border-on-surface font-label-sm text-label-sm uppercase truncate"
-                  style={{ width: COL_IDENTITY }}
-                >
+                <SheetTh rowIndex={4} pinned className="font-medium">
                   {identityLabel}
-                </th>
-                {data.steps.map((s) => (
-                  <th
-                    key={s.stepNo}
-                    className="sticky top-0 z-10 bg-surface-container align-top py-2 px-3 border-r border-b-2 border-l-2 border-on-surface font-normal"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-4 h-4 flex items-center justify-center bg-on-surface text-surface font-label-sm text-[10px] shrink-0">
-                        {s.stepNo}
-                      </span>
-                      <span className="font-label-sm text-[10px] uppercase text-on-surface-variant truncate">
-                        {describeTat(s.tat)}
-                      </span>
-                    </div>
-                    <div className="mt-1 font-body-md text-body-md text-on-surface font-semibold leading-tight truncate" title={s.what}>
-                      {s.what}
-                    </div>
-                    <div className="font-label-sm text-label-sm text-on-surface-variant truncate" title={`${s.doerName} · ${s.how}`}>
-                      {s.doerName}
-                    </div>
-                  </th>
+                </SheetTh>
+                <SheetTh rowIndex={4} className="font-medium text-on-surface-variant">
+                  Started
+                </SheetTh>
+                {extraLabels.map((label, i) => (
+                  <SheetTh key={i} rowIndex={4} className="font-medium text-on-surface-variant">
+                    {label}
+                  </SheetTh>
                 ))}
-                <th className="sticky top-0 z-10 bg-surface-container border-b-2 border-on-surface" />
+                {data.steps.map((s) => (
+                  <Fragment key={s.stepNo}>
+                    <SheetTh rowIndex={4} divider className="font-medium text-on-surface-variant">
+                      Planned
+                    </SheetTh>
+                    <SheetTh rowIndex={4} className="font-medium text-on-surface-variant">
+                      Actual
+                    </SheetTh>
+                    <SheetTh rowIndex={4} className="font-medium text-on-surface-variant">
+                      Status
+                    </SheetTh>
+                    <SheetTh rowIndex={4} className="font-medium text-on-surface-variant">
+                      Delay
+                    </SheetTh>
+                  </Fragment>
+                ))}
+                <SheetTh rowIndex={4} />
               </tr>
             </thead>
-            <tbody className="font-body-md text-body-md text-on-surface">
-              {visibleRuns.map((run, rowIndex) => {
+            <tbody>
+              {visibleRuns.map((run) => {
                 const selected = selectedId === run.id;
-                const rowBg = selected
-                  ? "bg-primary-fixed"
-                  : rowIndex % 2 === 0
-                  ? "bg-surface"
-                  : "bg-surface-container-lowest";
                 const identity = run.fieldValues[0] || run.title;
-                // Labelled, not raw values — "hmh" means nothing on its own;
-                // "City: hmh" does.
-                const secondary = run.fieldValues
-                  .slice(1)
-                  .map((v, i) => (v ? `${data.fieldLabels[i + 1] ?? ""}: ${v}` : null))
-                  .filter((v): v is string => v !== null)
-                  .join(" · ");
                 const current = currentStepOf(run);
                 const currentDef = current ? stepDefByNo.get(current.stepNo) : undefined;
                 const lateCount = run.steps.filter(
                   (s) => s.status === "Overdue" || (s.delayMinutes !== null && s.delayMinutes > 0)
                 ).length;
+                const rowBg = selected ? "bg-[#d6e3ff]" : "bg-white";
                 return (
-                  <tr key={run.id} onClick={() => onRowClick(run.id)} className={`group cursor-pointer ${rowBg}`}>
-                    {/*
-                      The one column you never scroll away from has to answer
-                      "is this row fine?" on its own — otherwise pinning it is
-                      pointless, since you'd still have to scroll right on
-                      every single row just to find out. So it also carries
-                      whose turn it is and how many steps are late, not just
-                      the row's name.
-                    */}
+                  <tr
+                    key={run.id}
+                    onClick={() => onRowClick(run.id)}
+                    className={`group cursor-pointer ${rowBg} ${selected ? "" : "hover:bg-[#f8f9fa]"}`}
+                  >
+                    {/* Pinned column: has to answer "is this row fine?" on its
+                        own, since it's the only thing that never scrolls away. */}
                     <td
                       className={`sticky left-0 z-10 ${rowBg} ${
-                        selected ? "" : "group-hover:bg-surface-container-low"
-                      } py-2 px-3 border-r-2 border-b border-on-surface align-top`}
+                        selected ? "" : "group-hover:bg-[#f8f9fa]"
+                      } border-[#e0e0e0] border-r border-b px-1.5 py-0.5 align-top overflow-hidden`}
                     >
-                      <span className="flex items-start justify-between gap-1">
-                        <p className="font-semibold truncate" title={identity}>
+                      <span className="flex items-center justify-between gap-1">
+                        <span className="truncate font-medium" title={identity}>
                           {identity || "—"}
-                        </p>
+                        </span>
                         {lateCount > 0 && (
-                          <span className="shrink-0 border-2 border-error bg-error text-on-error px-1 font-label-sm text-[9px] uppercase">
+                          <span className="shrink-0 text-[10px] font-semibold text-[#c5221f]">
                             {lateCount} late
                           </span>
                         )}
                       </span>
-                      {secondary && (
-                        <p className="font-label-sm text-[10px] text-on-surface-variant truncate" title={secondary}>
-                          {secondary}
-                        </p>
-                      )}
-                      <p
-                        className={`font-label-sm text-[10px] truncate ${
-                          current?.status === "Overdue" ? "text-error font-semibold" : "text-on-surface-variant"
+                      <span
+                        className={`block truncate text-[11px] ${
+                          current?.status === "Overdue" ? "text-[#c5221f] font-medium" : "text-[#80868b]"
                         }`}
                       >
                         {current
-                          ? `Now: ${currentDef?.doerName ?? "—"} · ${currentDef?.what ?? `Step ${current.stepNo}`}`
+                          ? `${currentDef?.doerName ?? "—"} · ${currentDef?.what ?? `Step ${current.stepNo}`}`
                           : run.status === "Complete"
                           ? "Finished"
                           : "Not started"}
-                      </p>
+                      </span>
                     </td>
+                    <td className="border-[#e0e0e0] border-r border-b px-1.5 py-0.5 align-top text-[#80868b] whitespace-nowrap overflow-hidden">
+                      {formatTsShort(run.startedAt)}
+                    </td>
+                    {extraLabels.map((_label, i) => (
+                      <td
+                        key={i}
+                        className="border-[#e0e0e0] border-r border-b px-1.5 py-0.5 align-top truncate overflow-hidden"
+                        title={run.fieldValues[i + 1] ?? ""}
+                      >
+                        {run.fieldValues[i + 1] || "—"}
+                      </td>
+                    ))}
                     {run.steps.map((s) => {
-                      const late = s.status === "Overdue" || (s.delayMinutes !== null && s.delayMinutes > 0);
+                      const st = statusText(s.status);
+                      const dl = delayText(s.delayMinutes);
                       return (
-                        <td
-                          key={s.stepNo}
-                          className={`py-2 px-3 border-r border-l-2 border-b border-on-surface align-top ${
-                            late ? "bg-error/5" : ""
-                          }`}
-                        >
-                          <StepStatusBadge status={s.status} />
-                          <p className="mt-1 font-label-sm text-[10px] text-on-surface-variant truncate">
-                            {s.actual ? `Done ${formatTsShort(s.actual)}` : s.planned ? `Due ${formatTsShort(s.planned)}` : "—"}
-                          </p>
-                          {s.delayMinutes !== null && (
-                            <p className={`font-label-sm text-[10px] font-semibold truncate ${
-                              s.delayMinutes > 0 ? "text-error" : "text-on-surface-variant"
-                            }`}>
-                              {formatDelayMinutes(s.delayMinutes)}
-                            </p>
-                          )}
-                        </td>
+                        <Fragment key={s.stepNo}>
+                          <td className="border-[#e0e0e0] border-l-2 border-l-[#999999] border-r border-b px-1.5 py-0.5 align-top text-[#80868b] whitespace-nowrap overflow-hidden">
+                            {s.planned ? formatTsShort(s.planned) : "—"}
+                          </td>
+                          <td className="border-[#e0e0e0] border-r border-b px-1.5 py-0.5 align-top text-[#80868b] whitespace-nowrap overflow-hidden">
+                            {s.actual ? formatTsShort(s.actual) : "—"}
+                          </td>
+                          <td className={`border-[#e0e0e0] border-r border-b px-1.5 py-0.5 align-top whitespace-nowrap overflow-hidden ${st.className}`}>
+                            {st.text}
+                          </td>
+                          <td className={`border-[#e0e0e0] border-r border-b px-1.5 py-0.5 align-top whitespace-nowrap overflow-hidden ${dl.className}`}>
+                            {dl.text}
+                          </td>
+                        </Fragment>
                       );
                     })}
-                    <td className="py-2 px-2 border-b border-on-surface text-right align-top">
+                    <td className="border-[#e0e0e0] border-b px-1 py-0.5 align-top text-right">
                       <button
                         onClick={(e) => onDeleteRow(run.id, run.title, run.status, e)}
                         title="Delete this work"
-                        className="border-2 border-error text-error px-2 py-0.5 font-label-sm text-[10px] uppercase hover:bg-error hover:text-on-error transition-colors"
+                        className="text-[10px] uppercase text-[#c5221f] hover:underline"
                       >
                         Delete
                       </button>
