@@ -372,6 +372,8 @@ export interface WorkflowStepEvent {
   actual: string; // ISO timestamp, "" until complete
   status: WorkflowStepStatus;
   reworkCount: number;
+  /** Why this step was sent back, set on the step that gets reopened for rework. */
+  rejectReason: string;
 }
 
 // ---- DGMAX Negative Performance Scoring System Types ----------------------

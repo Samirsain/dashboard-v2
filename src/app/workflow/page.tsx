@@ -85,16 +85,6 @@ function describeTat(tat: string): string {
 }
 
 /** "3h 20m late" — how far past its deadline a step is right now. */
-function formatLateness(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours >= 24) {
-    const days = Math.floor(hours / 24);
-    return `${days}d ${hours % 24}h late`;
-  }
-  return hours > 0 ? `${hours}h ${mins}m late` : `${mins}m late`;
-}
-
 function formatDelayMinutes(minutes: number | null): string {
   if (minutes === null) return "—";
   if (minutes === 0) return "On time";
@@ -149,230 +139,6 @@ function formatTsShort(ts: string): string {
 /** At 100+ runs the plain list stops being scannable — page it instead. */
 const RUN_PAGE_SIZE = 20;
 
-/** How many attention rows to show before "show more". */
-const ATTENTION_PAGE_SIZE = 15;
-
-/** One headline number on the live board. */
-function StatTile({ label, value, tone }: { label: string; value: number; tone: "plain" | "error" | "warn" }) {
-  const styles =
-    tone === "error"
-      ? "border-error bg-error/10 text-error"
-      : tone === "warn"
-      ? "border-on-surface bg-surface-container text-on-surface"
-      : "border-on-surface bg-surface text-on-surface";
-  return (
-    <div className={`flex-1 min-w-[130px] border-2 px-4 py-2.5 ${styles}`}>
-      <p className="font-headline-lg text-headline-lg leading-none">{value}</p>
-      <p className="mt-1 font-label-sm text-label-sm uppercase opacity-80">{label}</p>
-    </div>
-  );
-}
-
-/**
- * The manager's landing view: where work is piled up right now, across every
- * template, worst first.
- *
- * A per-template sheet answers "how is this workflow doing". It cannot answer
- * "what is late anywhere", which is the question actually asked each morning.
- *
- * Listing every outstanding step individually doesn't survive real volume: a
- * thousand runs waiting on the same person at the same step is a thousand rows
- * that all say the same thing. So the board shows the *pile* — one row per
- * (workflow, step, person) with an exact count — and opens up to the most
- * urgent few inside it. That keeps the screen the same size whether there are
- * ten runs or ten thousand.
- */
-function WorkflowControlRoom({
-  overview,
-  onOpenRun,
-}: {
-  overview: WorkflowOverview;
-  onOpenRun: (instanceId: string, templateId: string) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [doerFilter, setDoerFilter] = useState<string | null>(null);
-  const [openBucket, setOpenBucket] = useState<string | null>(null);
-  const [visible, setVisible] = useState(ATTENTION_PAGE_SIZE);
-
-  const q = search.trim().toLowerCase();
-  const groups = overview.buckets.filter((b) => {
-    if (doerFilter && b.doerId !== doerFilter) return false;
-    if (!q) return true;
-    return (
-      b.what.toLowerCase().includes(q) ||
-      b.templateName.toLowerCase().includes(q) ||
-      b.doerName.toLowerCase().includes(q) ||
-      b.runs.some((r) => r.runTitle.toLowerCase().includes(q))
-    );
-  });
-  const shown = groups.slice(0, visible);
-  const totalWaiting = overview.people.reduce((sum, p) => sum + p.total, 0);
-
-  return (
-    <div className="bg-surface border-2 border-on-surface p-stack-lg flex flex-col gap-stack-md">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-on-surface pb-stack-md">
-        <h3 className="font-headline-md text-headline-md text-on-surface">Live Board</h3>
-        <p className="font-data-mono text-data-mono text-on-surface-variant text-xs uppercase">
-          Where work is stuck, right now
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <StatTile label="Running Work" value={overview.totals.activeRuns} tone="plain" />
-        <StatTile label="Overdue Steps" value={overview.totals.overdueSteps} tone={overview.totals.overdueSteps > 0 ? "error" : "plain"} />
-        <StatTile label="Due Today" value={overview.totals.dueTodaySteps} tone="warn" />
-      </div>
-
-      {/* Filter by person — chips rather than a dropdown so the load per
-          person is visible without opening anything. Counts come from the
-          server and cover every step, not just the ones listed below. */}
-      {overview.people.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              setDoerFilter(null);
-              setVisible(ATTENTION_PAGE_SIZE);
-            }}
-            className={
-              doerFilter === null
-                ? "border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase"
-                : "border-2 border-on-surface px-3 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-            }
-          >
-            Everyone ({totalWaiting})
-          </button>
-          {overview.people.map((p) => (
-            <button
-              key={p.doerId}
-              onClick={() => {
-                setDoerFilter((prev) => (prev === p.doerId ? null : p.doerId));
-                setVisible(ATTENTION_PAGE_SIZE);
-              }}
-              className={`px-3 py-1 font-label-sm text-label-sm uppercase border-2 transition-colors ${
-                doerFilter === p.doerId
-                  ? "border-on-surface bg-on-surface text-surface"
-                  : p.overdue > 0
-                  ? "border-error text-error hover:bg-error/10"
-                  : "border-on-surface text-on-surface hover:bg-surface-container"
-              }`}
-            >
-              {p.doerName} ({p.total}
-              {p.overdue > 0 ? ` · ${p.overdue} late` : ""})
-            </button>
-          ))}
-        </div>
-      )}
-
-      <input
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setVisible(ATTENTION_PAGE_SIZE);
-        }}
-        placeholder="Filter the board by workflow, step or person..."
-        className="min-h-[38px] w-full border-2 border-on-surface bg-surface px-3 py-1.5 font-data-mono text-sm text-on-surface focus:outline-none"
-      />
-
-      {shown.length === 0 ? (
-        <p className="border-2 border-on-surface bg-surface-container-lowest px-4 py-8 text-center font-body-md text-body-md text-on-surface-variant">
-          {overview.buckets.length === 0
-            ? "Nothing is waiting on anyone. All caught up."
-            : "Nothing matches this filter."}
-        </p>
-      ) : (
-        <div className="border-2 border-on-surface divide-y-2 divide-on-surface">
-          {shown.map((b) => {
-            const open = openBucket === b.key;
-            return (
-              <div key={b.key} className={b.overdue > 0 ? "bg-error/5" : ""}>
-                <button
-                  onClick={() => setOpenBucket((prev) => (prev === b.key ? null : b.key))}
-                  className="w-full text-left flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 hover:bg-surface-container-low transition-colors"
-                >
-                  <span className="flex-1 min-w-[220px]">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-body-md text-body-md text-on-surface font-semibold">
-                        {b.what}
-                      </span>
-                      <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                        {b.templateName} · Step {b.stepNo}
-                      </span>
-                    </span>
-                    <span className="block font-data-mono text-data-mono text-on-surface-variant text-xs mt-0.5">
-                      {b.doerName}
-                      {b.nextDue ? ` · next due ${formatTsShort(b.nextDue)}` : " · no deadline"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-2 shrink-0">
-                    {b.overdue > 0 && (
-                      <span className="border-2 border-error bg-error text-on-error px-2 py-0.5 font-label-sm text-label-sm uppercase">
-                        {b.overdue} late
-                      </span>
-                    )}
-                    <span className="border-2 border-on-surface px-2 py-0.5 font-label-sm text-label-sm uppercase text-on-surface">
-                      {b.total} waiting
-                    </span>
-                    <span className="material-symbols-outlined text-on-surface-variant">
-                      {open ? "expand_less" : "expand_more"}
-                    </span>
-                  </span>
-                </button>
-
-                {open && (
-                  <div className="border-t-2 border-on-surface bg-surface-container-lowest divide-y divide-outline-variant">
-                    {b.runs.map((r) => {
-                      const late = r.lateMinutes !== null;
-                      return (
-                        <button
-                          key={r.instanceId}
-                          onClick={() => onOpenRun(r.instanceId, b.templateId)}
-                          className="w-full text-left flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 hover:bg-surface-container-low transition-colors"
-                        >
-                          <span className="font-body-md text-body-md text-on-surface font-semibold">
-                            {r.runTitle}
-                          </span>
-                          <span className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`font-label-sm text-label-sm ${
-                                late ? "text-error font-bold" : "text-on-surface-variant"
-                              }`}
-                            >
-                              {late
-                                ? formatLateness(r.lateMinutes!)
-                                : r.planned
-                                ? `by ${formatTsShort(r.planned)}`
-                                : "no deadline"}
-                            </span>
-                            <StepStatusBadge status={r.status} />
-                          </span>
-                        </button>
-                      );
-                    })}
-                    {b.total > b.runs.length && (
-                      <p className="px-3 py-2 font-data-mono text-data-mono text-on-surface-variant text-xs">
-                        Showing the {b.runs.length} most urgent of {b.total}. Open{" "}
-                        <span className="uppercase">{b.templateName}</span> below to work through all of them.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {groups.length > shown.length && (
-        <button
-          onClick={() => setVisible((prev) => prev + ATTENTION_PAGE_SIZE)}
-          className="border-2 border-on-surface px-4 py-2 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-        >
-          Show {Math.min(ATTENTION_PAGE_SIZE, groups.length - shown.length)} more ({groups.length - shown.length} left)
-        </button>
-      )}
-    </div>
-  );
-}
 
 /** Which step of a run is somebody's turn right now, if any. */
 function currentStepOf(run: WorkflowTemplateExport["runs"][number]) {
@@ -814,15 +580,24 @@ function MyWorkflowSteps() {
   }, []);
 
   async function act(row: MyStep, action: "complete" | "reject") {
-    if (
-      action === "reject" &&
-      !confirm(`Send "${row.step.what}" back to the previous person for rework?`)
-    ) {
-      return;
+    let reason = "";
+    if (action === "reject") {
+      // A bounce with no explanation just moves the confusion to whoever
+      // picks it back up — they need to know what to fix.
+      const input = prompt(`Why is "${row.step.what}" being sent back? This will be shown to whoever reworks it.`);
+      if (input === null) return; // cancelled
+      reason = input.trim();
+      if (!reason) {
+        alert("Please say why this is being sent back.");
+        return;
+      }
     }
     setBusyKey(`${row.instanceId}:${row.step.stepNo}`);
     try {
-      await api.post(`/workflow/instances/${row.instanceId}/steps/${row.step.stepNo}/${action}`);
+      await api.post(
+        `/workflow/instances/${row.instanceId}/steps/${row.step.stepNo}/${action}`,
+        action === "reject" ? { reason } : undefined
+      );
       await load();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Could not update this step.");
@@ -991,6 +766,15 @@ function MyWorkflowSteps() {
                     />
                   </div>
 
+                  {/* Shows up only while this step is the rework — once it's
+                      done again the reason has served its purpose. */}
+                  {s.status === "Active" && s.rejectReason && (
+                    <div className="border-2 border-error bg-error/5 p-2">
+                      <p className="font-label-sm text-label-sm uppercase text-error">Sent back — why</p>
+                      <p className="font-body-md text-body-md text-on-surface">{s.rejectReason}</p>
+                    </div>
+                  )}
+
                   {/* The run's own data — what this step is actually about. */}
                   {row.fieldValues.length > 0 && (
                     <div className="border border-on-surface/20 bg-surface-container-lowest p-2 flex flex-col gap-0.5">
@@ -1132,15 +916,6 @@ function WorkflowInner() {
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTemplateId]);
-
-  /** Jump from a Live Board row straight into that run's row in its sheet. */
-  function openRunFromBoard(instanceId: string, templateId: string) {
-    setOpenTemplateId(templateId);
-    setRunSearch("");
-    setVisibleRunCount(RUN_PAGE_SIZE);
-    loadSheet(templateId);
-    setSelectedId(instanceId);
-  }
 
   async function handleDeleteTemplate(id: string) {
     if (!confirm("Delete this workflow template? Work already in progress is unaffected.")) return;
@@ -1304,11 +1079,6 @@ function WorkflowInner() {
             <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
             </p>
-          )}
-
-          {/* Everything in flight, across every workflow — the landing view. */}
-          {isAdmin && overview && (
-            <WorkflowControlRoom overview={overview} onOpenRun={openRunFromBoard} />
           )}
 
           {/*

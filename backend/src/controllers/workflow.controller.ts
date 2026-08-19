@@ -79,6 +79,7 @@ export const workflowController = {
         req.params.id as string,
         stepNo,
         req.user!.sub,
+        (req.body as { reason: string }).reason,
         canManageWorkflow(req.user)
       )
     );

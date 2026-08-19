@@ -359,6 +359,7 @@ export const sheetsConfig = {
       Actual: "actual",
       Status: "status",
       "Rework Count": "rework_count",
+      "Reject Reason": "reject_reason",
     },
     "WORKFLOW_STEP_EVENTS"
   ),

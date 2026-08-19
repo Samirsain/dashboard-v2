@@ -47,5 +47,10 @@ export const stepNoParamSchema = z.object({
   stepNo: z.coerce.number().int().min(1),
 });
 
+/** Sending a step back has to say why — the person picking up the rework needs a reason, not just a bounce. */
+export const rejectStepSchema = z.object({
+  reason: z.string().trim().min(1, "Say why this is being sent back."),
+});
+
 export type CreateWorkflowTemplateInput = z.infer<typeof createWorkflowTemplateSchema>;
 export type StartWorkflowInstanceInput = z.infer<typeof startWorkflowInstanceSchema>;

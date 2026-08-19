@@ -105,6 +105,7 @@ function toEvent(r: SheetRecord): WorkflowStepEvent {
     actual: r["Actual"] ?? "",
     status: (r["Status"] as WorkflowStepStatus) || "Pending",
     reworkCount: Number(r["Rework Count"] || 0),
+    rejectReason: r["Reject Reason"] ?? "",
   };
 }
 
@@ -849,6 +850,7 @@ export const workflowService = {
     instanceId: string,
     stepNo: number,
     actorId: string,
+    reason: string,
     canManageAnyStep = false
   ): Promise<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }> {
     if (stepNo <= 1) {
@@ -874,18 +876,21 @@ export const workflowService = {
         user: actorId,
         action: "Workflow step rejected",
         task: current.what,
-        detail: `Step ${stepNo} exceeded ${MAX_REWORK} reworks — escalated, not auto-reopened`,
+        detail: `Step ${stepNo} exceeded ${MAX_REWORK} reworks — escalated, not auto-reopened. Reason: ${reason}`,
       });
     } else {
+      // The reason lands on the REOPENED step, not the rejecting one — that's
+      // whose screen needs to explain "why is this back with me".
       await dataService.updateById(eventsEntity, previous.id, {
         Status: "Active",
         Actual: "",
+        "Reject Reason": reason,
       });
       await activityService.log({
         user: actorId,
         action: "Workflow step rejected",
         task: current.what,
-        detail: `Step ${stepNo} rejected — step ${stepNo - 1} (${previous.what}) reopened for rework`,
+        detail: `Step ${stepNo} rejected — step ${stepNo - 1} (${previous.what}) reopened for rework. Reason: ${reason}`,
       });
     }
 

@@ -322,6 +322,8 @@ export interface WorkflowStepEvent {
   actual: string;
   status: WorkflowStepStatus;
   reworkCount: number;
+  /** Why this step was sent back, if it was. Set on the step that got reopened. */
+  rejectReason: string;
 }
 
 // ---- Help Ticket System --------------------------------------------------

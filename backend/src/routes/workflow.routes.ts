@@ -7,6 +7,7 @@ import { canManageWorkflow } from "../utils/access";
 import { idParamSchema } from "../validation/user.schema";
 import {
   createWorkflowTemplateSchema,
+  rejectStepSchema,
   startWorkflowInstanceSchema,
   stepNoParamSchema,
 } from "../validation/workflow.schema";
@@ -72,7 +73,7 @@ router.post(
 );
 router.post(
   "/instances/:id/steps/:stepNo/reject",
-  validate({ params: stepNoParamSchema }),
+  validate({ params: stepNoParamSchema, body: rejectStepSchema }),
   workflowController.rejectStep
 );
 

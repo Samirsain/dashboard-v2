@@ -26,10 +26,11 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
-import { canAccessAllTasks, canManageDoers } from "@/lib/access";
+import { canAccessAllTasks, canManageDoers, canManageWorkflow } from "@/lib/access";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import CreateChecklistModal from "@/components/CreateChecklistModal";
+import StartWorkflowInstanceModal from "@/components/StartWorkflowInstanceModal";
 import { isOrphanedTask } from "@/lib/types";
 import type {
   ChecklistInstance,
@@ -41,6 +42,7 @@ import type {
   Ticket,
   WorkflowFieldValue,
   WorkflowStepEvent,
+  WorkflowTemplate,
 } from "@/lib/types";
 
 /** One of the signed-in user's own workflow steps, from GET /workflow/my-steps. */
@@ -125,13 +127,19 @@ function DashboardInner() {
   // choose from.
   const [showCreatePicker, setShowCreatePicker] = useState(false);
   const [createMode, setCreateMode] = useState<"task" | "checklist" | null>(null);
+  // Starting a workflow run isn't a "create task" in the TASKLIST sense, but
+  // it's the same "I need to kick something off" moment for whoever manages
+  // workflows, so it lives in the same picker rather than sending them to a
+  // different page first.
+  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplate[]>([]);
+  const [showStartWorkflow, setShowStartWorkflow] = useState(false);
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
       await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
-      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData, workflowSteps] =
+      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData, workflowSteps, workflowTemplateData] =
         await Promise.all([
           api.get<FullDashboard>("/dashboard"),
           api.get<Task[]>("/tasks"),
@@ -143,6 +151,7 @@ function DashboardInner() {
           api.get<Doer[]>("/users").catch(() => [] as Doer[]),
           api.get<Ticket[]>("/tickets").catch(() => [] as Ticket[]),
           api.get<MyWorkflowStep[]>("/workflow/my-steps").catch(() => [] as MyWorkflowStep[]),
+          api.get<WorkflowTemplate[]>("/workflow/templates").catch(() => [] as WorkflowTemplate[]),
         ]);
       setDashboard(dash);
       setLists(listsData);
@@ -151,6 +160,7 @@ function DashboardInner() {
       setTemplates(templateData);
       setDoers(doerData);
       setHasPendingTickets((ticketData ?? []).some((t) => t.status !== "Completed"));
+      setWorkflowTemplates(workflowTemplateData);
       setMyWorkflowSteps(workflowSteps);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load dashboard.");
@@ -186,16 +196,25 @@ function DashboardInner() {
   }
 
   async function handleWorkflowAction(row: MyWorkflowStep, action: "complete" | "reject") {
-    if (
-      action === "reject" &&
-      !confirm(`Send "${row.step.what}" back to the previous person for rework?`)
-    ) {
-      return;
+    let reason = "";
+    if (action === "reject") {
+      // A bounce with no explanation just moves the confusion to whoever
+      // picks it back up next — they need to know what to fix.
+      const input = prompt(`Why is "${row.step.what}" being sent back? This will be shown to whoever reworks it.`);
+      if (input === null) return; // cancelled
+      reason = input.trim();
+      if (!reason) {
+        alert("Please say why this is being sent back.");
+        return;
+      }
     }
     const key = `${row.instanceId}:${row.step.stepNo}`;
     setWorkflowBusyKey(key);
     try {
-      await api.post(`/workflow/instances/${row.instanceId}/steps/${row.step.stepNo}/${action}`);
+      await api.post(
+        `/workflow/instances/${row.instanceId}/steps/${row.step.stepNo}/${action}`,
+        action === "reject" ? { reason } : undefined
+      );
       const refreshed = await api.get<MyWorkflowStep[]>("/workflow/my-steps").catch(() => myWorkflowSteps);
       setMyWorkflowSteps(refreshed);
     } catch (err) {
@@ -206,7 +225,6 @@ function DashboardInner() {
   }
 
   const myWorkflowTurn = myWorkflowSteps.filter((r) => r.isMyTurn);
-  const myWorkflowOverdueCount = myWorkflowTurn.filter((r) => r.step.status === "Overdue").length;
 
   const isPrivileged = user?.role === "MD" || user?.role === "PC";
   const canCreateTasks = canAccessAllTasks(user);
@@ -224,18 +242,27 @@ function DashboardInner() {
   }
 
   // Every open item across the systems — tasks (Task List) + checklist items
-  // (Checklist) — as one uniform row: what it is, which system (Office/Sahil),
-  // its type, due date, and the action to take.
+  // (Checklist) + a doer's own workflow steps — as one uniform row: what it
+  // is, which system, its type, due date, and the action to take. A workflow
+  // step is shaped nothing like a Task (Planned/Actual/Status, no priority),
+  // so it's normalised down to just what this table needs rather than
+  // getting a whole separate section that duplicates this same list.
   type PendRow = {
     id: string;
-    kind: "task" | "checklist";
+    kind: "task" | "checklist" | "workflow";
     task: string;
     systemName: string;
     systemType: string;
     dueDate: string;
     taskObj?: Task;
+    workflowRow?: MyWorkflowStep;
     assignedDoerId?: string;
   };
+
+  /** ISO timestamp -> local YYYY-MM-DD, matching how `today` below is computed. */
+  function isoToLocalDate(iso: string): string {
+    return iso ? new Date(iso).toLocaleDateString("en-CA") : "";
+  }
 
   const allPending: PendRow[] = [
     ...allTasks
@@ -260,6 +287,17 @@ function DashboardInner() {
         systemType: "Checklist",
         dueDate: c.date,
         assignedDoerId: c.assignedDoerId,
+      })),
+    ...myWorkflowTurn
+      .map((r) => ({
+        id: `${r.instanceId}:${r.step.stepNo}`,
+        kind: "workflow" as const,
+        task: r.step.what,
+        systemName: r.templateName,
+        systemType: "Workflow",
+        dueDate: isoToLocalDate(r.step.planned),
+        workflowRow: r,
+        assignedDoerId: user?.id,
       })),
   ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
@@ -437,17 +475,41 @@ function DashboardInner() {
                         </td>
                         <td className={tdClass}>
                           <div className="flex items-center justify-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              onClick={() => (r.kind === "task" ? handleTaskDone(r.id) : handleChecklistDone(r.id))}
-                            >
-                              Done
-                            </Button>
-                            {r.kind === "task" && r.taskObj && (
-                              <Button size="sm" onClick={() => setTaskToRevise(r.taskObj!)}>
-                                Revise
-                              </Button>
+                            {r.kind === "workflow" && r.workflowRow ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  disabled={workflowBusyKey === r.id}
+                                  onClick={() => handleWorkflowAction(r.workflowRow!, "complete")}
+                                >
+                                  {workflowBusyKey === r.id ? "Saving…" : "Done"}
+                                </Button>
+                                {r.workflowRow.step.stepNo > 1 && (
+                                  <Button
+                                    size="sm"
+                                    disabled={workflowBusyKey === r.id}
+                                    onClick={() => handleWorkflowAction(r.workflowRow!, "reject")}
+                                  >
+                                    Send Back
+                                  </Button>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => (r.kind === "task" ? handleTaskDone(r.id) : handleChecklistDone(r.id))}
+                                >
+                                  Done
+                                </Button>
+                                {r.kind === "task" && r.taskObj && (
+                                  <Button size="sm" onClick={() => setTaskToRevise(r.taskObj!)}>
+                                    Revise
+                                  </Button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
@@ -458,79 +520,6 @@ function DashboardInner() {
             </table>
           </TableWrap>
         </Card>
-
-        {/* My Workflow — a step from the Workflow feature is a different
-            shape than a TASKLIST row (Planned/Actual/Status, no due date or
-            priority), so it can't just be merged into the table above.
-            Only shown when there's actually something waiting, same as the
-            Help Ticket blink above — no point in an empty section for
-            everyone who isn't part of any workflow. */}
-        {myWorkflowTurn.length > 0 && (
-          <Card
-            title={`My Workflow (${myWorkflowTurn.length})`}
-            actions={
-              myWorkflowOverdueCount > 0 ? (
-                <span className="border-2 border-red-600 bg-red-600 px-2 py-1 text-xs font-bold uppercase text-white">
-                  {myWorkflowOverdueCount} overdue
-                </span>
-              ) : undefined
-            }
-          >
-            <div className="flex flex-col gap-2">
-              {myWorkflowTurn.map((row) => {
-                const s = row.step;
-                const overdue = s.status === "Overdue";
-                const busy = workflowBusyKey === `${row.instanceId}:${s.stepNo}`;
-                return (
-                  <div
-                    key={s.id}
-                    className={`border-2 p-3 flex flex-col gap-1.5 ${
-                      overdue ? "border-red-600 bg-red-50" : "border-on-surface bg-surface"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                        {row.templateName} · {row.instanceTitle}
-                      </span>
-                      {overdue && (
-                        <span className="font-label-sm text-[10px] uppercase text-red-600 font-bold">
-                          Overdue
-                        </span>
-                      )}
-                    </div>
-                    <p className="font-body-md text-body-md text-on-surface font-semibold">{s.what}</p>
-                    {s.planned && (
-                      <p className={`font-data-mono text-data-mono text-xs ${overdue ? "text-red-600" : "text-on-surface-variant"}`}>
-                        {overdue ? "Was due " : "By "}
-                        {new Date(s.planned).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-3 pt-1">
-                      <Button size="sm" onClick={() => handleWorkflowAction(row, "complete")} disabled={busy}>
-                        {busy ? "Saving…" : "Mark Done"}
-                      </Button>
-                      {s.stepNo > 1 && (
-                        <button
-                          onClick={() => handleWorkflowAction(row, "reject")}
-                          disabled={busy}
-                          className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-red-600 transition-colors disabled:opacity-40"
-                        >
-                          Send Back
-                        </button>
-                      )}
-                      <Link
-                        href="/workflow"
-                        className="font-label-sm text-label-sm uppercase text-on-surface-variant underline underline-offset-4 hover:text-on-surface transition-colors"
-                      >
-                        View in Workflow
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        )}
       </PageBody>
 
       {taskToRevise && (
@@ -570,6 +559,23 @@ function DashboardInner() {
             >
               Checklist — repeating checklist item
             </Button>
+            {/* Starting a run of an existing workflow — not creating a new
+                workflow template, that's a Workflow-page-only action. */}
+            {canManageWorkflow(user) && (
+              <Button
+                fullWidth
+                disabled={workflowTemplates.length === 0}
+                className="justify-start text-left normal-case"
+                onClick={() => {
+                  setShowCreatePicker(false);
+                  setShowStartWorkflow(true);
+                }}
+              >
+                {workflowTemplates.length === 0
+                  ? "Workflow — no workflows set up yet"
+                  : "Workflow — start a run, fill in its details"}
+              </Button>
+            )}
           </div>
         </Modal>
       )}
@@ -595,6 +601,17 @@ function DashboardInner() {
           onCreated={() => {
             setCreateMode(null);
             load(); // refresh so the new checklist item shows if due today
+          }}
+        />
+      )}
+
+      {showStartWorkflow && (
+        <StartWorkflowInstanceModal
+          templates={workflowTemplates}
+          onClose={() => setShowStartWorkflow(false)}
+          onStarted={() => {
+            setShowStartWorkflow(false);
+            load(); // the new run may already show up if it's assigned to me
           }}
         />
       )}
