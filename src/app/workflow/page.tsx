@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
@@ -12,7 +12,6 @@ import { canManageWorkflow } from "@/lib/access";
 import type {
   Doer,
   WorkflowFieldValue,
-  WorkflowInstance,
   WorkflowInstanceStatus,
   WorkflowStepEvent,
   WorkflowStepStatus,
@@ -125,18 +124,6 @@ function StepStatusBadge({ status }: { status: WorkflowStepStatus }) {
       {status}
     </span>
   );
-}
-
-function formatDelay(planned: string, actual: string): string {
-  if (!planned || !actual) return "—";
-  const diffMs = new Date(actual).getTime() - new Date(planned).getTime();
-  const minutes = Math.round(diffMs / 60000);
-  if (minutes === 0) return "On time";
-  const abs = Math.abs(minutes);
-  const hours = Math.floor(abs / 60);
-  const mins = abs % 60;
-  const label = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  return minutes > 0 ? `+${label} late` : `-${label} early`;
 }
 
 function formatTs(ts: string): string {
@@ -585,9 +572,22 @@ function WorkflowRunList({
               {(["What", "Who", "How", "When"] as const).map((rowLabel, rowIndex) => (
                 <tr key={rowLabel}>
                   <SheetTh rowIndex={rowIndex} pinned className="font-medium text-on-surface-variant">
-                    {rowIndex === 0 ? identityLabel : rowLabel}
+                    {rowLabel}
                   </SheetTh>
-                  <SheetTh rowIndex={rowIndex} colSpan={1 + extraLabels.length} />
+                  {/* The fields (PO Number, Vendor Name, ...) are the intake
+                      for the first step — exactly like the original sheet,
+                      where those columns sit under "Generate PO" itself
+                      rather than a blank header of their own. */}
+                  <SheetTh rowIndex={rowIndex} colSpan={1 + extraLabels.length}>
+                    {data.steps[0] &&
+                      (rowLabel === "What"
+                        ? data.steps[0].what
+                        : rowLabel === "Who"
+                        ? data.steps[0].doerName
+                        : rowLabel === "How"
+                        ? data.steps[0].how
+                        : describeTat(data.steps[0].tat))}
+                  </SheetTh>
                   {data.steps.map((s) => (
                     <SheetTh key={s.stepNo} rowIndex={rowIndex} colSpan={4} divider>
                       {rowLabel === "What" && s.what}
@@ -605,7 +605,7 @@ function WorkflowRunList({
                   {identityLabel}
                 </SheetTh>
                 <SheetTh rowIndex={4} className="font-medium text-on-surface-variant">
-                  Started
+                  Timestamp
                 </SheetTh>
                 {extraLabels.map((label, i) => (
                   <SheetTh key={i} rowIndex={4} className="font-medium text-on-surface-variant">
@@ -1076,9 +1076,10 @@ function WorkflowInner() {
   const [sheetStatusFilter, setSheetStatusFilter] = useState<WorkflowInstanceStatus>("Active");
   const [runSearch, setRunSearch] = useState("");
   const [visibleRunCount, setVisibleRunCount] = useState(RUN_PAGE_SIZE);
+  // Highlights the row last clicked — the sheet itself is the whole page now,
+  // there's no separate detail panel to open, so this is purely a "which one
+  // did I just look at" marker.
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedSteps, setSelectedSteps] = useState<WorkflowStepEvent[]>([]);
-  const [selectedInstance, setSelectedInstance] = useState<WorkflowInstance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
@@ -1092,10 +1093,6 @@ function WorkflowInner() {
   // the template's expanded view now, not an optional extra.
   const [sheetLoadingId, setSheetLoadingId] = useState<string | null>(null);
   const [sheetDataByTemplate, setSheetDataByTemplate] = useState<Record<string, WorkflowTemplateExport>>({});
-  // Clicking a run has to visibly do something: the Step Timeline it opens
-  // renders well below the sheet, so without this a click looks like it did
-  // nothing until you happen to scroll down past it yourself.
-  const detailRef = useRef<HTMLDivElement>(null);
 
   async function loadData(opts?: { silent?: boolean }) {
     if (!opts?.silent) setLoading(true);
@@ -1136,61 +1133,13 @@ function WorkflowInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTemplateId]);
 
-  // Runs after the detail panel actually mounts for this id, not before —
-  // scrolling inside openInstance itself would race the render.
-  useEffect(() => {
-    if (selectedId) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [selectedId]);
-
-  async function openInstance(id: string) {
-    setSelectedId(id);
-    try {
-      const detail = await api.get<{ instance: WorkflowInstance; steps: WorkflowStepEvent[] }>(
-        `/workflow/instances/${id}`
-      );
-      setSelectedSteps(detail.steps);
-      setSelectedInstance(detail.instance);
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to load workflow instance.");
-    }
-  }
-
-  async function refreshSelected() {
-    if (selectedId) await openInstance(selectedId);
-    if (openTemplateId) await loadSheet(openTemplateId, { force: true });
-    // Completing or bouncing a step changes who is holding what, so the board
-    // above has to move with it rather than wait for the next poll.
-    await loadData({ silent: true });
-  }
-
-  /** Jump from a Live Board row straight into that run's step timeline. */
-  async function openRunFromBoard(instanceId: string, templateId: string) {
+  /** Jump from a Live Board row straight into that run's row in its sheet. */
+  function openRunFromBoard(instanceId: string, templateId: string) {
     setOpenTemplateId(templateId);
     setRunSearch("");
     setVisibleRunCount(RUN_PAGE_SIZE);
     loadSheet(templateId);
-    await openInstance(instanceId);
-  }
-
-  async function handleComplete(stepNo: number) {
-    if (!selectedId) return;
-    try {
-      await api.post(`/workflow/instances/${selectedId}/steps/${stepNo}/complete`);
-      await refreshSelected();
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to complete step.");
-    }
-  }
-
-  async function handleReject(stepNo: number) {
-    if (!selectedId) return;
-    if (!confirm(`Reject step ${stepNo}? This sends the work back to step ${stepNo - 1} for rework.`)) return;
-    try {
-      await api.post(`/workflow/instances/${selectedId}/steps/${stepNo}/reject`);
-      await refreshSelected();
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to reject step.");
-    }
+    setSelectedId(instanceId);
   }
 
   async function handleDeleteTemplate(id: string) {
@@ -1283,7 +1232,7 @@ function WorkflowInner() {
     status: WorkflowInstanceStatus,
     e?: { stopPropagation: () => void }
   ) {
-    e?.stopPropagation(); // don't also trigger the row's openInstance click
+    e?.stopPropagation(); // don't also trigger the row's own click handler
     const warning =
       status === "Active"
         ? " This work is still in progress — its full step history goes with it."
@@ -1293,11 +1242,7 @@ function WorkflowInner() {
       await api.delete(`/workflow/instances/${id}`);
       await loadSheet(templateId, { force: true });
       await loadData({ silent: true });
-      if (selectedId === id) {
-        setSelectedId(null);
-        setSelectedSteps([]);
-        setSelectedInstance(null);
-      }
+      if (selectedId === id) setSelectedId(null);
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to delete this work.");
     }
@@ -1464,7 +1409,7 @@ function WorkflowInner() {
                           visibleCount={visibleRunCount}
                           onShowMore={() => setVisibleRunCount((prev) => prev + RUN_PAGE_SIZE)}
                           selectedId={selectedId}
-                          onRowClick={openInstance}
+                          onRowClick={setSelectedId}
                           onDeleteRow={(id, title, status, e) =>
                             handleDeleteInstance(openTemplate.id, id, title, status, e)
                           }
@@ -1505,117 +1450,6 @@ function WorkflowInner() {
             )}
           </div>
 
-          {/* Selected instance detail */}
-          {selectedId && (
-            <div ref={detailRef} className="bg-surface border-2 border-on-surface p-stack-lg scroll-mt-20">
-              <div className="border-b-2 border-on-surface pb-stack-md mb-stack-md">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-headline-md text-headline-md text-on-surface">Step Timeline</h3>
-                  {isAdmin && selectedInstance && (
-                    <button
-                      onClick={() =>
-                        handleDeleteInstance(
-                          selectedInstance.templateId,
-                          selectedInstance.id,
-                          selectedInstance.title,
-                          selectedInstance.status
-                        )
-                      }
-                      className="border-2 border-error text-error px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors shrink-0"
-                    >
-                      Delete This Work
-                    </button>
-                  )}
-                </div>
-                {(selectedInstance?.fieldValues?.length ?? 0) > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
-                    {selectedInstance!.fieldValues.map((f) => (
-                      <span key={f.label} className="font-data-mono text-data-mono text-xs">
-                        <span className="uppercase text-on-surface-variant">{f.label}: </span>
-                        <span className="text-on-surface">{f.value || "—"}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {selectedInstance?.details && (
-                  <p className="font-data-mono text-data-mono text-on-surface-variant text-sm mt-1 whitespace-pre-wrap">
-                    {selectedInstance.details}
-                  </p>
-                )}
-              </div>
-              {/* One card per step, stacked — not a wide table. Answering "what's
-                  next and when" shouldn't need scrolling sideways. */}
-              <div className="flex flex-col gap-2">
-                {selectedSteps.map((s) => {
-                  const canAct =
-                    (s.status === "Active" || s.status === "Overdue") &&
-                    (s.doerId === user?.id || isAdmin);
-                  const late = s.status === "Overdue";
-                  return (
-                    <div
-                      key={s.id}
-                      className={`border-2 p-3 flex flex-col gap-1.5 ${
-                        late ? "border-error bg-error/5" : "border-on-surface bg-surface"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className="w-5 h-5 shrink-0 flex items-center justify-center bg-on-surface text-surface font-label-sm text-[10px]">
-                            {s.stepNo}
-                          </span>
-                          <span className="font-body-md text-body-md text-on-surface font-semibold">
-                            {s.what}
-                          </span>
-                        </span>
-                        <span className="flex items-center gap-2 shrink-0">
-                          <StepStatusBadge status={s.status} />
-                          {s.reworkCount > 0 && (
-                            <span className="font-label-sm text-[10px] text-on-surface-variant">
-                              rework x{s.reworkCount}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="font-data-mono text-data-mono text-on-surface-variant text-xs">
-                        {doerName(s.doerId)}
-                        {s.how ? ` · ${s.how}` : ""}
-                      </div>
-
-                      <div className="flex flex-col gap-0.5 font-data-mono text-data-mono text-xs">
-                        <span className={late ? "text-error font-bold" : "text-on-surface-variant"}>
-                          Planned {s.planned ? formatTs(s.planned) : "—"}
-                        </span>
-                        {s.actual && (
-                          <span className="text-on-surface-variant">Actual {formatTs(s.actual)}</span>
-                        )}
-                        <span className="text-on-surface-variant">Delay {formatDelay(s.planned, s.actual)}</span>
-                      </div>
-
-                      {canAct && (
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            onClick={() => handleComplete(s.stepNo)}
-                            className="border-2 border-on-surface bg-on-surface text-surface px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
-                          >
-                            Done
-                          </button>
-                          {s.stepNo > 1 && (
-                            <button
-                              onClick={() => handleReject(s.stepNo)}
-                              className="border-2 border-error text-error px-3 py-1 font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors"
-                            >
-                              Reject
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </main>
       </div>
 
@@ -1642,7 +1476,7 @@ function WorkflowInner() {
             setVisibleRunCount(RUN_PAGE_SIZE);
             loadSheet(instance.templateId, { force: true });
             loadData({ silent: true });
-            openInstance(instance.id);
+            setSelectedId(instance.id);
           }}
         />
       )}
