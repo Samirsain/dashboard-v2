@@ -42,6 +42,17 @@ function exportResponsesToCsv(
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Extracts the spreadsheet ID out of a pasted Google Sheets URL
+ * (e.g. https://docs.google.com/spreadsheets/d/<ID>/edit#gid=0). If the
+ * value doesn't look like a URL, it's returned unchanged so a raw ID still
+ * works.
+ */
+function extractSpreadsheetId(value: string): string {
+  const match = value.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : value.trim();
+}
+
 /** Copies text to the clipboard, falling back to a hidden textarea on older browsers. */
 async function copyText(text: string): Promise<void> {
   if (navigator.clipboard) {
@@ -164,12 +175,21 @@ function AddFormModal({
           </div>
 
           <div>
-            <label className={label}>Spreadsheet ID</label>
+            <label className={label}>Spreadsheet ID or Link</label>
             <input
               required
               value={spreadsheetId}
               onChange={(e) => setSpreadsheetId(e.target.value)}
-              placeholder="From the Google Sheet's URL"
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData("text");
+                const extracted = extractSpreadsheetId(pasted);
+                if (extracted !== pasted) {
+                  e.preventDefault();
+                  setSpreadsheetId(extracted);
+                }
+              }}
+              onBlur={(e) => setSpreadsheetId(extractSpreadsheetId(e.target.value))}
+              placeholder="Paste the full Google Sheet link — the ID is pulled out automatically"
               className={`${field} font-data-mono text-data-mono`}
             />
           </div>
