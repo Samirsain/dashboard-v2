@@ -24,6 +24,9 @@ router.get("/today", attendanceController.today);
 router.get("/history", validate({ query: attendanceDateQuerySchema }), attendanceController.history);
 router.get("/day", validate({ query: attendanceDateQuerySchema }), attendanceController.day);
 router.get("/range", validate({ query: attendanceRangeQuerySchema }), attendanceController.range);
+// Forgotten check-outs (10h+). Everyone may call it: a marker gets the whole
+// team, anyone else only their own rows.
+router.get("/alerts", attendanceController.alerts);
 router.post("/mark", validate({ body: markStatusSchema }), attendanceController.markStatus);
 router.post("/check-in", validate({ body: checkInOutSchema }), attendanceController.checkIn);
 router.post("/check-out", validate({ body: checkInOutSchema }), attendanceController.checkOut);

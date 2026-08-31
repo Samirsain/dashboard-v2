@@ -3,11 +3,36 @@ import { dataService, type SheetRecord } from "./data.service";
 import { usersService } from "./users.service";
 import { generateId } from "../utils/id";
 import { todayIso } from "../utils/date";
-import { computeAttendance, zonedTimeToUtcIso } from "../utils/attendanceTime";
+import {
+  computeAttendance,
+  isCheckoutOverdue,
+  minutesSinceCheckIn,
+  zonedTimeToUtcIso,
+} from "../utils/attendanceTime";
 import { AppError } from "../utils/AppError";
 import type { Attendance, AttendanceStatus, User } from "../types";
 
 const entity = sheetsConfig.attendance;
+
+/** One "checked in but never checked out" warning, joined with the employee it belongs to. */
+export interface CheckoutAlert {
+  employee: User;
+  attendance: Attendance;
+  /** Minutes since check-in, i.e. how long they have been "in" without an out. */
+  elapsedMinutes: number;
+}
+
+/** Empty per-status buckets — one shape reused for counts and for date lists. */
+function emptyStatusMap<T>(make: () => T): Record<AttendanceStatus, T> {
+  return {
+    Present: make(),
+    Late: make(),
+    "Half Day": make(),
+    Absent: make(),
+    Leave: make(),
+    "Pending Checkout": make(),
+  };
+}
 
 function toAttendance(record: SheetRecord): Attendance {
   return {
@@ -246,11 +271,23 @@ export const attendanceService = {
       .sort((a, b) => b.date.localeCompare(a.date));
   },
 
-  /** Per-employee attendance counts for every day in [from, to] (inclusive). */
+  /**
+   * Per-employee attendance counts for every day in [from, to] (inclusive),
+   * plus the actual dates behind each count — so the report can answer
+   * "which days exactly was this person on Leave / Half Day?" without a
+   * second round-trip.
+   */
   async range(
     from: string,
     to: string
-  ): Promise<Array<{ employee: User; counts: Record<AttendanceStatus, number>; totalMarked: number }>> {
+  ): Promise<
+    Array<{
+      employee: User;
+      counts: Record<AttendanceStatus, number>;
+      dates: Record<AttendanceStatus, string[]>;
+      totalMarked: number;
+    }>
+  > {
     const [users, records] = await Promise.all([usersService.list(), dataService.findAll(entity)]);
     const inRange = records.filter((r) => {
       const date = r["Date"] as string;
@@ -266,25 +303,49 @@ export const attendanceService = {
     return users
       .filter((u) => u.status === "Active" && u.role !== "MD")
       .map((employee) => {
-        const counts: Record<AttendanceStatus, number> = {
-          Present: 0,
-          Late: 0,
-          "Half Day": 0,
-          Absent: 0,
-          Leave: 0,
-          "Pending Checkout": 0,
-        };
+        const counts = emptyStatusMap<number>(() => 0);
+        const dates = emptyStatusMap<string[]>(() => []);
         let totalMarked = 0;
         for (const r of byEmployee.get(employee.id) ?? []) {
           const status = r["Status"] as AttendanceStatus | "";
-          if (status) {
-            counts[status]++;
-            totalMarked++;
-          }
+          // A status written by an older policy that no longer exists is
+          // ignored rather than crashing the whole report.
+          if (!status || !(status in counts)) continue;
+          counts[status]++;
+          dates[status].push(r["Date"] as string);
+          totalMarked++;
         }
-        return { employee, counts, totalMarked };
+        for (const list of Object.values(dates)) list.sort();
+        return { employee, counts, dates, totalMarked };
       })
       .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
+  },
+
+  /**
+   * Every employee who checked in and never checked out, once the alert
+   * threshold has passed — across all dates, not just today, so a check-out
+   * forgotten last week still surfaces. Longest-pending first. Pass
+   * `employeeId` to narrow it to one person (what a doer sees on their own page).
+   */
+  async pendingCheckouts(employeeId?: string, now: Date = new Date()): Promise<CheckoutAlert[]> {
+    const [users, records] = await Promise.all([usersService.list(), dataService.findAll(entity)]);
+    const byId = new Map(
+      users.filter((u) => u.status === "Active" && u.role !== "MD").map((u) => [u.id, u])
+    );
+    const alerts: CheckoutAlert[] = [];
+    for (const r of records) {
+      const rowEmployeeId = (r["Employee ID"] as string) ?? "";
+      if (employeeId && rowEmployeeId !== employeeId) continue;
+      if (!isCheckoutOverdue((r["CheckIn"] as string) ?? "", (r["CheckOut"] as string) ?? "", now)) continue;
+      const employee = byId.get(rowEmployeeId);
+      if (!employee) continue; // inactive/deleted employee — nothing to act on
+      alerts.push({
+        employee,
+        attendance: toAttendance(r),
+        elapsedMinutes: minutesSinceCheckIn(r["CheckIn"] as string, now),
+      });
+    }
+    return alerts.sort((a, b) => b.elapsedMinutes - a.elapsedMinutes);
   },
 
   /** All active employees for `date`, each joined with their attendance row (or null if unmarked). */

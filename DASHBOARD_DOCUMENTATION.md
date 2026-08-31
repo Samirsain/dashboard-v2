@@ -175,6 +175,16 @@ PerformanceScore  = 100 + NegativeScore
 ### 5.6 Attendance
 - Check-in / check-out, daily/history/range views.
 - Late/early-exit/working-minutes auto-computation.
+- **Checkout Alert** — jiska check-in ho gaya lekin 10 ghante tak check-out
+  nahi hua, uska red alert banner page ke upar aata hai (sabhi dates ke liye,
+  sirf aaj ka nahi). Marker ko poori team dikhti hai, doer ko sirf apna row.
+  Alert se seedha "Open Date" (us date ka table) ya "Fix" (Edit modal me
+  missing check-out time bharna) kiya ja sakta hai; day table me bhi wo row
+  highlight hoti hai. Threshold `CHECKOUT_ALERT_HOURS` se aata hai.
+- **Monthly Report ke counts clickable hain** — Half Day / Leave / Absent
+  waghairah ka number click karne par exact dates (weekday ke saath) ki list
+  khulti hai, yaani "konsi date ko leave/half day tha" turant pata chal jata
+  hai.
 - MD-only: wipe-all aur recompute tools.
 - `canMarkAttendance` / `canEditAttendance` permissions se PC ko selectively
   access diya ja sakta hai.
@@ -265,7 +275,7 @@ read), (2) periodic backup destination.
 | Forms | `/api/forms` | responses, statuses, member management — `canManageForms` |
 | Backup | `/api/backup` | `POST /run` — shared-secret `x-backup-token` |
 | Tickets | `/api/tickets` | CRUD, `/stats`, status/solution updates |
-| Attendance | `/api/attendance` | mark, check-in/out, history/range, MD-only wipe/recompute |
+| Attendance | `/api/attendance` | mark, check-in/out, history/range, `/alerts` (10h+ pending checkout), MD-only wipe/recompute |
 | IMS | `/api/ims` | items, transactions, stock-ledger, reorder-sheet — all `canAccessInventory` |
 | Performance | `/api/performance` | `GET /dgmax` — `canViewTeamPerformance` |
 
