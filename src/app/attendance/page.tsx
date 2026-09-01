@@ -9,6 +9,12 @@ import EditAttendanceModal from "@/components/EditAttendanceModal";
 import AttendanceStatusDatesModal from "@/components/AttendanceStatusDatesModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
+import {
+  REPORT_STATUSES,
+  downloadAttendancePdf,
+  monthTitleOf,
+  statusColumnLabel,
+} from "@/lib/attendanceReport";
 import { useAuth } from "@/lib/auth-context";
 import { canEditAttendance, canMarkAttendance } from "@/lib/access";
 import type {
@@ -24,21 +30,36 @@ function todayIso(): string {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
-/** Returns { from, to } ISO dates for a given month offset (0 = current, -1 = last month, etc.) */
-function monthRange(offset: number): { from: string; to: string } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + offset;
-  const start = new Date(y, m, 1);
-  const end = new Date(y, m + 1, 0); // last day of that month
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: fmt(start), to: fmt(end) };
+/** "2026-08-01" for a local Date — never toISOString(), which shifts the day in IST. */
+function isoOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * { from, to } for a calendar month, given either a month offset (0 = this
+ * month, -1 = last month) or a "YYYY-MM" value from the month input. `to` is
+ * clamped to today so the current month never asks for future dates.
+ */
+function monthRange(month: number | string): { from: string; to: string } {
+  const now = new Date();
+  const start =
+    typeof month === "string"
+      ? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
+      : new Date(now.getFullYear(), now.getMonth() + month, 1);
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, 0); // last day of that month
+  return { from: isoOf(start), to: isoOf(end > now ? now : end) };
+}
+
+/** "Aug 2026" for a month offset — the label on the quick-pick buttons. */
 function monthLabel(offset: number): string {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
   return d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+}
+
+/** "YYYY-MM" for the month input when the range is exactly one month, else "". */
+function monthValueOf(from: string, to: string): string {
+  return from && to && monthTitleOf(from, to) ? from.slice(0, 7) : "";
 }
 
 function formatMinutes(mins: number): string {
@@ -52,16 +73,6 @@ function formatClockTime(iso: string): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
-
-/** Statuses the Monthly Report breaks out, in column order. */
-const REPORT_STATUSES: AttendanceStatus[] = [
-  "Present",
-  "Late",
-  "Half Day",
-  "Absent",
-  "Leave",
-  "Pending Checkout",
-];
 
 /** An employee+date the Edit modal is open on — the date isn't always the page's. */
 type EditTarget = AttendanceDayRow & { date: string };
@@ -404,10 +415,12 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
   // Which Monthly Report cell was clicked open: the dates behind one count.
   const [datesModal, setDatesModal] = useState<StatusDatesTarget | null>(null);
   const { alerts, thresholdHours, reload: reloadAlerts } = useCheckoutAlerts();
+  const { user } = useAuth();
+  const [exporting, setExporting] = useState(false);
 
-  /** Quick month picker helper */
-  function pickMonth(offset: number) {
-    const { from, to } = monthRange(offset);
+  /** Points the range report at one whole calendar month. */
+  function pickMonth(month: number | string) {
+    const { from, to } = monthRange(month);
     setRangeFrom(from);
     setRangeTo(to);
   }
@@ -433,6 +446,22 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
     }
     return s;
   }, [filteredRangeRows]);
+
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      await downloadAttendancePdf({
+        rows: filteredRangeRows,
+        from: rangeFrom,
+        to: rangeTo,
+        generatedBy: user?.name ?? "",
+      });
+    } catch {
+      alert("Could not build the PDF. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const editable = isAdmin || date === todayIso();
 
@@ -574,6 +603,29 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
           {!editable && (
             <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">(view only)</span>
           )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">Month</label>
+          <button
+            onClick={() => pickMonth(0)}
+            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+          >
+            {monthLabel(0)}
+          </button>
+          <button
+            onClick={() => pickMonth(-1)}
+            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+          >
+            {monthLabel(-1)}
+          </button>
+          <input
+            type="month"
+            value={monthValueOf(rangeFrom, rangeTo)}
+            max={todayIso().slice(0, 7)}
+            onChange={(e) => e.target.value && pickMonth(e.target.value)}
+            title="Pick any month"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
@@ -723,17 +775,35 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
       {rangeFrom && rangeTo && (
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Monthly Report</h3>
-          <select
-            value={reportDoer}
-            onChange={(e) => setReportDoer(e.target.value)}
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px]"
-          >
-            <option value="">All Employees</option>
-            {rangeRows.filter((r) => r.employee.role !== "MD").map(({ employee }) => (
-              <option key={employee.id} value={employee.id}>{employee.name}</option>
-            ))}
-          </select>
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Monthly Report</h3>
+            <span className="font-data-mono text-data-mono text-on-surface-variant">
+              {monthTitleOf(rangeFrom, rangeTo) || `${formatDMY(rangeFrom)} to ${formatDMY(rangeTo)}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={reportDoer}
+              onChange={(e) => setReportDoer(e.target.value)}
+              className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px]"
+            >
+              <option value="">All Employees</option>
+              {rangeRows.filter((r) => r.employee.role !== "MD").map(({ employee }) => (
+                <option key={employee.id} value={employee.id}>{employee.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleExportPdf}
+              disabled={exporting || rangeLoading || filteredRangeRows.length === 0}
+              title="Download this month's report as a PDF"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-on-surface text-surface border-on-surface hover:opacity-90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined text-base" data-icon="download">
+                download
+              </span>
+              {exporting ? "Preparing..." : "Export PDF"}
+            </button>
+          </div>
         </div>
 
         {rangeError && (
@@ -767,7 +837,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
                 <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
                 {REPORT_STATUSES.map((status) => (
                   <th key={status} className="py-3 px-4 border-r border-surface-variant">
-                    {status === "Pending Checkout" ? "No Checkout" : status}
+                    {statusColumnLabel(status)}
                   </th>
                 ))}
                 <th className="py-3 px-4">Total Marked</th>

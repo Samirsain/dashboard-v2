@@ -22,3 +22,14 @@ export function formatDMY(value: string | null | undefined): string {
 export function formatPct(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "—";
 }
+
+/**
+ * The weekday name for an ISO date ("2026-08-14" -> "Friday"). Blank for
+ * anything that isn't an ISO date, so a stray value renders as nothing
+ * rather than "Invalid Date".
+ */
+export function weekdayOf(iso: string | null | undefined): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const date = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-IN", { weekday: "long" });
+}
