@@ -169,8 +169,15 @@ PerformanceScore  = 100 + NegativeScore
   link, allowed member IDs).
 - Frontend har 20 seconds me poll karta hai.
 - Per-doer access control (member list) — Admin/MD sabkuch dekh sakta hai.
-- CSV export, search, status tracking (Working/Complete), pagination
-  (25/page).
+- CSV export aur status tracking (Working/Complete).
+- **Ek hi page par saara data** — koi pagination nahi. Table apne box ke andar
+  scroll hota hai aur header pinned rehta hai, isliye 3000+ rows bhi bina page
+  badle dekh sakte hain.
+- **Smart search bar** — terms AND hote hain (`ravi delhi`), `"quoted phrase"`
+  exact match, `field:value` sirf us column me dhundta hai (`name:ravi`,
+  `status:working`), aur `-term` us row ko hata deta hai. Match kiya hua text
+  cell me highlight ho jata hai. Syntax `src/lib/smartSearch.ts` me hai; bar ke
+  neeche "Tips" button par examples milte hain.
 
 ### 5.6 Attendance
 - Check-in / check-out, daily/history/range views.

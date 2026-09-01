@@ -1,21 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { canManageForms } from "@/lib/access";
+import HighlightedText from "@/components/HighlightedText";
+import { highlightNeedles, matchesSearch, parseSearchQuery } from "@/lib/smartSearch";
 import type { Doer, FormConfig, FormResponses, FormResponseStatusMap, FormResponseStatusValue } from "@/lib/types";
 
 // New submissions land in the Sheet at any time — re-check periodically so
 // they show up without a manual refresh.
 const POLL_MS = 20000;
-// How many response rows per page in each form's table.
-const PAGE_SIZE = 25;
 
 type ResponseRow = FormResponses["rows"][number];
+
+/**
+ * A row as the search sees it: every sheet column, plus the dashboard-only
+ * enquiry status folded in so `status:working` works like any other field.
+ * Merged into the sheet's own Status column when it happens to have one.
+ */
+function toSearchRecord(row: ResponseRow, status: string): Record<string, string> {
+  const record: Record<string, string> = { ...row.data };
+  if (!status) return record;
+  const existingKey = Object.keys(record).find((key) => key.toLowerCase() === "status");
+  if (existingKey) record[existingKey] = `${record[existingKey]} ${status}`.trim();
+  else record.Status = status;
+  return record;
+}
 
 /** Builds and downloads a CSV of the given rows for one form, including their status. */
 function exportResponsesToCsv(
@@ -273,7 +287,9 @@ function FormResponsesSection({
   // "Working" / "Complete" enquiry-status filter, so staff can see which
   // enquiries are in progress vs done.
   const [statusFilter, setStatusFilter] = useState<"" | FormResponseStatusValue | "unset">("");
-  const [page, setPage] = useState(0);
+  // Filtering runs on every keystroke over every row, so let React keep the
+  // input responsive and catch up with the table a beat later.
+  const deferredSearch = useDeferredValue(search);
 
   async function load(opts: { silent?: boolean } = {}) {
     if (!opts.silent) setLoading(true);
@@ -313,11 +329,14 @@ function FormResponsesSection({
 
   const headers = responses?.headers ?? [];
 
+  const searchTerms = useMemo(() => parseSearchQuery(deferredSearch), [deferredSearch]);
+
+  const allRows = responses?.rows ?? [];
+
   const filteredRows = useMemo(() => {
     let rows = responses?.rows ?? [];
-    if (search) {
-      const q = search.toLowerCase();
-      rows = rows.filter((r) => Object.values(r.data).some((v) => v.toLowerCase().includes(q)));
+    if (searchTerms.length > 0) {
+      rows = rows.filter((r) => matchesSearch(toSearchRecord(r, statuses[r.row] ?? ""), searchTerms));
     }
     if (statusFilter) {
       rows = rows.filter((r) => {
@@ -326,12 +345,9 @@ function FormResponsesSection({
       });
     }
     return rows;
-  }, [responses, search, statusFilter, statuses]);
+  }, [responses, searchTerms, statusFilter, statuses]);
 
-  // Keep the page in range as filters shrink the result set.
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount - 1);
-  const pagedRows = filteredRows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const filtered = filteredRows.length !== allRows.length;
 
   return (
     <div className="w-full bg-surface-container-lowest border-2 border-on-surface flex flex-col">
@@ -339,7 +355,9 @@ function FormResponsesSection({
         <div className="flex items-baseline gap-3">
           <h3 className="font-headline-md text-headline-md text-on-surface">{form.name}</h3>
           <span className="font-data-mono text-data-mono text-on-surface-variant">
-            {filteredRows.length} response{filteredRows.length === 1 ? "" : "s"}
+            {filtered
+              ? `${filteredRows.length} of ${allRows.length} responses`
+              : `${allRows.length} response${allRows.length === 1 ? "" : "s"}`}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -374,10 +392,7 @@ function FormResponsesSection({
           <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">Status</span>
           <select
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as typeof statusFilter);
-              setPage(0);
-            }}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
             className="border-2 border-on-surface bg-surface px-3 py-1.5 font-label-sm text-label-sm uppercase text-on-surface focus:outline-none"
           >
             <option value="">All</option>
@@ -390,9 +405,14 @@ function FormResponsesSection({
 
       {error && <p className="font-label-sm text-label-sm text-error px-4 py-2">{error}</p>}
 
-      <div className="overflow-x-auto">
+      {/*
+        Every matching row is rendered — no page cursor to click through. The
+        list scrolls inside this box instead of the window, with the header
+        pinned, so a long form stays readable and the page keeps its shape.
+      */}
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-left border-collapse min-w-[720px]">
-          <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
+          <thead className="sticky top-0 z-10 bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
             <tr>
               {headers.map((h) => (
                 <th key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
@@ -419,12 +439,13 @@ function FormResponsesSection({
                   colSpan={Math.max(headers.length, 1) + 1}
                   className="py-6 text-center font-data-mono text-data-mono text-on-surface-variant"
                 >
-                  No responses yet.
+                  {allRows.length === 0 ? "No responses yet." : "No response matches this search."}
                 </td>
               </tr>
             )}
-            {pagedRows.map((r) => {
+            {filteredRows.map((r) => {
               const status = statuses[r.row] ?? "";
+              const record = toSearchRecord(r, status);
               return (
                 <tr
                   key={r.row}
@@ -432,7 +453,14 @@ function FormResponsesSection({
                 >
                   {headers.map((h) => (
                     <td key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
-                      {r.data[h] || "—"}
+                      {r.data[h] ? (
+                        <HighlightedText
+                          text={r.data[h]}
+                          needles={highlightNeedles(searchTerms, h, record)}
+                        />
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   ))}
                   <td className="py-3 px-4 whitespace-nowrap">
@@ -469,33 +497,79 @@ function FormResponsesSection({
         </table>
       </div>
 
-      {/* Pagination */}
-      {filteredRows.length > PAGE_SIZE && (
-        <div className="border-t-2 border-on-surface p-stack-md flex flex-wrap items-center justify-between gap-3">
+      {/* Row count — the whole filtered set is above, nothing is paged away. */}
+      {!loading && filteredRows.length > 0 && (
+        <div className="border-t-2 border-on-surface p-stack-md">
           <span className="font-data-mono text-data-mono text-on-surface-variant">
-            {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filteredRows.length)} of{" "}
-            {filteredRows.length}
+            Showing all {filteredRows.length} row{filteredRows.length === 1 ? "" : "s"}
+            {filtered ? ` (filtered from ${allRows.length})` : ""}
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage(Math.max(0, safePage - 1))}
-              disabled={safePage === 0}
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50"
-            >
-              Prev
-            </button>
-            <span className="font-data-mono text-data-mono text-on-surface">
-              {safePage + 1} / {pageCount}
-            </span>
-            <button
-              onClick={() => setPage(Math.min(pageCount - 1, safePage + 1))}
-              disabled={safePage >= pageCount - 1}
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** The syntax cheat-sheet shown under the search bar. */
+const SEARCH_TIPS: Array<[string, string]> = [
+  ["ravi delhi", "Both words, anywhere in the row"],
+  ['"ravi kumar"', "The exact phrase, spaces included"],
+  ["name:ravi", "Only in a column whose title has \"name\""],
+  ["status:working", "Only rows marked Working"],
+  ["-complete", "Skip rows that mention \"complete\""],
+];
+
+/**
+ * One search box for every shown form. More than a substring filter: terms are
+ * AND-ed, phrases can be quoted, `field:value` narrows to a column and a
+ * leading `-` excludes — see SEARCH_TIPS, which is one click away under the bar.
+ */
+function SmartSearchBar({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const [showTips, setShowTips] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 border-2 border-on-surface bg-surface px-3 focus-within:outline-2 focus-within:outline-offset-[-4px] focus-within:outline-on-surface">
+        <span className="material-symbols-outlined text-on-surface-variant" data-icon="search">
+          search
+        </span>
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder='Smart search — try  name:ravi  "ravi kumar"  status:working  -complete'
+          className="flex-1 min-w-0 bg-transparent py-2 text-on-surface focus:outline-none"
+        />
+        {value && (
+          <button
+            onClick={() => onChange("")}
+            title="Clear the search"
+            className="font-label-sm text-label-sm uppercase text-on-surface-variant hover:text-on-surface"
+          >
+            Clear
+          </button>
+        )}
+        <span className="w-px h-5 bg-surface-variant" />
+        <button
+          onClick={() => setShowTips((prev) => !prev)}
+          className="font-label-sm text-label-sm uppercase text-on-surface-variant hover:text-on-surface"
+        >
+          {showTips ? "Hide Tips" : "Tips"}
+        </button>
+      </div>
+
+      {showTips && (
+        <ul className="border border-on-surface bg-surface-container-lowest divide-y divide-surface-variant">
+          {SEARCH_TIPS.map(([syntax, meaning]) => (
+            <li key={syntax} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2">
+              <code className="font-data-mono text-data-mono text-on-surface border border-on-surface px-1.5">
+                {syntax}
+              </code>
+              <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                {meaning}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -738,12 +812,7 @@ function FormsInner() {
                   </label>
                 ))}
               </div>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search responses across the selected forms..."
-                className="w-full border-2 border-on-surface bg-surface px-3 py-2 text-on-surface focus:outline-none"
-              />
+              <SmartSearchBar value={search} onChange={setSearch} />
             </div>
           )}
 

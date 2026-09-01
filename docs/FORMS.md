@@ -60,11 +60,20 @@ they've been explicitly granted access to.
 
 - **Checkbox list** — tick any forms to show; each opens its own live table, so
   several forms can be reviewed at once.
-- **Search** — filters across every column of the shown forms.
+- **Smart search** — one bar across every shown form. Terms are AND-ed
+  (`ravi delhi`), `"quotes"` keep a phrase together, `field:value` narrows to a
+  column whose header contains that word (`name:ravi`, `status:working`), and a
+  leading `-` excludes (`-complete`). Everything is case-insensitive and matches
+  partial words; matched text is highlighted in the cell. A `field:` that
+  matches no column falls back to a plain text search, so a stray colon (a time
+  like `10:30`) never blanks the table. Implementation:
+  `src/lib/smartSearch.ts`.
 - **Status** — filter/track each response's Working / Complete / Not-set state
   (Admin can set it inline; it's dashboard-only, never written to the Sheet).
 - **Copy Form Link** — copies the form's shareable URL to the clipboard.
-- **Pagination** — 25 rows per page per form.
+- **One page, no pagination** — every matching row is rendered. The table
+  scrolls inside its own box with the header pinned, so a long form stays
+  readable without paging through it.
 - **Export CSV** — downloads the currently-filtered rows of a form, including status.
 
 ## API
