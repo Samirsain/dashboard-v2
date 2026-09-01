@@ -1,14 +1,7 @@
 "use client";
 
-import { formatDMY } from "@/lib/format";
+import { formatDMY, weekdayOf } from "@/lib/format";
 import type { AttendanceStatus } from "@/lib/types";
-
-/** "2026-08-14" -> "Friday". Blank for anything that isn't an ISO date. */
-function weekdayOf(iso: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { weekday: "long" });
-}
 
 /**
  * The dates behind one cell of the Monthly Report — click a "Half Day: 3" and
