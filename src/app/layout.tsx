@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import ReticleInit from "@/components/ReticleInit";
@@ -19,7 +19,11 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "ThirtyMilestones",
   description: "Task management system",
+  // iOS: "Add to Home Screen" opens full screen, named like the app.
+  appleWebApp: { capable: true, title: "Milestones", statusBarStyle: "default" },
 };
+
+export const viewport: Viewport = { themeColor: "#f9f9f9" };
 
 export default function RootLayout({
   children,
