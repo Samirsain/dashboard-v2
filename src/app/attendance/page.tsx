@@ -402,8 +402,10 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
-  const [rangeFrom, setRangeFrom] = useState("");
-  const [rangeTo, setRangeTo] = useState("");
+  // The report (and its Export PDF button) opens on the current month, so
+  // exporting never depends on first discovering the range pickers.
+  const [rangeFrom, setRangeFrom] = useState(() => monthRange(0).from);
+  const [rangeTo, setRangeTo] = useState(() => monthRange(0).to);
   const [rangeRows, setRangeRows] = useState<AttendanceRangeRow[]>([]);
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeError, setRangeError] = useState<string | null>(null);
@@ -645,14 +647,13 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
             onChange={(e) => setRangeTo(e.target.value)}
             className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
           />
-          {(rangeFrom || rangeTo) && (
-            <button
-              onClick={() => { setRangeFrom(""); setRangeTo(""); setReportDoer(""); }}
-              className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-            >
-              Clear
-            </button>
-          )}
+          <button
+            onClick={() => { pickMonth(0); setReportDoer(""); }}
+            title="Reset the report to the current month"
+            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+          >
+            Reset
+          </button>
         </div>
         <input
           value={search}
@@ -771,7 +772,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
         </table>
       </div>
 
-      {/* Monthly Report — visible only when date range is selected */}
+      {/* Monthly Report — defaults to the current month; hidden only while a range is half-typed */}
       {rangeFrom && rangeTo && (
       <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
