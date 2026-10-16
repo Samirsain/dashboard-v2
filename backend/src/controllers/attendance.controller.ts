@@ -5,6 +5,7 @@ import { attendanceService } from "../services/attendance.service";
 import { canMarkAttendance } from "../utils/access";
 import { todayIso } from "../utils/date";
 import { AppError } from "../utils/AppError";
+import { CHECKOUT_ALERT_HOURS } from "../utils/attendanceTime";
 import type {
   AttendanceDateQuery,
   AttendanceRangeQuery,
@@ -50,6 +51,19 @@ export const attendanceController = {
     requireMarker(req);
     const { from, to } = req.query as unknown as AttendanceRangeQuery;
     ok(res, await attendanceService.range(from, to));
+  }),
+
+  /**
+   * "Checked in but never checked out" alerts. A marker sees every employee's;
+   * anyone else only their own. `thresholdHours` travels with the payload so
+   * the UI never has to hardcode the policy number.
+   */
+  alerts: asyncHandler(async (req: Request, res: Response) => {
+    const scopeToSelf = !canMarkAttendance(req.user);
+    ok(res, {
+      thresholdHours: CHECKOUT_ALERT_HOURS,
+      alerts: await attendanceService.pendingCheckouts(scopeToSelf ? req.user!.sub : undefined),
+    });
   }),
 
   markStatus: asyncHandler(async (req: Request, res: Response) => {

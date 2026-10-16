@@ -61,7 +61,23 @@ export interface AttendanceDayRow {
 export interface AttendanceRangeRow {
   employee: Doer;
   counts: Record<AttendanceStatus, number>;
+  /** The actual dates behind each count, so a count can be clicked open. */
+  dates: Record<AttendanceStatus, string[]>;
   totalMarked: number;
+}
+
+/** One employee who checked in and never checked out — see GET /attendance/alerts. */
+export interface CheckoutAlert {
+  employee: Doer;
+  attendance: Attendance;
+  /** How long they have been "in" with no "out", in minutes. */
+  elapsedMinutes: number;
+}
+
+export interface CheckoutAlertResponse {
+  /** Hours without a check-out before a row becomes an alert (server policy). */
+  thresholdHours: number;
+  alerts: CheckoutAlert[];
 }
 
 /** A row in the Master Sheet — free-form documentation of a list/system. */

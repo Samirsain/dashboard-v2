@@ -24,6 +24,7 @@ viewer, IT/HR help-tickets aur inventory management (IMS) sab ek jagah hai.
 | Auth | Custom JWT (no third-party auth provider), bcrypt password hashing |
 | Deployment | Backend → Render.com (`render.yaml`). Frontend → likely Vercel (separate, not in this repo config) |
 | Scheduler | `node-cron` — daily checklist generation + periodic Supabase→Sheets backup |
+| PDF export | `jspdf` + `jspdf-autotable`, client-side aur lazy-loaded (Export click par hi download hota hai) |
 
 Frontend aur backend **do independent apps** hain jo sirf REST API (HTTP/JSON)
 ke through baat karte hain — koi shared code/monorepo tooling nahi hai.
@@ -175,6 +176,26 @@ PerformanceScore  = 100 + NegativeScore
 ### 5.6 Attendance
 - Check-in / check-out, daily/history/range views.
 - Late/early-exit/working-minutes auto-computation.
+- **Checkout Alert** — jiska check-in ho gaya lekin 10 ghante tak check-out
+  nahi hua, uska red alert banner page ke upar aata hai (sabhi dates ke liye,
+  sirf aaj ka nahi). Marker ko poori team dikhti hai, doer ko sirf apna row.
+  Alert se seedha "Open Date" (us date ka table) ya "Fix" (Edit modal me
+  missing check-out time bharna) kiya ja sakta hai; day table me bhi wo row
+  highlight hoti hai. Threshold `CHECKOUT_ALERT_HOURS` se aata hai.
+- **Monthly Report ke counts clickable hain** — Half Day / Leave / Absent
+  waghairah ka number click karne par exact dates (weekday ke saath) ki list
+  khulti hai, yaani "konsi date ko leave/half day tha" turant pata chal jata
+  hai.
+- **Month quick-pick** — "This month" / "Last month" buttons aur ek month
+  picker; ye From/To range set kar dete hain (current month ka `to` aaj tak
+  clamp hota hai).
+- **Export PDF** — Monthly Report ke header me button; click karte hi seedha
+  `.pdf` download ho jata hai (koi print dialog nahi). Report me letterhead,
+  period + generated-by line, summary totals, employee-wise table (grand total
+  row ke saath) aur — jab ek hi employee select ho — us employee ka day-wise
+  detail (date, weekday, status) hota hai. Multi-page par header repeat hota
+  hai aur footer me "Page X of Y" aata hai. Code: `src/lib/attendanceReport.ts`;
+  jsPDF sirf click par load hota hai, page ke initial bundle me nahi.
 - MD-only: wipe-all aur recompute tools.
 - `canMarkAttendance` / `canEditAttendance` permissions se PC ko selectively
   access diya ja sakta hai.
@@ -265,7 +286,7 @@ read), (2) periodic backup destination.
 | Forms | `/api/forms` | responses, statuses, member management — `canManageForms` |
 | Backup | `/api/backup` | `POST /run` — shared-secret `x-backup-token` |
 | Tickets | `/api/tickets` | CRUD, `/stats`, status/solution updates |
-| Attendance | `/api/attendance` | mark, check-in/out, history/range, MD-only wipe/recompute |
+| Attendance | `/api/attendance` | mark, check-in/out, history/range, `/alerts` (10h+ pending checkout), MD-only wipe/recompute |
 | IMS | `/api/ims` | items, transactions, stock-ledger, reorder-sheet — all `canAccessInventory` |
 | Performance | `/api/performance` | `GET /dgmax` — `canViewTeamPerformance` |
 

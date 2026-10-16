@@ -153,3 +153,29 @@ export function zonedTimeToUtcIso(
   const offsetMinutes = timezoneOffsetMinutes(utcGuess, timeZone);
   return new Date(utcGuess.getTime() - offsetMinutes * 60000).toISOString();
 }
+
+/**
+ * A check-in with no matching check-out this many hours later is treated as a
+ * forgotten check-out and raises an alert on the Attendance page — someone
+ * punched in, went home, and never punched out.
+ */
+export const CHECKOUT_ALERT_HOURS = 10;
+const CHECKOUT_ALERT_MINUTES = CHECKOUT_ALERT_HOURS * 60;
+
+/** Minutes elapsed since a check-in timestamp. 0 for blank/unparseable/future values. */
+export function minutesSinceCheckIn(checkInIso: string, now: Date = new Date()): number {
+  if (!checkInIso) return 0;
+  const start = new Date(checkInIso).getTime();
+  if (Number.isNaN(start)) return 0;
+  return Math.max(0, Math.round((now.getTime() - start) / 60000));
+}
+
+/** Checked in, never checked out, and CHECKOUT_ALERT_HOURS have gone by. */
+export function isCheckoutOverdue(
+  checkInIso: string,
+  checkOutIso: string,
+  now: Date = new Date()
+): boolean {
+  if (!checkInIso || checkOutIso) return false;
+  return minutesSinceCheckIn(checkInIso, now) >= CHECKOUT_ALERT_MINUTES;
+}
