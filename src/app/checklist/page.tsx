@@ -10,6 +10,7 @@ import CreateChecklistModal from "@/components/CreateChecklistModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/ConfirmDialog";
 import type { Doer, ChecklistInstance, ChecklistTemplate, List } from "@/lib/types";
 
 function ChecklistStatusPill({ status }: { status: "Pending" | "Completed" }) {
@@ -87,8 +88,11 @@ function ChecklistInner() {
     });
   }, []);
 
+  const confirm = useConfirm();
+
   async function handleComplete(id: string) {
     if (!user) return;
+    if (!(await confirm({ title: "Mark as done?", message: instances.find((c) => c.id === id)?.taskName }))) return;
     try {
       await api.post(`/checklist/instances/${id}/complete`);
       setInstances((prev) =>

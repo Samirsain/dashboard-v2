@@ -8,6 +8,7 @@ import CreateWorkflowTemplateModal from "@/components/CreateWorkflowTemplateModa
 import StartWorkflowInstanceModal from "@/components/StartWorkflowInstanceModal";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { canManageWorkflow } from "@/lib/access";
 import type {
   Doer,
@@ -579,6 +580,8 @@ function MyWorkflowSteps() {
     return () => clearInterval(timer);
   }, []);
 
+  const confirm = useConfirm();
+
   async function act(row: MyStep, action: "complete" | "reject") {
     let reason = "";
     if (action === "reject") {
@@ -591,6 +594,8 @@ function MyWorkflowSteps() {
         alert("Please say why this is being sent back.");
         return;
       }
+    } else if (!(await confirm({ title: "Mark step as done?", message: row.step.what }))) {
+      return;
     }
     setBusyKey(`${row.instanceId}:${row.step.stepNo}`);
     try {

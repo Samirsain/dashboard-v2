@@ -26,6 +26,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { canAccessAllTasks, canManageDoers, canManageWorkflow } from "@/lib/access";
 import ReviseTaskModal from "@/components/ReviseTaskModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
@@ -177,7 +178,10 @@ function DashboardInner() {
 
   const templateListMap = new Map(templates.map((t) => [t.id, t.listId]));
 
+  const confirm = useConfirm();
+
   async function handleTaskDone(id: string) {
+    if (!(await confirm({ title: "Mark as done?", message: allTasks.find((t) => t.id === id)?.title }))) return;
     try {
       await api.patch(`/tasks/${id}`, { status: "Completed" });
       setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: "Completed" } : t)));
@@ -187,6 +191,7 @@ function DashboardInner() {
   }
 
   async function handleChecklistDone(id: string) {
+    if (!(await confirm({ title: "Mark as done?", message: pendingChecklist.find((c) => c.id === id)?.taskName }))) return;
     try {
       await api.post(`/checklist/instances/${id}/complete`);
       setPendingChecklist((prev) => prev.filter((c) => c.id !== id));
@@ -207,6 +212,8 @@ function DashboardInner() {
         alert("Please say why this is being sent back.");
         return;
       }
+    } else if (!(await confirm({ title: "Mark step as done?", message: row.step.what }))) {
+      return;
     }
     const key = `${row.instanceId}:${row.step.stepNo}`;
     setWorkflowBusyKey(key);

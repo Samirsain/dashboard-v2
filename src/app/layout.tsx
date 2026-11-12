@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import ReticleInit from "@/components/ReticleInit";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
 import "./globals.css";
 
 const geist = Geist({
@@ -40,7 +41,9 @@ export default function RootLayout({
       </head>
       <body className="antialiased selection:bg-primary-container selection:text-on-primary" suppressHydrationWarning>
         <ReticleInit />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </AuthProvider>
       </body>
     </html>
   );

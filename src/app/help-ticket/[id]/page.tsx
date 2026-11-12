@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/ConfirmDialog";
 import type { Ticket } from "@/lib/types";
 
 function StatusBadge({ status }: { status: Ticket["status"] }) {
@@ -93,7 +94,15 @@ function TicketDetailsInner() {
     }
   }
 
+  const confirm = useConfirm();
+
   async function handleEmployeeStatus(newStatus: "Completed" | "Reopened") {
+    if (
+      newStatus === "Completed" &&
+      !(await confirm({ title: "Mark ticket as done?", message: "This will close the ticket." }))
+    ) {
+      return;
+    }
     setSubmitting(true);
     try {
       const updated = await api.patch<Ticket>(`/tickets/${id}/status`, {

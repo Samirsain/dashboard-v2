@@ -11,6 +11,7 @@ import ReviseTaskModal from "@/components/ReviseTaskModal";
 import { api, ApiError } from "@/lib/api";
 import { formatDMY } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { canAccessAllTasks, canDeleteTask } from "@/lib/access";
 import type { Doer, List, Task } from "@/lib/types";
 
@@ -80,7 +81,10 @@ function TaskListInner() {
       `${t.title} ${t.doer?.name ?? ""}`.toLowerCase().includes(search.toLowerCase())
     );
 
+  const confirm = useConfirm();
+
   async function handleMarkDone(id: string) {
+    if (!(await confirm({ title: "Mark as done?", message: tasks.find((t) => t.id === id)?.title }))) return;
     try {
       await api.patch(`/tasks/${id}`, { status: "Completed" });
       setTasks((prev) =>
