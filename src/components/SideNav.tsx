@@ -116,7 +116,7 @@ export default function SideNav({ active }: { active: NavKey }) {
         >
           {expanded ? (
             <Link href="/" className="flex items-center gap-3 text-on-surface min-w-0 overflow-hidden">
-              <BrandLogo className="h-8 w-auto shrink-0" />
+              <BrandLogo iconOnly className="h-8 w-auto shrink-0" />
             </Link>
           ) : (
             <Link href="/" className="text-on-surface" title="Thirty Milestones">

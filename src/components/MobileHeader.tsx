@@ -94,7 +94,7 @@ export default function MobileHeader({ ticketAlert = false }: { ticketAlert?: bo
     <>
       <header className="md:hidden sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b-2 border-on-surface bg-surface px-4">
         <Link href="/" aria-label="Dashboard home">
-          <BrandLogo className="h-7 w-auto text-on-surface" />
+          <BrandLogo iconOnly className="h-8 w-auto text-on-surface" />
         </Link>
         {/* Help Ticket lives up here on phones; the dot means a ticket is open
             (the dashboard passes it — elsewhere the icon is just a shortcut). */}
@@ -158,7 +158,7 @@ export default function MobileHeader({ ticketAlert = false }: { ticketAlert?: bo
           {/* Drawer */}
           <nav className="drawer flex h-full w-80 max-w-[86%] flex-col overflow-y-auto border-l-2 border-on-surface bg-surface pb-[env(safe-area-inset-bottom)]">
             <div className="flex h-14 shrink-0 items-center justify-between border-b-2 border-on-surface px-4">
-              <BrandLogo className="h-7 w-auto text-on-surface" />
+              <BrandLogo iconOnly className="h-8 w-auto text-on-surface" />
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
