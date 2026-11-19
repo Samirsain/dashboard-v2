@@ -177,16 +177,16 @@ function CheckoutAlertBanner({
   if (alerts.length === 0) return null;
 
   return (
-    <div className="border-2 border-error bg-error/10 p-4 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="material-symbols-outlined text-error" data-icon="warning">
+    <div className="border border-error bg-error/5 p-3 flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="material-symbols-outlined text-error text-lg" data-icon="warning">
           warning
         </span>
-        <h3 className="font-headline-md text-headline-md text-error uppercase">
+        <h3 className="font-label-sm text-xs uppercase tracking-wide text-error">
           Checkout Alert{!mine && ` — ${alerts.length}`}
         </h3>
       </div>
-      <p className="font-data-mono text-xs text-on-surface-variant">
+      <p className="font-data-mono text-[11px] text-on-surface-variant">
         {mine
           ? `You checked in but no check-out was recorded, ${thresholdHours}+ hours later. Ask your Attendance Manager or MD to correct it.`
           : `Checked in with no check-out for ${thresholdHours}+ hours. Record the missing check-out or fix the times.`}
@@ -236,6 +236,10 @@ function CheckoutAlertBanner({
     </div>
   );
 }
+
+/** The one input style on this page (date, month, search). */
+const fieldCls =
+  "min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface";
 
 const STATUS_STYLES: Record<string, string> = {
   Present: "bg-primary/20 text-on-surface",
@@ -292,8 +296,8 @@ function EmployeeView() {
 
       <CheckoutAlertBanner alerts={alerts} thresholdHours={thresholdHours} mine />
 
-      <div className="bg-surface-container-lowest border-2 border-on-surface p-stack-lg">
-        <h3 className="font-headline-md text-headline-md text-on-surface uppercase mb-4">Today</h3>
+      <div className="bg-surface border border-on-surface p-4">
+        <h3 className="font-label-sm text-xs uppercase tracking-wide text-on-surface-variant mb-3">Today</h3>
         {loading ? (
           <p className="font-data-mono text-data-mono text-on-surface-variant">Loading...</p>
         ) : (
@@ -319,40 +323,53 @@ function EmployeeView() {
         {today?.remarks && (
           <p className="mt-4 font-data-mono text-xs text-on-surface-variant">Remarks: {today.remarks}</p>
         )}
-        <p className="mt-4 font-data-mono text-xs text-on-surface-variant">
-          Attendance is marked by your Attendance Manager or MD — you can&apos;t edit it here.
+        <p className="mt-3 font-data-mono text-[11px] text-on-surface-variant">
+          Marked by your Attendance Manager or MD.
         </p>
       </div>
 
-      <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center gap-3">
-        <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
-        <input
-          type="date"
-          value={rangeFrom}
-          max={rangeTo || undefined}
-          onChange={(e) => setRangeFrom(e.target.value)}
-          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:flex-1"
-        />
-        <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
-        <input
-          type="date"
-          value={rangeTo}
-          min={rangeFrom || undefined}
-          onChange={(e) => setRangeTo(e.target.value)}
-          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:flex-1"
-        />
-        {(rangeFrom || rangeTo) && (
-          <button
-            onClick={() => {
-              setRangeFrom("");
-              setRangeTo("");
-            }}
-            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {/* Narrowing the history by date is occasional, so it folds away. */}
+      <details className="group" open={!!(rangeFrom || rangeTo)}>
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-label-sm text-label-sm uppercase text-on-surface-variant hover:text-on-surface [&::-webkit-details-marker]:hidden">
+          Filter by date
+          <span aria-hidden="true" className="material-symbols-outlined text-lg transition-transform group-open:rotate-180">
+            expand_more
+          </span>
+        </summary>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+          <label className="flex flex-col gap-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
+            From
+            <input
+              type="date"
+              value={rangeFrom}
+              max={rangeTo || undefined}
+              onChange={(e) => setRangeFrom(e.target.value)}
+              className={`${fieldCls} w-full normal-case`}
+            />
+          </label>
+          <label className="flex flex-col gap-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
+            To
+            <input
+              type="date"
+              value={rangeTo}
+              min={rangeFrom || undefined}
+              onChange={(e) => setRangeTo(e.target.value)}
+              className={`${fieldCls} w-full normal-case`}
+            />
+          </label>
+          {(rangeFrom || rangeTo) && (
+            <button
+              onClick={() => {
+                setRangeFrom("");
+                setRangeTo("");
+              }}
+              className="col-span-2 min-h-[40px] px-3 border border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </details>
 
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
         <table className="m-cards w-full text-left border-collapse min-w-[640px]">
@@ -421,6 +438,8 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
   const { alerts, thresholdHours, reload: reloadAlerts } = useCheckoutAlerts();
   const { user } = useAuth();
   const [exporting, setExporting] = useState(false);
+  // The Monthly Report is folded by default; its data loads on first open.
+  const [reportOpen, setReportOpen] = useState(false);
 
   /** Points the range report at one whole calendar month. */
   function pickMonth(month: number | string) {
@@ -499,6 +518,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
   }, [rows, search]);
 
   useEffect(() => {
+    if (!reportOpen) return;
     queueMicrotask(async () => {
       if (!rangeFrom || !rangeTo) {
         setRangeRows([]);
@@ -514,7 +534,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
         setRangeLoading(false);
       }
     });
-  }, [rangeFrom, rangeTo]);
+  }, [rangeFrom, rangeTo, reportOpen]);
 
   async function handleCheckIn(employeeId: string) {
     setBusy(employeeId);
@@ -593,79 +613,28 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
         }
       />
 
-      {/* Filter bar */}
-      <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center gap-4 max-md:gap-3 max-md:p-3">
-        <div className="flex flex-wrap items-center gap-3 max-md:w-full">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:w-12">Date</label>
-          <input
-            type="date"
-            value={date}
-            max={isAdmin ? undefined : todayIso()}
-            onChange={(e) => setDate(e.target.value)}
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:flex-1"
-          />
-          {!editable && (
-            <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">(view only)</span>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 max-md:w-full">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:w-12">Month</label>
-          <button
-            onClick={() => pickMonth(0)}
-            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-          >
-            {monthLabel(0)}
-          </button>
-          <button
-            onClick={() => pickMonth(-1)}
-            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
-          >
-            {monthLabel(-1)}
-          </button>
-          <input
-            type="month"
-            value={monthValueOf(rangeFrom, rangeTo)}
-            max={todayIso().slice(0, 7)}
-            onChange={(e) => e.target.value && pickMonth(e.target.value)}
-            title="Pick any month"
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:ml-auto max-md:basis-[calc(100%-3.5rem)]"
-          />
-        </div>
-        {/* Phones: a two-column grid, each label above its date, Reset below. */}
-        <div className="flex flex-wrap items-center gap-3 max-md:grid max-md:w-full max-md:grid-cols-2 max-md:gap-x-2 max-md:gap-y-1">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:order-1">From</label>
-          <input
-            type="date"
-            value={rangeFrom}
-            max={rangeTo || todayIso()}
-            onChange={(e) => setRangeFrom(e.target.value)}
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:order-3 max-md:min-w-0 max-md:w-full"
-          />
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:order-2">To</label>
-          <input
-            type="date"
-            value={rangeTo}
-            min={rangeFrom || undefined}
-            max={todayIso()}
-            onChange={(e) => setRangeTo(e.target.value)}
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:order-4 max-md:min-w-0 max-md:w-full"
-          />
-          <button
-            onClick={() => { pickMonth(0); setReportDoer(""); }}
-            title="Reset the report to the current month"
-            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors max-md:order-5 max-md:col-span-2 max-md:mt-1"
-          >
-            Reset
-          </button>
-        </div>
+      {/* Only the everyday controls up top: which day you're marking, and a
+          name search. The report period lives inside the Monthly Report. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          aria-label="Attendance date"
+          value={date}
+          max={isAdmin ? undefined : todayIso()}
+          onChange={(e) => setDate(e.target.value)}
+          className={`${fieldCls} max-md:min-w-0 max-md:flex-1`}
+        />
+        {!editable && (
+          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">View only</span>
+        )}
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search employee..."
-          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px] ml-auto max-md:w-full max-md:min-w-0 max-md:ml-0"
+          placeholder="Search employee"
+          aria-label="Search employee"
+          className={`${fieldCls} ml-auto min-w-[220px] max-md:ml-0 max-md:min-w-0 max-md:flex-1`}
         />
       </div>
-
 
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
         <table className="m-cards w-full text-left border-collapse min-w-[1000px]">
@@ -730,14 +699,14 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
                         <button
                           disabled={rowBusy || !!attendance?.checkIn}
                           onClick={() => handleCheckIn(employee.id)}
-                          className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
+                          className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40 max-md:disabled:hidden"
                         >
                           In
                         </button>
                         <button
                           disabled={rowBusy || !attendance?.checkIn || !!attendance?.checkOut}
                           onClick={() => handleCheckOut(employee.id)}
-                          className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
+                          className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40 max-md:disabled:hidden"
                         >
                           Out
                         </button>
@@ -776,17 +745,99 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
         </table>
       </div>
 
-      {/* Monthly Report — defaults to the current month; hidden only while a range is half-typed */}
-      {rangeFrom && rangeTo && (
-      <div className="bg-surface border-2 border-on-surface p-4 flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Monthly Report</h3>
-            <span className="font-data-mono text-data-mono text-on-surface-variant">
-              {monthTitleOf(rangeFrom, rangeTo) || `${formatDMY(rangeFrom)} to ${formatDMY(rangeTo)}`}
+      {/* Monthly Report — not an everyday tool, so it stays folded behind an
+          arrow and only fetches its data once opened. Opens on the current
+          month, so Export PDF is one tap away. */}
+      <details
+        className="group border border-on-surface bg-surface"
+        onToggle={(e) => setReportOpen(e.currentTarget.open)}
+      >
+        <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
+          <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <span className="font-label-sm text-xs uppercase tracking-wide text-on-surface">Monthly Report</span>
+            <span className="font-data-mono text-xs text-on-surface-variant">
+              {rangeFrom && rangeTo
+                ? monthTitleOf(rangeFrom, rangeTo) || `${formatDMY(rangeFrom)} to ${formatDMY(rangeTo)}`
+                : "Pick a period"}
             </span>
+          </span>
+          <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant transition-transform group-open:rotate-180">
+            expand_more
+          </span>
+        </summary>
+
+      <div className="flex flex-col gap-4 border-t border-on-surface p-4 max-md:p-3">
+        {/* Period: the two recent months one tap away; any other month or a
+            custom range is folded behind its own arrow. */}
+        <div className="flex flex-wrap items-center gap-2">
+          {[0, -1].map((offset) => {
+            const active = monthValueOf(rangeFrom, rangeTo) === monthRange(offset).from.slice(0, 7);
+            return (
+              <button
+                key={offset}
+                onClick={() => pickMonth(offset)}
+                aria-pressed={active}
+                className={`min-h-[40px] px-3 border font-label-sm text-label-sm uppercase transition-colors ${
+                  active ? "border-on-surface bg-on-surface text-surface" : "border-on-surface text-on-surface hover:bg-surface-container"
+                }`}
+              >
+                {monthLabel(offset)}
+              </button>
+            );
+          })}
+        </div>
+
+        <details className="group/range">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-label-sm text-label-sm uppercase text-on-surface-variant hover:text-on-surface [&::-webkit-details-marker]:hidden">
+            Other month / range
+            <span aria-hidden="true" className="material-symbols-outlined text-lg transition-transform group-open/range:rotate-180">
+              expand_more
+            </span>
+          </summary>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+            <label className="col-span-2 flex flex-col gap-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
+              Month
+              <input
+                type="month"
+                value={monthValueOf(rangeFrom, rangeTo)}
+                max={todayIso().slice(0, 7)}
+                onChange={(e) => e.target.value && pickMonth(e.target.value)}
+                className={`${fieldCls} w-full normal-case`}
+              />
+            </label>
+            <label className="flex flex-col gap-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
+              From
+              <input
+                type="date"
+                value={rangeFrom}
+                max={rangeTo || todayIso()}
+                onChange={(e) => setRangeFrom(e.target.value)}
+                className={`${fieldCls} w-full normal-case`}
+              />
+            </label>
+            <label className="flex flex-col gap-1 font-label-sm text-label-sm uppercase text-on-surface-variant">
+              To
+              <input
+                type="date"
+                value={rangeTo}
+                min={rangeFrom || undefined}
+                max={todayIso()}
+                onChange={(e) => setRangeTo(e.target.value)}
+                className={`${fieldCls} w-full normal-case`}
+              />
+            </label>
+            <button
+              onClick={() => { pickMonth(0); setReportDoer(""); }}
+              title="Reset the report to the current month"
+              className="col-span-2 min-h-[40px] px-3 border border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            >
+              Reset
+            </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+        </details>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 max-md:w-full">
             <select
               value={reportDoer}
               onChange={(e) => setReportDoer(e.target.value)}
@@ -892,7 +943,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
           </table>
         </div>
       </div>
-      )}
+      </details>
 
       {datesModal && (
         <AttendanceStatusDatesModal
