@@ -125,7 +125,7 @@ function TicketDetailsInner() {
       <SideNav active="help-ticket" />
 
       <div className="md:ml-16 flex-1 flex flex-col min-h-screen bg-background">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Ticket Details
           </div>
@@ -138,12 +138,6 @@ function TicketDetailsInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg max-w-4xl">
-          <div className="border-b-2 border-on-surface pb-stack-md flex justify-between items-end md:hidden">
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              Ticket Details
-            </h2>
-          </div>
-
           {loading ? (
             <div className="font-data-mono text-data-mono text-on-surface-variant">Loading...</div>
           ) : error || !ticket ? (

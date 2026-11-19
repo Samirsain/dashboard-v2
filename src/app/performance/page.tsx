@@ -166,13 +166,13 @@ function PerformanceInner() {
                 )}
                 {!loading && dgmaxSummary?.summaries.map((row, i) => (
                   <tr key={row.doerId} className={trClass}>
-                    <td className={`${tdClass} text-center font-data-mono text-on-surface-variant`}>{i + 1}</td>
-                    <td className={tdClass}>{row.doerName}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{row.completedTasks}/{row.assignedTasks}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{formatPct(row.taskScore ?? 0)}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{row.completedChecklists ?? 0}/{row.assignedChecklists ?? 0}</td>
-                    <td className={`${tdClass} text-center font-data-mono`}>{formatPct(row.checklistScore ?? 0)}</td>
-                    <td className={`${tdClass} text-right font-data-mono font-bold`}>{formatPct(row.negativeScore)}</td>
+                    <td data-hide-mobile className={`${tdClass} text-center font-data-mono text-on-surface-variant`}>{i + 1}</td>
+                    <td data-title className={tdClass}>{row.doerName}</td>
+                    <td data-label="Tasks" className={`${tdClass} text-center font-data-mono`}>{row.completedTasks}/{row.assignedTasks}</td>
+                    <td data-label="Task score" className={`${tdClass} text-center font-data-mono`}>{formatPct(row.taskScore ?? 0)}</td>
+                    <td data-label="Checklists" className={`${tdClass} text-center font-data-mono`}>{row.completedChecklists ?? 0}/{row.assignedChecklists ?? 0}</td>
+                    <td data-label="CL score" className={`${tdClass} text-center font-data-mono`}>{formatPct(row.checklistScore ?? 0)}</td>
+                    <td data-aside className={`${tdClass} text-right font-data-mono font-bold`}>{formatPct(row.negativeScore)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -227,10 +227,10 @@ function PerformanceInner() {
                 {!loading && filteredTasks.map((t) => (
                   <tr key={t.id} className={trClass}>
                     <td className={`${tdClass} min-w-[200px]`}>{t.title}</td>
-                    <td className={`${tdClass} text-on-surface-variant`}>{t.doer?.name ?? "—"}</td>
-                    <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs`}>{formatDMY(t.dueDate)}</td>
-                    <td className={`${tdClass} text-center font-data-mono text-xs text-on-surface-variant`}>{t.status}</td>
-                    <td className={`${tdClass} text-right font-label-sm text-xs uppercase`}>{CATEGORY_LABEL[t.scoreCategory]}</td>
+                    <td data-meta className={`${tdClass} text-on-surface-variant`}>{t.doer?.name ?? "—"}</td>
+                    <td data-aside className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs`}>{formatDMY(t.dueDate)}</td>
+                    <td data-meta className={`${tdClass} text-center font-data-mono text-xs text-on-surface-variant`}>{t.status}</td>
+                    <td data-meta className={`${tdClass} text-right font-label-sm text-xs uppercase`}>{CATEGORY_LABEL[t.scoreCategory]}</td>
                   </tr>
                 ))}
               </tbody>

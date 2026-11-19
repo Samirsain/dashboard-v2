@@ -252,7 +252,8 @@ function ImsInner() {
       <SideNav active="ims" />
 
       <div className="md:ml-16 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        {/* Phones get the shorter title + actions block at the top of <main>. */}
+        <header className="page-bar max-md:hidden flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1 font-black">
             📦 Inventory Management System
           </div>
@@ -382,7 +383,7 @@ function ImsInner() {
                         </span>
                       </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[1100px]">
+                        <table className="m-cards w-full text-left border-collapse min-w-[1100px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                             <tr>
                               <th className={thCls}>Item Code</th>
@@ -420,17 +421,17 @@ function ImsInner() {
                                 : undefined;
                               return (
                               <tr key={i.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0 transition-colors">
-                                <td className={tdCls}>{i.skuCode}</td>
-                                <td className="py-2 px-4 border-r border-surface-variant font-medium whitespace-nowrap">{i.itemName}</td>
-                                <td className={tdCls}>{i.category}</td>
-                                <td className={tdCls}>{num(i.avgDailyConsumption)}</td>
-                                <td className={tdCls}>{num(i.leadTime)}</td>
-                                <td className={tdCls}>{num(i.safetyFactor)}</td>
-                                <td className={tdCls}>{num(i.moq)}</td>
-                                <td className={tdCls}>{num(i.baseMaxLevel)}</td>
-                                <td className={tdCls}>{num(i.effectiveMaxLevel)}</td>
-                                <td className={tdCls}>{num(i.materialInTransit)}</td>
-                                <td className="py-2 px-4 whitespace-nowrap">
+                                <td data-aside className={tdCls}>{i.skuCode}</td>
+                                <td data-title className="py-2 px-4 border-r border-surface-variant font-medium whitespace-nowrap">{i.itemName}</td>
+                                <td data-meta className={tdCls}>{i.category}</td>
+                                <td data-label="Daily use" className={tdCls}>{num(i.avgDailyConsumption)}</td>
+                                <td data-label="Delivery days" className={tdCls}>{num(i.leadTime)}</td>
+                                <td data-label="Safety" className={tdCls}>{num(i.safetyFactor)}</td>
+                                <td data-label="Min order" className={tdCls}>{num(i.moq)}</td>
+                                <td data-label="Max" className={tdCls}>{num(i.baseMaxLevel)}</td>
+                                <td data-label="Target" className={tdCls}>{num(i.effectiveMaxLevel)}</td>
+                                <td data-label="On the way" className={tdCls}>{num(i.materialInTransit)}</td>
+                                <td data-actions className="py-2 px-4 whitespace-nowrap">
                                   <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => { setEditingItem(i); setShowItemModal(true); }}
@@ -507,7 +508,7 @@ function ImsInner() {
                       </div>
 
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[720px]">
+                        <table className="m-cards w-full text-left border-collapse min-w-[720px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                             <tr>
                               <th className={thCls}>Timestamp</th>
@@ -531,12 +532,12 @@ function ImsInner() {
                             )}
                             {filteredTransactions.map((t) => (
                               <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
-                                <td className={tdCls}>
+                                <td data-meta className={tdCls}>
                                   {t.timestamp ? new Date(t.timestamp).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—"}
                                 </td>
-                                <td className={tdCls}>{t.skuCode}</td>
-                                <td className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{nameBySku.get(t.skuCode) ?? "—"}</td>
-                                <td className="py-2 px-4 border-r border-surface-variant">
+                                <td data-aside className={tdCls}>{t.skuCode}</td>
+                                <td data-title className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{nameBySku.get(t.skuCode) ?? "—"}</td>
+                                <td data-meta className="py-2 px-4 border-r border-surface-variant">
                                   <span
                                     className={`inline-block px-2 py-0.5 border font-label-sm text-label-sm uppercase font-bold ${
                                       t.direction === "In"
@@ -547,9 +548,9 @@ function ImsInner() {
                                     {t.direction === "In" ? "↑ In" : "↓ Out"}
                                   </span>
                                 </td>
-                                <td className={tdCls}>{formatDMY(t.date)}</td>
-                                <td className={tdCls}>{num(t.quantity)}</td>
-                                <td className="py-2 px-4">
+                                <td data-label="Date" className={tdCls}>{formatDMY(t.date)}</td>
+                                <td data-label="Qty" className={tdCls}>{num(t.quantity)}</td>
+                                <td data-actions className="py-2 px-4">
                                   <button
                                     onClick={() => handleDeleteTransaction(t.id)}
                                     className="px-2 py-1 border-2 border-error text-error font-label-sm text-label-sm uppercase hover:bg-error hover:text-on-error transition-colors cursor-pointer"
@@ -581,7 +582,7 @@ function ImsInner() {
                       )}
 
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="m-cards w-full text-left border-collapse">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                             <tr>
                               <th className={thCls}>Item Code</th>
@@ -604,13 +605,13 @@ function ImsInner() {
                             )}
                             {ledger.rows.map((r) => (
                               <tr key={r.skuCode} className="border-b border-surface-variant last:border-b-0">
-                                <td className={tdCls}>{r.skuCode}</td>
-                                <td className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{r.itemName}</td>
-                                <td className={tdCls}>{num(r.maxLevel)}</td>
-                                <td className={tdCls}>{num(r.materialInTransit)}</td>
-                                <td className={tdCls}>{num(r.closingStock)}</td>
+                                <td data-aside className={tdCls}>{r.skuCode}</td>
+                                <td data-title className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{r.itemName}</td>
+                                <td data-label="Target" className={tdCls}>{num(r.maxLevel)}</td>
+                                <td data-label="On the way" className={tdCls}>{num(r.materialInTransit)}</td>
+                                <td data-label="Stock" className={tdCls}>{num(r.closingStock)}</td>
                                 {visibleLedgerDates.map((d) => (
-                                  <td key={d} className={tdCls}>{num(r.byDate[d] ?? 0)}</td>
+                                  <td key={d} data-label={formatDMY(d)} className={tdCls}>{num(r.byDate[d] ?? 0)}</td>
                                 ))}
                               </tr>
                             ))}
@@ -638,7 +639,7 @@ function ImsInner() {
                         </span>
                       </div>
                       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[1100px]">
+                        <table className="m-cards w-full text-left border-collapse min-w-[1100px]">
                           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                             <tr>
                               <th className={thCls}>Item Code</th>
@@ -679,16 +680,16 @@ function ImsInner() {
                                 : "";
                               return (
                               <tr key={r.skuCode} style={rowStyle} className="border-b border-surface-variant last:border-b-0">
-                                <td className={tdCls}>{r.skuCode}</td>
-                                <td className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{r.itemName}</td>
-                                <td className={tdCls}>{r.category}</td>
-                                <td className={tdCls}>{num(r.moq)}</td>
-                                <td className={tdCls}>{num(r.baseMaxLevel)}</td>
-                                <td className={tdCls}>{num(r.safetyFactor)}</td>
-                                <td className={tdCls}>{num(r.effectiveMaxLevel)}</td>
-                                <td className={tdCls}>{num(r.closingStock)}</td>
-                                <td className={tdCls}>{num(r.materialInTransit)}</td>
-                                <td className="py-2 px-4 font-data-mono text-data-mono font-bold">
+                                <td data-aside className={tdCls}>{r.skuCode}</td>
+                                <td data-title className="py-2 px-4 border-r border-surface-variant whitespace-nowrap">{r.itemName}</td>
+                                <td data-meta className={tdCls}>{r.category}</td>
+                                <td data-label="Min order" className={tdCls}>{num(r.moq)}</td>
+                                <td data-label="Max" className={tdCls}>{num(r.baseMaxLevel)}</td>
+                                <td data-label="Safety" className={tdCls}>{num(r.safetyFactor)}</td>
+                                <td data-label="Target" className={tdCls}>{num(r.effectiveMaxLevel)}</td>
+                                <td data-label="Stock" className={tdCls}>{num(r.closingStock)}</td>
+                                <td data-label="On the way" className={tdCls}>{num(r.materialInTransit)}</td>
+                                <td data-label="Order now" className="py-2 px-4 font-data-mono text-data-mono font-bold">
                                   <span className={qtyColor}>{num(r.reorderQty)}</span>
                                 </td>
                               </tr>

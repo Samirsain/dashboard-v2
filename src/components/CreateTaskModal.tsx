@@ -82,7 +82,7 @@ export default function CreateTaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border border-on-surface bg-surface">
+      <div className="sheet flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border border-on-surface bg-surface">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Create Task</h3>
           <button

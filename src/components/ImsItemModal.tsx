@@ -67,7 +67,7 @@ export default function ImsItemModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="w-full max-w-lg bg-surface-container-lowest border-2 border-on-surface max-h-[90vh] overflow-y-auto">
+      <div className="sheet w-full max-w-lg bg-surface-container-lowest border-2 border-on-surface max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md sticky top-0 bg-surface-container-lowest">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
             {isEdit ? "Edit Item" : "Add Item"}

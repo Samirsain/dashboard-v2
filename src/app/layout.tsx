@@ -24,7 +24,8 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Milestones", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { themeColor: "#f9f9f9" };
+// viewport-fit=cover lets the bottom tab bar pad itself clear of the iPhone home indicator.
+export const viewport: Viewport = { themeColor: "#f9f9f9", viewportFit: "cover" };
 
 export default function RootLayout({
   children,

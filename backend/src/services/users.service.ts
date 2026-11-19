@@ -39,7 +39,31 @@ function toUserWithSecrets(record: SheetRecord): UserWithSecrets {
   return { ...toUser(record), passwordHash: record["PasswordHash"] ?? "" };
 }
 
+/**
+ * requireAuth re-reads the caller's row on every request so role changes
+ * apply at once — but that read sits in front of every single API call, and
+ * the dashboard alone fires ten of them per load. So it's memoised briefly,
+ * and identical lookups in flight share one query. Any change to a doer made
+ * through this API (role, permissions, status, delete) drops their entry, so
+ * it still applies on the very next request; only an edit made directly in
+ * the database waits out the TTL.
+ */
+const AUTH_TTL_MS = 10_000;
+const authCache = new Map<string, { at: number; user: Promise<User> }>();
+
 export const usersService = {
+  /** getById for the auth middleware: cached for AUTH_TTL_MS, see above. */
+  getForAuth(id: string): Promise<User> {
+    const hit = authCache.get(id);
+    if (hit && Date.now() - hit.at < AUTH_TTL_MS) return hit.user;
+    const user = this.getById(id);
+    authCache.set(id, { at: Date.now(), user });
+    user.catch(() => {
+      if (authCache.get(id)?.user === user) authCache.delete(id);
+    });
+    return user;
+  },
+
   async list(): Promise<User[]> {
     const records = await dataService.findAll(entity);
     return records.map(toUser);
@@ -178,11 +202,13 @@ export const usersService = {
       patch["Can Manage Master Sheet"] = String(updates.canManageMasterSheet);
 
     const saved = await dataService.updateById(entity, id, patch);
+    authCache.delete(id);
     return toUser(saved);
   },
 
   async remove(id: string): Promise<void> {
     await dataService.deleteById(entity, id);
+    authCache.delete(id);
   },
 
   /**

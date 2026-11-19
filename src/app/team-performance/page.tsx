@@ -162,14 +162,14 @@ function TeamPerformanceInner() {
                 {!loading &&
                   dgmaxSummary?.summaries.map((s, i) => (
                     <tr key={s.doerId} className={trClass}>
-                      <td className={`${tdClass} text-center font-data-mono text-on-surface-variant`}>{i + 1}</td>
-                      <td className={tdClass}>{s.doerName}</td>
-                      <td className={`${tdClass} text-center font-data-mono`}>{s.completedTasks}/{s.assignedTasks}</td>
-                      <td className={`${tdClass} text-center font-data-mono`}>{s.revisionCount ?? 0}</td>
-                      <td className={`${tdClass} text-center font-data-mono`}>{formatPct(s.taskScore ?? 0)}</td>
-                      <td className={`${tdClass} text-center font-data-mono`}>{s.completedChecklists ?? 0}/{s.assignedChecklists ?? 0}</td>
-                      <td className={`${tdClass} text-center font-data-mono`}>{formatPct(s.checklistScore ?? 0)}</td>
-                      <td className={`${tdClass} text-right font-data-mono font-bold`}>{formatPct(s.negativeScore)}</td>
+                      <td data-hide-mobile className={`${tdClass} text-center font-data-mono text-on-surface-variant`}>{i + 1}</td>
+                      <td data-title className={tdClass}>{s.doerName}</td>
+                      <td data-label="Tasks" className={`${tdClass} text-center font-data-mono`}>{s.completedTasks}/{s.assignedTasks}</td>
+                      <td data-label="Revisions" className={`${tdClass} text-center font-data-mono`}>{s.revisionCount ?? 0}</td>
+                      <td data-label="Task score" className={`${tdClass} text-center font-data-mono`}>{formatPct(s.taskScore ?? 0)}</td>
+                      <td data-label="Checklists" className={`${tdClass} text-center font-data-mono`}>{s.completedChecklists ?? 0}/{s.assignedChecklists ?? 0}</td>
+                      <td data-label="CL score" className={`${tdClass} text-center font-data-mono`}>{formatPct(s.checklistScore ?? 0)}</td>
+                      <td data-aside className={`${tdClass} text-right font-data-mono font-bold`}>{formatPct(s.negativeScore)}</td>
                     </tr>
                   ))}
               </tbody>

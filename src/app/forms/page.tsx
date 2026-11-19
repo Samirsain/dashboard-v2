@@ -137,7 +137,7 @@ function AddFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border border-on-surface bg-surface">
+      <div className="sheet flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border border-on-surface bg-surface">
         <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md">
           <h3 className="font-headline-md text-headline-md text-on-surface uppercase">Add Form</h3>
           <button
@@ -391,7 +391,7 @@ function FormResponsesSection({
       {error && <p className="font-label-sm text-label-sm text-error px-4 py-2">{error}</p>}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[720px]">
+        <table className="m-cards w-full text-left border-collapse min-w-[720px]">
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
             <tr>
               {headers.map((h) => (
@@ -431,11 +431,12 @@ function FormResponsesSection({
                   className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors"
                 >
                   {headers.map((h) => (
-                    <td key={h} className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
+                    // Free-form answers: on phones each field gets its own labelled line.
+                    <td key={h} data-label={h} data-full className="py-3 px-4 border-r border-surface-variant last:border-r-0 whitespace-nowrap">
                       {r.data[h] || "—"}
                     </td>
                   ))}
-                  <td className="py-3 px-4 whitespace-nowrap">
+                  <td data-actions className="py-3 px-4 whitespace-nowrap">
                     {canEditStatus ? (
                       <select
                         value={status}
@@ -589,7 +590,7 @@ function FormsInner() {
       <SideNav active="forms" />
 
       <div className="md:ml-16 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Form Responses
           </div>
@@ -604,20 +605,6 @@ function FormsInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
-          <div className="border-b-2 border-on-surface pb-stack-md flex justify-between items-end md:hidden">
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              Form Responses
-            </h2>
-            {canManage && (
-              <button
-                onClick={() => setShowAdd(true)}
-                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
-              >
-                + Form
-              </button>
-            )}
-          </div>
-
           {error && (
             <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
@@ -651,7 +638,7 @@ function FormsInner() {
 
           {canManageAccess && showFormAccess && forms.length > 0 && (
             <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[600px]">
+              <table className="m-cards w-full text-left border-collapse min-w-[600px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   <tr>
                     <th className="py-3 px-4 border-r border-surface-variant">Form</th>
@@ -662,8 +649,8 @@ function FormsInner() {
                   {forms.map((f) => (
                     <tr key={f.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                       <td className="py-3 px-4 border-r border-surface-variant font-medium">{f.name}</td>
-                      <td className="py-3 px-4 align-top">
-                        <div className="relative">
+                      <td data-full className="py-3 px-4 align-top">
+                        <div className="relative w-full">
                           <button
                             onClick={() => setOpenAccessId((prev) => (prev === f.id ? null : f.id))}
                             className="w-full flex items-center justify-between gap-2 border-2 border-on-surface px-2 py-1 font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"

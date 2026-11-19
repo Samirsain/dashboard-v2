@@ -37,7 +37,7 @@ import type {
   ChecklistInstance,
   ChecklistTemplate,
   Doer,
-  FullDashboard,
+  DashboardSummary,
   List,
   Task,
   Ticket,
@@ -103,7 +103,7 @@ function listGroupKey(name: string): string {
 function DashboardInner() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "MD" || user?.role === "PC";
-  const [dashboard, setDashboard] = useState<FullDashboard | null>(null);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [pendingChecklist, setPendingChecklist] = useState<ChecklistInstance[]>([]);
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
@@ -115,7 +115,9 @@ function DashboardInner() {
   // priority — it has Planned/Actual/Status instead), so it gets its own
   // section here rather than being forced into the Pending Tasks table.
   const [myWorkflowSteps, setMyWorkflowSteps] = useState<MyWorkflowStep[]>([]);
-  const [workflowBusyKey, setWorkflowBusyKey] = useState<string | null>(null);
+  // The row whose Done/Send Back is in flight — disables it so a second tap
+  // can't fire a duplicate request, and shows that something is happening.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Pending Tasks filter: "all" = every open item (past/today/future);
@@ -139,22 +141,33 @@ function DashboardInner() {
     setLoading(true);
     setError(null);
     try {
-      await api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
-      const [dash, tasks, listsData, checklist, templateData, doerData, ticketData, workflowSteps, workflowTemplateData] =
+      // GET /checklist/today creates today's checklist rows. The pending list
+      // and the KPI summary (which also generates) must wait for it — run in
+      // parallel they'd miss today's rows or race into duplicates — but
+      // nothing else depends on it, so everything else starts right away
+      // instead of queueing behind it.
+      const generated = api.get<ChecklistInstance[]>("/checklist/today").catch(() => []);
+      const [summaryData, tasks, listsData, checklist, templateData, doerData, ticketData, workflowSteps, workflowTemplateData] =
         await Promise.all([
-          api.get<FullDashboard>("/dashboard"),
+          // Only the four KPI numbers are shown, and only to MD/PC; the full
+          // /dashboard payload also scans the whole activity log.
+          isPrivileged
+            ? generated.then(() => api.get<DashboardSummary>("/dashboard/summary"))
+            : Promise.resolve(null),
           api.get<Task[]>("/tasks"),
           api.get<List[]>("/lists").catch(() => [] as List[]),
-          api
-            .get<ChecklistInstance[]>("/checklist/instances?status=Pending")
-            .catch(() => [] as ChecklistInstance[]),
+          generated.then(() =>
+            api
+              .get<ChecklistInstance[]>("/checklist/instances?status=Pending")
+              .catch(() => [] as ChecklistInstance[])
+          ),
           api.get<ChecklistTemplate[]>("/checklist/templates").catch(() => [] as ChecklistTemplate[]),
           api.get<Doer[]>("/users").catch(() => [] as Doer[]),
           api.get<Ticket[]>("/tickets").catch(() => [] as Ticket[]),
           api.get<MyWorkflowStep[]>("/workflow/my-steps").catch(() => [] as MyWorkflowStep[]),
           api.get<WorkflowTemplate[]>("/workflow/templates").catch(() => [] as WorkflowTemplate[]),
         ]);
-      setDashboard(dash);
+      setSummary(summaryData);
       setLists(listsData);
       setAllTasks(tasks);
       setPendingChecklist(checklist);
@@ -182,21 +195,27 @@ function DashboardInner() {
 
   async function handleTaskDone(id: string) {
     if (!(await confirm({ title: "Mark as done?", message: allTasks.find((t) => t.id === id)?.title }))) return;
+    setBusyKey(id);
     try {
       await api.patch(`/tasks/${id}`, { status: "Completed" });
       setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: "Completed" } : t)));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to update task.");
+    } finally {
+      setBusyKey(null);
     }
   }
 
   async function handleChecklistDone(id: string) {
     if (!(await confirm({ title: "Mark as done?", message: pendingChecklist.find((c) => c.id === id)?.taskName }))) return;
+    setBusyKey(id);
     try {
       await api.post(`/checklist/instances/${id}/complete`);
       setPendingChecklist((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to complete checklist item.");
+    } finally {
+      setBusyKey(null);
     }
   }
 
@@ -216,7 +235,7 @@ function DashboardInner() {
       return;
     }
     const key = `${row.instanceId}:${row.step.stepNo}`;
-    setWorkflowBusyKey(key);
+    setBusyKey(key);
     try {
       await api.post(
         `/workflow/instances/${row.instanceId}/steps/${row.step.stepNo}/${action}`,
@@ -227,7 +246,7 @@ function DashboardInner() {
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Could not update this step.");
     } finally {
-      setWorkflowBusyKey(null);
+      setBusyKey(null);
     }
   }
 
@@ -318,21 +337,23 @@ function DashboardInner() {
     .filter((r) => (pendingFilter === "today" ? r.dueDate === today || isOverdue(r.dueDate) : true))
     .filter((r) => (pendingDoerFilter ? r.assignedDoerId === pendingDoerFilter : true));
 
-  const summary = dashboard?.summary;
 
   const kpis = [
-    { label: "Total Tasks", value: summary?.totalTasks ?? 0 },
-    { label: "Completed", value: summary?.completed ?? 0 },
+    { label: "Total Tasks", short: "Total", value: summary?.totalTasks ?? 0 },
+    { label: "Completed", short: "Done", value: summary?.completed ?? 0 },
     { label: "Overdue", value: summary?.overdue ?? 0 },
     { label: "Pending", value: summary?.pending ?? 0 },
   ];
 
   return (
     <>
-      <MobileHeader />
+      <MobileHeader ticketAlert={hasPendingTickets} />
       <SideNav active="dashboard" />
 
       <PageBody>
+        {/* Phones keep only the primary action here: Help Ticket moves to an
+            icon (with the pending-ticket dot) in the top bar, Settings and
+            Logout live in the More menu, and CSV export is a desk task. */}
         <PageHeader
           title="Dashboard"
           actions={
@@ -343,7 +364,11 @@ function DashboardInner() {
                 </Button>
               )}
               {isAdmin && (
-                <Button onClick={() => exportTasksToCsv(allTasks)} disabled={allTasks.length === 0}>
+                <Button
+                  className="max-md:hidden"
+                  onClick={() => exportTasksToCsv(allTasks)}
+                  disabled={allTasks.length === 0}
+                >
                   Export CSV
                 </Button>
               )}
@@ -351,18 +376,18 @@ function DashboardInner() {
                 href="/help-ticket"
                 className={
                   hasPendingTickets
-                    ? `${buttonClass("secondary")} border-2 border-red-600 font-bold animate-blink-red`
-                    : buttonClass("secondary")
+                    ? `${buttonClass("secondary", "md", "max-md:hidden")} border-2 border-red-600 font-bold animate-blink-red`
+                    : buttonClass("secondary", "md", "max-md:hidden")
                 }
               >
                 Help Ticket
               </Link>
               {canManageDoers(user) && (
-                <Link href="/settings" className={buttonClass("secondary")}>
+                <Link href="/settings" className={buttonClass("secondary", "md", "max-md:hidden")}>
                   Settings
                 </Link>
               )}
-              <Button variant="ghost" onClick={logout}>
+              <Button variant="ghost" className="max-md:hidden" onClick={logout}>
                 Logout
               </Button>
             </>
@@ -373,15 +398,17 @@ function DashboardInner() {
 
         {/* KPIs — admin/manager only */}
         {isPrivileged && (
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 max-md:grid-cols-4 lg:grid-cols-4">
             {kpis.map((kpi) => (
-              <Stat key={kpi.label} label={kpi.label} value={kpi.value} />
+              <Stat key={kpi.label} label={kpi.label} shortLabel={kpi.short} value={kpi.value} />
             ))}
           </div>
         )}
 
         {/* Pending Tasks & Checklists — all open items (tasks + checklist), All / Today */}
+        {/* Phones drop the card frame: the rows below are cards themselves. */}
         <Card
+          className="max-md:border-0 max-md:bg-transparent max-md:[&>div:first-child]:border-0 max-md:[&>div:first-child]:px-0 max-md:[&>div:first-child]:pt-1"
           title={`Pending Tasks & Checklists (${pendingRows.length})`}
           bodyClassName=""
           actions={
@@ -391,7 +418,7 @@ function DashboardInner() {
                   value={pendingDoerFilter}
                   onChange={(e) => setPendingDoerFilter(e.target.value)}
                   aria-label="Filter by doer"
-                  className={`${fieldInlineClass} text-xs uppercase`}
+                  className={`${fieldInlineClass} text-xs uppercase max-md:normal-case max-sm:min-w-0 max-sm:flex-1`}
                 >
                   <option value="">All Doers</option>
                   {assignableDoers.map((d) => (
@@ -401,17 +428,20 @@ function DashboardInner() {
                   ))}
                 </select>
               )}
-              {(["all", "today"] as const).map((f) => (
-                <Button
-                  key={f}
-                  size="sm"
-                  variant={pendingFilter === f ? "primary" : "secondary"}
-                  aria-pressed={pendingFilter === f}
-                  onClick={() => setPendingFilter(f)}
-                >
-                  {f === "all" ? "All" : "Today"}
-                </Button>
-              ))}
+              {/* One joined All/Today toggle rather than two loose buttons. */}
+              <div className="flex" role="group" aria-label="Show">
+                {(["all", "today"] as const).map((f, i) => (
+                  <Button
+                    key={f}
+                    variant={pendingFilter === f ? "primary" : "secondary"}
+                    aria-pressed={pendingFilter === f}
+                    className={`min-w-[64px] ${i > 0 ? "-ml-px" : ""}`}
+                    onClick={() => setPendingFilter(f)}
+                  >
+                    {f === "all" ? "All" : "Today"}
+                  </Button>
+                ))}
+              </div>
             </>
           }
         >
@@ -424,17 +454,21 @@ function DashboardInner() {
                   <th className={thClass}>Type</th>
                   {showDoerColumn && <th className={thClass}>Doer</th>}
                   <th className={`${thClass} text-center`}>Due Date</th>
-                  <th className={`${thClass} text-center`}>Action</th>
+                  <th className={thClass}>Action</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {loading && <StateRow colSpan={showDoerColumn ? 6 : 5}>Loading…</StateRow>}
+                {/* "Loading" only on the first fetch — a refresh after an edit
+                    keeps the current rows on screen instead of blanking them. */}
+                {loading && allPending.length === 0 && (
+                  <StateRow colSpan={showDoerColumn ? 6 : 5}>Loading…</StateRow>
+                )}
                 {!loading && pendingRows.length === 0 && (
                   <StateRow colSpan={showDoerColumn ? 6 : 5}>
                     {pendingFilter === "today" ? "Nothing pending today. 🎉" : "Nothing pending. 🎉"}
                   </StateRow>
                 )}
-                {!loading &&
+                {!(loading && allPending.length === 0) &&
                   pendingRows.map((r) => {
                     const overdue = isOverdue(r.dueDate);
                     const urgent =
@@ -453,14 +487,14 @@ function DashboardInner() {
                         }`}
                       >
                         <td className={`${tdClass} min-w-[200px]`}>{r.task}</td>
-                        <td className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
+                        <td data-meta className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
                           {r.systemName}
                         </td>
-                        <td className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
+                        <td data-meta className={`${tdClass} font-label-sm text-xs uppercase text-on-surface-variant`}>
                           {r.systemType}
                         </td>
                         {showDoerColumn && (
-                          <td className={`${tdClass} text-on-surface-variant`}>
+                          <td data-meta className={`${tdClass} text-on-surface-variant`}>
                             {r.kind === "task" && r.taskObj?.doer?.name ? (
                               r.taskObj.doer.name
                             ) : r.kind === "task" && r.taskObj && isOrphanedTask(r.taskObj) ? (
@@ -477,25 +511,31 @@ function DashboardInner() {
                             )}
                           </td>
                         )}
-                        <td className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs ${overdue ? "font-bold" : ""}`}>
+                        <td
+                          data-aside
+                          className={`${tdClass} whitespace-nowrap text-center font-data-mono text-xs ${overdue ? "font-bold" : ""}`}
+                        >
                           {formatDMY(r.dueDate)}
                         </td>
-                        <td className={tdClass}>
-                          <div className="flex items-center justify-center gap-2">
+                        <td data-actions className={tdClass}>
+                          {/* Left-aligned so Done sits in the same spot on every row,
+                              whether or not a Revise / Send Back follows it. */}
+                          <div className="flex items-center gap-2">
                             {r.kind === "workflow" && r.workflowRow ? (
                               <>
                                 <Button
                                   size="sm"
                                   variant="primary"
-                                  disabled={workflowBusyKey === r.id}
+                                  className="max-md:order-2"
+                                  disabled={busyKey === r.id}
                                   onClick={() => handleWorkflowAction(r.workflowRow!, "complete")}
                                 >
-                                  {workflowBusyKey === r.id ? "Saving…" : "Done"}
+                                  {busyKey === r.id ? "Saving…" : "Done"}
                                 </Button>
                                 {r.workflowRow.step.stepNo > 1 && (
                                   <Button
                                     size="sm"
-                                    disabled={workflowBusyKey === r.id}
+                                    disabled={busyKey === r.id}
                                     onClick={() => handleWorkflowAction(r.workflowRow!, "reject")}
                                   >
                                     Send Back
@@ -507,12 +547,14 @@ function DashboardInner() {
                                 <Button
                                   size="sm"
                                   variant="primary"
+                                  className="max-md:order-2"
+                                  disabled={busyKey === r.id}
                                   onClick={() => (r.kind === "task" ? handleTaskDone(r.id) : handleChecklistDone(r.id))}
                                 >
-                                  Done
+                                  {busyKey === r.id ? "Saving…" : "Done"}
                                 </Button>
                                 {r.kind === "task" && r.taskObj && (
-                                  <Button size="sm" onClick={() => setTaskToRevise(r.taskObj!)}>
+                                  <Button size="sm" disabled={busyKey === r.id} onClick={() => setTaskToRevise(r.taskObj!)}>
                                     Revise
                                   </Button>
                                 )}

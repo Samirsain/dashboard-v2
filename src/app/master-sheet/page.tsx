@@ -153,36 +153,36 @@ function MasterSheetInner() {
   // render — the edit inputs stay focused/typed while you work.
   const renderEditRow = (isNew: boolean, key: string) => (
       <tr key={key} className="bg-surface-container-low border-b-2 border-on-surface">
-        <td className={cell}>
+        <td data-label="Code" data-full className={cell}>
           <input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="TL / CL" className={`${inputCls} font-data-mono w-20`} />
         </td>
-        <td className={cell}>
+        <td data-label="Name" data-full className={cell}>
           <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Office" className={inputCls} />
         </td>
-        <td className={cell}>
+        <td data-label="Type" data-full className={cell}>
           <input value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} placeholder="Task List" className={inputCls} />
         </td>
-        <td className={cell}>
+        <td data-label="Description" data-full className={cell}>
           <textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="2-line description" rows={2} className={`${inputCls} min-w-[180px]`} />
         </td>
-        <td className={cell}>
+        <td data-label="Date" data-full className={cell}>
           <input value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} type="date" className={`${inputCls} font-data-mono`} />
         </td>
-        <td className={cell}>
+        <td data-label="Training video" data-full className={cell}>
           <textarea value={draft.videos} onChange={(e) => setDraft({ ...draft, videos: e.target.value })} placeholder="One training video link per line" rows={2} className={`${inputCls} min-w-[160px]`} />
         </td>
-        <td className={cell}>
+        <td data-label="PC" data-full className={cell}>
           <input value={draft.pc} onChange={(e) => setDraft({ ...draft, pc: e.target.value })} placeholder="Process Coordinator" className={inputCls} />
         </td>
-        <td className={cell}>
+        <td data-label="PS" data-full className={cell}>
           <input value={draft.ps} onChange={(e) => setDraft({ ...draft, ps: e.target.value })} placeholder="Problem Solver" className={inputCls} />
         </td>
-        <td className={cell}>
+        <td data-label="Link" data-full className={cell}>
           <input value={draft.link} onChange={(e) => setDraft({ ...draft, link: e.target.value })} placeholder="https://..." className={inputCls} />
         </td>
 
-        <td className="py-3 px-3 text-center align-top">
-          <div className="flex flex-col gap-1">
+        <td data-actions className="py-3 px-3 text-center align-top">
+          <div className="flex flex-col gap-1 max-md:flex-row">
             <button onClick={saveDraft} disabled={saving} className="px-2 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-50">
               {saving ? "..." : isNew ? "Add" : "Save"}
             </button>
@@ -200,7 +200,7 @@ function MasterSheetInner() {
       <SideNav active="master-sheet" />
 
       <div className="md:ml-16 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Master Sheet
           </div>
@@ -216,17 +216,6 @@ function MasterSheetInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-md">
-          <div className="flex justify-between items-end border-b-2 border-on-surface pb-stack-md md:hidden">
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              Master Sheet
-            </h2>
-            {canEdit && (
-              <button onClick={startAdd} disabled={adding} className="px-3 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase disabled:opacity-50">
-                + Add
-              </button>
-            )}
-          </div>
-
           {!canEdit && (
             <p className="font-data-mono text-data-mono text-on-surface-variant uppercase">
               Read Only
@@ -238,7 +227,7 @@ function MasterSheetInner() {
           )}
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
+            <table className="m-cards w-full text-left border-collapse min-w-[1200px] max-md:[&_:is(input,textarea)]:w-full max-md:[&_:is(input,textarea)]:min-w-0">
               <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                 <tr>
                   <th className="py-3 px-3 border-r border-surface-variant w-20">Code</th>
@@ -274,18 +263,18 @@ function MasterSheetInner() {
                     renderEditRow(false, row.id)
                   ) : (
                     <tr key={row.id} className="border-b border-surface-variant hover:bg-surface-container-low transition-colors">
-                      <td className={`${cell} font-data-mono font-bold`}>{row.code || "—"}</td>
-                      <td className={`${cell} font-medium`}>{row.name || "—"}</td>
-                      <td className={cell}>{row.type || "—"}</td>
-                      <td className={`${cell} whitespace-pre-line`}>{row.description || "—"}</td>
-                      <td className={`${cell} font-data-mono`}>{formatDMY(row.date)}</td>
-                      <td className={cell}><LinkList raw={row.videos} /></td>
-                      <td className={cell}>{row.pc || "—"}</td>
-                      <td className={cell}>{row.ps || "—"}</td>
-                      <td className={cell}><LinkList raw={row.link} /></td>
-                      <td className="py-3 px-3 text-center align-top">
+                      <td data-aside className={`${cell} font-data-mono font-bold`}>{row.code || "—"}</td>
+                      <td data-title className={`${cell} font-medium`}>{row.name || "—"}</td>
+                      <td data-meta className={cell}>{row.type || "—"}</td>
+                      <td data-full className={`${cell} whitespace-pre-line`}>{row.description || "—"}</td>
+                      <td data-label="Date" className={`${cell} font-data-mono`}>{formatDMY(row.date)}</td>
+                      <td data-label="Video" data-full className={cell}><LinkList raw={row.videos} /></td>
+                      <td data-label="PC" className={cell}>{row.pc || "—"}</td>
+                      <td data-label="PS" className={cell}>{row.ps || "—"}</td>
+                      <td data-label="Link" data-full className={cell}><LinkList raw={row.link} /></td>
+                      <td data-actions className="py-3 px-3 text-center align-top">
                         {canEdit ? (
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-col gap-1 max-md:flex-row">
                             <button onClick={() => startEdit(row)} className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors">
                               Edit
                             </button>

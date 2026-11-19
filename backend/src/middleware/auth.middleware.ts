@@ -25,9 +25,9 @@ declare global {
  * /auth/me) would show their new access while every API call still enforced
  * the old one — e.g. Inventory visible in the nav but 403ing on click.
  *
- * Costs one extra lookup per authenticated request, which is fine at this
- * app's scale and is the simplest way to keep permissions in sync without a
- * server-side session store.
+ * The lookup is memoised for a few seconds (usersService.getForAuth) since it
+ * sits in front of every request; any change to a doer made through the API
+ * drops their entry, so role/permission/status edits still apply at once.
  */
 export const requireAuth = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
@@ -47,7 +47,7 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
 
   let user;
   try {
-    user = await usersService.getById(claims.sub);
+    user = await usersService.getForAuth(claims.sub);
   } catch {
     next(AppError.unauthorized("Account no longer exists"));
     return;

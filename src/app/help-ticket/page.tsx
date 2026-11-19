@@ -77,7 +77,7 @@ function HelpTicketInner() {
       <SideNav active="help-ticket" />
 
       <div className="md:ml-16 flex-1 flex flex-col min-h-screen bg-background">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Help Ticket System
           </div>
@@ -90,18 +90,6 @@ function HelpTicketInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
-          <div className="border-b-2 border-on-surface pb-stack-md flex justify-between items-end md:hidden">
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              Help Tickets
-            </h2>
-            <Link
-              href="/help-ticket/new"
-              className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
-            >
-              + Ticket
-            </Link>
-          </div>
-
           {error && (
             <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}
@@ -109,26 +97,26 @@ function HelpTicketInner() {
           )}
 
           {isAdmin && stats && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-surface border-2 border-on-surface p-4">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Total</p>
-                <p className="font-headline-lg text-headline-lg mt-1">{stats.total}</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 max-md:grid-cols-3 max-md:gap-1.5">
+              <div className="bg-surface border-2 border-on-surface p-4 max-md:border max-md:p-2.5">
+                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase max-md:text-[10px] max-md:leading-3 max-md:tracking-normal">Total</p>
+                <p className="font-headline-lg text-headline-lg mt-1 max-md:text-[20px] max-md:leading-7">{stats.total}</p>
               </div>
-              <div className="bg-yellow-400/20 border-2 border-yellow-400 p-4">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Pending</p>
-                <p className="font-headline-lg text-headline-lg mt-1">{stats.pending}</p>
+              <div className="bg-yellow-400/20 border-2 border-yellow-400 p-4 max-md:border max-md:p-2.5">
+                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase max-md:text-[10px] max-md:leading-3 max-md:tracking-normal">Pending</p>
+                <p className="font-headline-lg text-headline-lg mt-1 max-md:text-[20px] max-md:leading-7">{stats.pending}</p>
               </div>
-              <div className="bg-primary/20 border-2 border-primary p-4">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Waiting</p>
-                <p className="font-headline-lg text-headline-lg mt-1">{stats.waiting}</p>
+              <div className="bg-primary/20 border-2 border-primary p-4 max-md:border max-md:p-2.5">
+                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase max-md:text-[10px] max-md:leading-3 max-md:tracking-normal">Waiting</p>
+                <p className="font-headline-lg text-headline-lg mt-1 max-md:text-[20px] max-md:leading-7">{stats.waiting}</p>
               </div>
-              <div className="bg-error/20 border-2 border-error p-4">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Reopened</p>
-                <p className="font-headline-lg text-headline-lg mt-1">{stats.reopened}</p>
+              <div className="bg-error/20 border-2 border-error p-4 max-md:border max-md:p-2.5">
+                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase max-md:text-[10px] max-md:leading-3 max-md:tracking-normal">Reopened</p>
+                <p className="font-headline-lg text-headline-lg mt-1 max-md:text-[20px] max-md:leading-7">{stats.reopened}</p>
               </div>
-              <div className="bg-green-600/20 border-2 border-green-600 p-4">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">Completed Today</p>
-                <p className="font-headline-lg text-headline-lg mt-1">{stats.completedToday}</p>
+              <div className="bg-green-600/20 border-2 border-green-600 p-4 max-md:border max-md:p-2.5">
+                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase max-md:text-[10px] max-md:leading-3 max-md:tracking-normal">Completed Today</p>
+                <p className="font-headline-lg text-headline-lg mt-1 max-md:text-[20px] max-md:leading-7">{stats.completedToday}</p>
               </div>
             </div>
           )}
@@ -153,7 +141,7 @@ function HelpTicketInner() {
           </div>
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="m-cards w-full text-left border-collapse min-w-[900px]">
               <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant w-32">Ticket ID</th>
@@ -182,16 +170,16 @@ function HelpTicketInner() {
                 )}
                 {filteredTickets.map((t) => (
                   <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
-                    <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
+                    <td data-aside className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
                       {t.id}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant font-medium">
+                    <td data-title className="py-3 px-4 border-r border-surface-variant font-medium">
                       {t.title}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
+                    <td data-label="From" className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
                       {t.employee_id === user?.id ? "You" : t.employee_name || "—"}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
+                    <td data-label="To" className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
                       {t.assigned_to_id === user?.id ? "You" : t.assigned_to_name || "—"}
                     </td>
                     <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono text-[12px]">
@@ -200,7 +188,7 @@ function HelpTicketInner() {
                     <td className="py-3 px-4 border-r border-surface-variant text-center">
                       <StatusBadge status={t.status} />
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td data-actions className="py-3 px-4 text-center">
                       <Link
                         href={`/help-ticket/${t.id}`}
                         className="px-3 py-1.5 border-2 border-on-surface text-on-surface font-label-sm text-label-sm uppercase hover:bg-on-surface hover:text-surface transition-colors"

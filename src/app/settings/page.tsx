@@ -272,7 +272,7 @@ function SettingsInner() {
       <SideNav active="settings" />
 
       <div className="md:ml-16 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Settings — Doer Management
           </div>
@@ -293,26 +293,6 @@ function SettingsInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-lg">
-          <div className="border-b-2 border-on-surface pb-stack-md flex justify-between items-end md:hidden">
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface uppercase tracking-tighter">
-              Doer Management
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowCreateList(true)}
-                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
-              >
-                + List
-              </button>
-              <button
-                onClick={() => setShowAddDoer(true)}
-                className="px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase"
-              >
-                + Doer
-              </button>
-            </div>
-          </div>
-
           {resetNotice && (
             <p className="font-label-sm text-label-sm text-primary border-2 border-primary px-3 py-2">
               {resetNotice}
@@ -325,7 +305,7 @@ function SettingsInner() {
           )}
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
+              <table className="m-cards w-full text-left border-collapse min-w-[900px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   <tr>
                     <th className="py-3 px-4 border-r border-surface-variant">Name</th>
@@ -363,10 +343,10 @@ function SettingsInner() {
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
+                      <td data-aside className="py-3 px-4 border-r border-surface-variant font-data-mono text-data-mono">
                         {d.employeeCode || "—"}
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center">
+                      <td data-label="Role" className="py-3 px-4 border-r border-surface-variant text-center">
                         {!isMdViewer ? (
                           <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
                             {d.role}
@@ -405,7 +385,7 @@ function SettingsInner() {
                           })()
                         )}
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant align-top">
+                      <td data-label="Lists" className="py-3 px-4 border-r border-surface-variant align-top">
                         {(() => {
                           const accessCount = buckets.filter((b) => hasAccess(d.id, b)).length;
                           return (
@@ -458,7 +438,7 @@ function SettingsInner() {
                           );
                         })()}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td data-actions className="py-3 px-4 text-center">
                         <div className="relative inline-block">
                           <button
                             onClick={() => {
@@ -533,7 +513,7 @@ function SettingsInner() {
           </div>
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+            <table className="m-cards w-full text-left border-collapse min-w-[700px]">
               <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant">List Name</th>
@@ -557,12 +537,12 @@ function SettingsInner() {
                       <td className="py-3 px-4 border-r border-surface-variant font-medium">
                         {b.label}
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center">
+                      <td data-aside className="py-3 px-4 border-r border-surface-variant text-center">
                         <span className="font-label-sm text-label-sm uppercase">
                           {b.kind === "task" ? "Task List" : "Checklist"}
                         </span>
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant">
+                      <td data-full className="py-3 px-4 border-r border-surface-variant">
                         {members.length === 0 ? (
                           <span className="font-data-mono text-data-mono text-on-surface-variant">
                             No one assigned
@@ -581,7 +561,7 @@ function SettingsInner() {
                           </div>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td data-actions className="py-3 px-4 text-center">
                         {b.isOffice ? (
                           <span className="font-label-sm text-[10px] uppercase text-on-surface-variant">
                             Default
@@ -623,7 +603,7 @@ function SettingsInner() {
           </div>
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[980px]">
+            <table className="m-cards w-full text-left border-collapse min-w-[980px]">
               <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant sticky left-0 bg-surface-container">
@@ -668,7 +648,7 @@ function SettingsInner() {
                       const checked = pc[p.field] === true;
                       const busy = savingPermKey === `${pc.id}:${p.field}`;
                       return (
-                        <td key={p.field} className="py-3 px-2 border-r border-surface-variant text-center">
+                        <td key={p.field} data-label={p.short} className="py-3 px-2 border-r border-surface-variant text-center">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -743,7 +723,7 @@ function SettingsInner() {
 
       {showAddPc && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-          <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border-2 border-on-surface bg-surface-container-lowest">
+          <div className="sheet flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto border-2 border-on-surface bg-surface-container-lowest">
             <div className="flex items-center justify-between border-b-2 border-on-surface p-stack-md sticky top-0 bg-surface-container-lowest">
               <h3 className="font-headline-md text-headline-md text-on-surface uppercase">
                 Add PC

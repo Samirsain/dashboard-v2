@@ -331,7 +331,7 @@ function EmployeeView() {
           value={rangeFrom}
           max={rangeTo || undefined}
           onChange={(e) => setRangeFrom(e.target.value)}
-          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:flex-1"
         />
         <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
         <input
@@ -339,7 +339,7 @@ function EmployeeView() {
           value={rangeTo}
           min={rangeFrom || undefined}
           onChange={(e) => setRangeTo(e.target.value)}
-          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:flex-1"
         />
         {(rangeFrom || rangeTo) && (
           <button
@@ -347,7 +347,7 @@ function EmployeeView() {
               setRangeFrom("");
               setRangeTo("");
             }}
-            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
           >
             Clear
           </button>
@@ -355,7 +355,7 @@ function EmployeeView() {
       </div>
 
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[640px]">
+        <table className="m-cards w-full text-left border-collapse min-w-[640px]">
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
             <tr>
               <th className="py-3 px-4 border-r border-surface-variant">Date</th>
@@ -376,10 +376,10 @@ function EmployeeView() {
             {filteredHistory.map((r) => (
               <tr key={r.id} className="border-b border-surface-variant last:border-b-0">
                 <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatDMY(r.date)}</td>
-                <td className="py-2 px-4 border-r border-surface-variant"><StatusPill status={r.status} /></td>
-                <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(r.checkIn)}</td>
-                <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(r.checkOut)}</td>
-                <td className="py-2 px-4 font-data-mono text-data-mono">{formatMinutes(r.workingMinutes)}</td>
+                <td data-aside className="py-2 px-4 border-r border-surface-variant"><StatusPill status={r.status} /></td>
+                <td data-label="In" className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(r.checkIn)}</td>
+                <td data-label="Out" className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(r.checkOut)}</td>
+                <td data-label="Worked" className="py-2 px-4 font-data-mono text-data-mono">{formatMinutes(r.workingMinutes)}</td>
               </tr>
             ))}
           </tbody>
@@ -400,7 +400,9 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
   const [rows, setRows] = useState<AttendanceDayRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  // Which employee row is saving ("all" for a bulk action). Only that row
+  // locks, so marking one person never freezes everyone else.
+  const [busy, setBusy] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   // The report (and its Export PDF button) opens on the current month, so
   // exporting never depends on first discovering the range pickers.
@@ -515,38 +517,38 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
   }, [rangeFrom, rangeTo]);
 
   async function handleCheckIn(employeeId: string) {
-    setBusy(true);
+    setBusy(employeeId);
     try {
       await api.post("/attendance/check-in", { employeeId, date });
       await load();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to check in.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function handleCheckOut(employeeId: string) {
-    setBusy(true);
+    setBusy(employeeId);
     try {
       await api.post("/attendance/check-out", { employeeId, date });
       await load();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to check out.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function handleMarkStatus(employeeId: string, status: string) {
-    setBusy(true);
+    setBusy(employeeId);
     try {
       await api.post("/attendance/mark", { employeeIds: [employeeId], date, status });
       await load();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : `Failed to mark ${status}.`);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -557,7 +559,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
       )
     )
       return;
-    setBusy(true);
+    setBusy("all");
     try {
       const result = await api.post<{ updated: number }>("/attendance/recompute", {});
       await load();
@@ -565,7 +567,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to recompute statuses.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -592,31 +594,31 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
       />
 
       {/* Filter bar */}
-      <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">Date</label>
+      <div className="bg-surface border-2 border-on-surface p-4 flex flex-wrap items-center gap-4 max-md:gap-3 max-md:p-3">
+        <div className="flex flex-wrap items-center gap-3 max-md:w-full">
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:w-12">Date</label>
           <input
             type="date"
             value={date}
             max={isAdmin ? undefined : todayIso()}
             onChange={(e) => setDate(e.target.value)}
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:flex-1"
           />
           {!editable && (
             <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">(view only)</span>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">Month</label>
+        <div className="flex flex-wrap items-center gap-2 max-md:w-full">
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:w-12">Month</label>
           <button
             onClick={() => pickMonth(0)}
-            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
           >
             {monthLabel(0)}
           </button>
           <button
             onClick={() => pickMonth(-1)}
-            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
           >
             {monthLabel(-1)}
           </button>
@@ -626,31 +628,32 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
             max={todayIso().slice(0, 7)}
             onChange={(e) => e.target.value && pickMonth(e.target.value)}
             title="Pick any month"
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:min-w-0 max-md:ml-auto max-md:basis-[calc(100%-3.5rem)]"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">From</label>
+        {/* Phones: a two-column grid, each label above its date, Reset below. */}
+        <div className="flex flex-wrap items-center gap-3 max-md:grid max-md:w-full max-md:grid-cols-2 max-md:gap-x-2 max-md:gap-y-1">
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:order-1">From</label>
           <input
             type="date"
             value={rangeFrom}
             max={rangeTo || todayIso()}
             onChange={(e) => setRangeFrom(e.target.value)}
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:order-3 max-md:min-w-0 max-md:w-full"
           />
-          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">To</label>
+          <label className="font-label-sm text-label-sm uppercase text-on-surface-variant max-md:order-2">To</label>
           <input
             type="date"
             value={rangeTo}
             min={rangeFrom || undefined}
             max={todayIso()}
             onChange={(e) => setRangeTo(e.target.value)}
-            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
+            className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface max-md:order-4 max-md:min-w-0 max-md:w-full"
           />
           <button
             onClick={() => { pickMonth(0); setReportDoer(""); }}
             title="Reset the report to the current month"
-            className="px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors"
+            className="min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors max-md:order-5 max-md:col-span-2 max-md:mt-1"
           >
             Reset
           </button>
@@ -659,13 +662,13 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search employee..."
-          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px] ml-auto"
+          className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px] ml-auto max-md:w-full max-md:min-w-0 max-md:ml-0"
         />
       </div>
 
 
       <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[1000px]">
+        <table className="m-cards w-full text-left border-collapse min-w-[1000px]">
           <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
             <tr>
               <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
@@ -694,6 +697,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
               // Checked in, no check-out, threshold hours gone by — flag the row
               // itself, not just the banner, so it's obvious where to act.
               const pendingMinutes = overdueMinutes(attendance, thresholdHours);
+              const rowBusy = busy === employee.id || busy === "all";
               return (
                 <tr
                   key={employee.id}
@@ -707,9 +711,9 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
                       <span className="font-medium">{employee.name}</span>
                     </div>
                   </td>
-                  <td className="py-2 px-4 border-r border-surface-variant"><StatusPill status={attendance?.status ?? ""} /></td>
-                  <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(attendance?.checkIn ?? "")}</td>
-                  <td className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">
+                  <td data-aside className="py-2 px-4 border-r border-surface-variant"><StatusPill status={attendance?.status ?? ""} /></td>
+                  <td data-label="In" className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">{formatClockTime(attendance?.checkIn ?? "")}</td>
+                  <td data-label="Out" className="py-2 px-4 border-r border-surface-variant font-data-mono text-data-mono">
                     {formatClockTime(attendance?.checkOut ?? "")}
                     {pendingMinutes > 0 && (
                       <span
@@ -721,25 +725,25 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
                     )}
                   </td>
                   {editable && (
-                    <td className="py-2 px-4">
+                    <td data-actions className="py-2 px-4">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <button
-                          disabled={busy || !!attendance?.checkIn}
+                          disabled={rowBusy || !!attendance?.checkIn}
                           onClick={() => handleCheckIn(employee.id)}
                           className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
                         >
                           In
                         </button>
                         <button
-                          disabled={busy || !attendance?.checkIn || !!attendance?.checkOut}
+                          disabled={rowBusy || !attendance?.checkIn || !!attendance?.checkOut}
                           onClick={() => handleCheckOut(employee.id)}
                           className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase hover:bg-surface-container transition-colors disabled:opacity-40"
                         >
                           Out
                         </button>
-                        <span className="w-px h-5 bg-surface-variant mx-0.5" />
+                        <span className="w-px h-5 bg-surface-variant mx-0.5 max-md:hidden" />
                         <button
-                          disabled={busy}
+                          disabled={rowBusy}
                           onClick={() => handleMarkStatus(employee.id, "Leave")}
                           className={`px-2 py-1 border-2 font-label-sm text-label-sm uppercase transition-colors disabled:opacity-40 ${
                             attendance?.status === "Leave"
@@ -751,9 +755,9 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
                         </button>
                         {canEdit && (
                           <>
-                            <span className="w-px h-5 bg-surface-variant mx-0.5" />
+                            <span className="w-px h-5 bg-surface-variant mx-0.5 max-md:hidden" />
                             <button
-                              disabled={busy}
+                              disabled={rowBusy}
                               onClick={() => setEditingRow({ employee, attendance, date })}
                               title="Manually edit check-in/check-out time and status for this date"
                               className="px-2 py-1 border-2 border-on-surface font-label-sm text-label-sm uppercase text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40"
@@ -786,7 +790,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
             <select
               value={reportDoer}
               onChange={(e) => setReportDoer(e.target.value)}
-              className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px]"
+              className="min-h-[40px] border border-on-surface bg-surface px-3 py-2 font-data-mono text-sm text-on-surface focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface min-w-[200px] max-md:min-w-0 max-md:flex-1"
             >
               <option value="">All Employees</option>
               {rangeRows.filter((r) => r.employee.role !== "MD").map(({ employee }) => (
@@ -813,7 +817,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
 
         {/* Summary stat cards */}
         {!rangeLoading && filteredRangeRows.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 max-md:grid-cols-4 max-md:gap-1.5">
             {[
               { label: "Present", value: rangeSummary.Present, color: "bg-primary/20 text-on-surface" },
               { label: "Late", value: rangeSummary.Late, color: "bg-yellow-100 text-yellow-800" },
@@ -823,16 +827,16 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
               { label: "No Checkout", value: rangeSummary["Pending Checkout"], color: "bg-amber-100 text-amber-900" },
               { label: "Total", value: rangeSummary.total, color: "bg-surface-container text-on-surface" },
             ].map((card) => (
-              <div key={card.label} className={`border-2 border-on-surface p-3 text-center ${card.color}`}>
-                <p className="font-label-sm text-label-sm uppercase">{card.label}</p>
-                <p className="font-headline-md text-headline-md mt-1">{card.value}</p>
+              <div key={card.label} className={`border-2 border-on-surface p-3 text-center max-md:border max-md:px-1 max-md:py-2 ${card.color}`}>
+                <p className="font-label-sm text-label-sm uppercase max-md:text-[9px] max-md:leading-3 max-md:tracking-normal">{card.label}</p>
+                <p className="font-headline-md text-headline-md mt-1 max-md:text-[17px] max-md:leading-6">{card.value}</p>
               </div>
             ))}
           </div>
         )}
 
         <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[840px]">
+          <table className="m-cards w-full text-left border-collapse min-w-[840px]">
             <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
               <tr>
                 <th className="py-3 px-4 border-r border-surface-variant">Employee</th>
@@ -868,7 +872,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
                     </div>
                   </td>
                   {REPORT_STATUSES.map((status) => (
-                    <td key={status} className="py-2 px-4 border-r border-surface-variant">
+                    <td key={status} data-label={statusColumnLabel(status)} className="py-2 px-4 border-r border-surface-variant">
                       <CountCell
                         value={counts[status] ?? 0}
                         onClick={() =>
@@ -881,7 +885,7 @@ function ManagerView({ isAdmin, canEdit }: { isAdmin: boolean; canEdit: boolean 
                       />
                     </td>
                   ))}
-                  <td className="py-2 px-4 font-data-mono text-data-mono">{totalMarked}</td>
+                  <td data-aside data-label="Total" className="py-2 px-4 font-data-mono text-data-mono">{totalMarked}</td>
                 </tr>
               ))}
             </tbody>
@@ -928,7 +932,7 @@ function AttendanceInner() {
       <SideNav active="attendance" />
 
       <div className="md:ml-16 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="font-headline-md text-headline-md text-on-surface uppercase border-b-2 border-on-surface pb-1">
             Attendance
           </div>

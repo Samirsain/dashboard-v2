@@ -638,7 +638,7 @@ function MyWorkflowSteps() {
       <SideNav active="workflow" />
 
       <div className="md:ml-16 flex flex-col min-h-screen bg-background">
-        <header className="flex w-full items-center border-b border-on-surface bg-surface p-3 z-30 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex w-full items-center border-b border-on-surface bg-surface p-3 z-30 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <h2 className="font-headline-md text-headline-md text-on-surface uppercase">My Workflow</h2>
         </header>
 
@@ -1040,7 +1040,7 @@ function WorkflowInner() {
       <SideNav active="workflow" />
 
       <div className="md:ml-16 flex flex-col min-h-screen bg-background">
-        <header className="flex flex-col gap-2 w-full border-b border-on-surface bg-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        <header className="page-bar flex flex-col gap-2 w-full border-b border-on-surface bg-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <h2 className="font-headline-md text-headline-md text-on-surface uppercase">Workflow</h2>
           <div className="flex flex-wrap items-center gap-2">
             {isAdmin && (
@@ -1062,25 +1062,6 @@ function WorkflowInner() {
         </header>
 
         <main className="flex-1 p-4 md:p-container-padding flex flex-col gap-stack-lg">
-          {/* Mobile actions (desktop header is hidden below md) */}
-          <div className="md:hidden flex flex-wrap gap-2">
-            {isAdmin && (
-              <button
-                onClick={() => setShowCreateTemplate(true)}
-                className="flex-1 border-2 border-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-on-surface"
-              >
-                + New Template
-              </button>
-            )}
-            <button
-              onClick={() => setShowStartInstance(true)}
-              disabled={templates.length === 0}
-              className="flex-1 border-2 border-on-surface bg-on-surface px-3 py-2 font-label-sm text-label-sm uppercase text-surface disabled:opacity-50"
-            >
-              + Start Workflow
-            </button>
-          </div>
-
           {error && (
             <p className="font-label-sm text-sm text-error border border-error px-3 py-2">
               {error}

@@ -119,7 +119,9 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <header className="flex flex-col gap-3 border-b border-on-surface pb-3 sm:flex-row sm:items-center sm:justify-between">
+    // Title and actions share one line, title left and actions right, on
+    // every width; they only wrap when the actions genuinely don't fit.
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-on-surface pb-3">
       <div className="min-w-0">
         <h1 className="font-headline-md text-headline-md uppercase font-bold text-on-surface truncate">
           {title}
@@ -190,7 +192,8 @@ export function TableWrap({ children, className = "" }: { children: ReactNode; c
   );
 }
 
-export const tableClass = "w-full border-collapse text-left";
+/** `m-cards` turns each row into a card on phones (globals.css); label cells with `data-label`. */
+export const tableClass = "m-cards w-full border-collapse text-left";
 export const theadClass =
   "border-b border-on-surface font-label-sm text-[11px] uppercase tracking-wide text-on-surface-variant";
 export const thClass = "whitespace-nowrap px-3 py-2 font-normal";
@@ -251,21 +254,21 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`flex max-h-[92vh] w-full ${widths[size]} flex-col border border-on-surface bg-surface`}
+        className={`sheet flex max-h-[92vh] w-full ${widths[size]} flex-col border border-on-surface bg-surface`}
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-on-surface px-3 py-2.5">
           <h2 className="font-label-sm text-xs uppercase tracking-wide text-on-surface">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="min-h-[32px] px-2 font-label-sm text-xs uppercase text-on-surface-variant hover:text-on-surface hover:underline cursor-pointer"
+            className="min-h-[32px] pointer-coarse:min-h-[44px] px-2 font-label-sm text-xs uppercase text-on-surface-variant hover:text-on-surface hover:underline cursor-pointer"
           >
             Close
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3">{children}</div>
         {footer && (
-          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-on-surface px-3 py-2.5">
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-on-surface px-3 py-2.5 max-sm:[&>*]:flex-1">
             {footer}
           </div>
         )}

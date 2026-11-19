@@ -89,10 +89,13 @@ function ChecklistInner() {
   }, []);
 
   const confirm = useConfirm();
+  // The item whose Complete is in flight: disabled so a second tap can't double-submit.
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function handleComplete(id: string) {
     if (!user) return;
     if (!(await confirm({ title: "Mark as done?", message: instances.find((c) => c.id === id)?.taskName }))) return;
+    setBusyId(id);
     try {
       await api.post(`/checklist/instances/${id}/complete`);
       setInstances((prev) =>
@@ -102,6 +105,8 @@ function ChecklistInner() {
       );
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to complete item.");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -128,7 +133,8 @@ function ChecklistInner() {
 
       <div className="md:ml-16 flex-1 flex flex-col bg-background min-h-screen">
         {/* TopNavBar */}
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        {/* Phones use the search box inside <main> instead. */}
+        <header className="page-bar max-md:hidden flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 border-b-2 border-on-surface pb-1">
               <span className="material-symbols-outlined text-on-surface-variant">
@@ -160,15 +166,15 @@ function ChecklistInner() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="SEARCH CHECKLIST..."
-            className="md:hidden w-full border-2 border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant focus:outline-none"
+            placeholder="Search checklist"
+            className="md:hidden min-h-[40px] w-full border border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono text-on-surface placeholder-on-surface-variant focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
           />
-          <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md">
+          <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md max-md:border-b max-md:pb-3">
             <div>
-              <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
+              <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter max-md:text-[20px] max-md:leading-[26px] max-md:font-bold max-md:tracking-normal">
                 {currentList ? currentList.name : "Daily Checklist"}
               </h2>
-              <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
+              <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase max-md:mt-0.5 max-md:text-[11px]">
                 {currentList ? `${filtered.length} in this list` : `${filtered.length} items`} &bull; System Live
               </p>
             </div>
@@ -195,7 +201,7 @@ function ChecklistInner() {
           )}
 
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="m-cards w-full text-left border-collapse min-w-[800px]">
               <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                 <tr>
                   <th className="py-3 px-4 border-r border-surface-variant">Task Name</th>
@@ -230,7 +236,7 @@ function ChecklistInner() {
                     <td className="py-3 px-4 border-r border-surface-variant">
                       {item.taskName}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant">
+                    <td data-meta className="py-3 px-4 border-r border-surface-variant">
                       <div className="flex items-center gap-2">
                         <InitialsAvatar
                           name={item.doer?.name ?? "?"}
@@ -241,19 +247,20 @@ function ChecklistInner() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
+                    <td data-aside className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                       {formatDMY(item.date)}
                     </td>
-                    <td className="py-3 px-4 border-r border-surface-variant text-center">
+                    <td data-meta className="py-3 px-4 border-r border-surface-variant text-center">
                       <ChecklistStatusPill status={item.status} />
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td data-actions className="py-3 px-4 text-center">
                       {item.status === "Pending" ? (
                         <button
                           onClick={() => handleComplete(item.id)}
-                          className="px-3 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors"
+                          disabled={busyId === item.id}
+                          className="px-3 py-1 bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase hover:bg-primary transition-colors disabled:opacity-40"
                         >
-                          Complete
+                          {busyId === item.id ? "Saving…" : "Complete"}
                         </button>
                       ) : (
                         <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">

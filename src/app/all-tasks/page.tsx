@@ -5,7 +5,7 @@ import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
 import AuthGuard from "@/components/AuthGuard";
 import { api, ApiError } from "@/lib/api";
-import { formatDMY } from "@/lib/format";
+import { formatDMY, weekdayOf } from "@/lib/format";
 import { nextChecklistDueDate } from "@/lib/checklistSchedule";
 import { todayIso } from "@/lib/week";
 import { useAuth } from "@/lib/auth-context";
@@ -345,7 +345,8 @@ function AllTasksInner() {
       <SideNav active="all-tasks" />
 
       <div className="md:ml-16 flex-1 flex flex-col bg-background min-h-screen">
-        <header className="flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
+        {/* Phones use the search + actions block inside <main> instead. */}
+        <header className="page-bar max-md:hidden flex flex-col gap-2 bg-surface w-full border-b border-on-surface p-3 z-30 md:flex-row md:items-center md:justify-between md:gap-4 md:h-16 md:py-0 md:px-container-padding md:sticky md:top-0">
           <div className="flex items-center gap-2 border-b-2 border-on-surface pb-1">
             <span className="material-symbols-outlined text-on-surface-variant">search</span>
             <input
@@ -376,36 +377,36 @@ function AllTasksInner() {
 
         <main className="flex-1 p-4 md:p-stack-lg flex flex-col gap-stack-md">
           {/* Mobile search + export (desktop header is hidden below md) */}
-          <div className="md:hidden flex flex-col gap-2">
+          <div className="md:hidden grid grid-cols-2 gap-2">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="SEARCH TASK / DOER..."
-              className="w-full border-2 border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono uppercase text-on-surface placeholder-on-surface-variant focus:outline-none"
+              placeholder="Search task or doer"
+              className="col-span-2 min-h-[40px] w-full border border-on-surface bg-surface px-3 py-2 font-data-mono text-data-mono text-on-surface placeholder-on-surface-variant focus:outline-2 focus:outline-offset-[-2px] focus:outline-on-surface"
             />
             <button
               onClick={() => setShowReassignAll(true)}
-              className="w-full px-4 py-2 bg-surface text-on-surface border-2 border-on-surface font-label-sm text-label-sm uppercase"
+              className="min-h-[40px] px-3 bg-surface text-on-surface border border-on-surface font-label-sm text-label-sm uppercase"
             >
-              Reassign All Work
+              Reassign All
             </button>
             <button
               onClick={exportCSV}
               disabled={rows === 0}
-              className="w-full px-4 py-2 bg-on-surface text-surface-container-lowest border-2 border-on-surface font-label-sm text-label-sm uppercase disabled:opacity-50"
+              className="min-h-[40px] px-3 bg-on-surface text-surface-container-lowest border border-on-surface font-label-sm text-label-sm uppercase disabled:opacity-40"
             >
               Export CSV
             </button>
           </div>
 
-          <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md">
+          <div className="flex flex-wrap justify-between items-end gap-3 border-b-2 border-on-surface pb-stack-md max-md:border-b max-md:pb-3">
             <div>
-              <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter">
+              <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-xl md:text-headline-xl text-on-surface uppercase tracking-tighter max-md:text-[20px] max-md:leading-[26px] max-md:font-bold max-md:tracking-normal">
                 {tab === "checklist" ? `All ${checklistStatus}`
                   : tab === "unassigned" ? "Unassigned"
                   : "All Completed"}
               </h2>
-              <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase">
+              <p className="font-data-mono text-data-mono text-on-surface-variant mt-2 uppercase max-md:mt-0.5 max-md:text-[11px]">
                 {rows}{" "}
                 {tab === "tasks" ? "task list items"
                   : tab === "unassigned" ? "orphaned tasks"
@@ -414,12 +415,13 @@ function AllTasksInner() {
               </p>
             </div>
             {tab === "checklist" && (
-              <div className="flex items-center gap-2">
-                {(["Pending", "Completed"] as const).map((s) => (
+              <div className="flex items-center" role="group" aria-label="Checklist status">
+                {(["Pending", "Completed"] as const).map((s, i) => (
                   <button
                     key={s}
                     onClick={() => setChecklistStatus(s)}
-                    className={`px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase transition-colors ${
+                    aria-pressed={checklistStatus === s}
+                    className={`min-h-[36px] px-3 py-1.5 border-2 border-on-surface font-label-sm text-label-sm uppercase transition-colors ${i > 0 ? "-ml-0.5" : ""} ${
                       checklistStatus === s
                         ? "bg-on-surface text-surface"
                         : "text-on-surface hover:bg-surface-container"
@@ -434,7 +436,7 @@ function AllTasksInner() {
 
           {/* Tabs as dropdown filters */}
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-md:w-full max-md:flex-wrap max-md:[&>select]:min-w-0 max-md:[&>select]:basis-full max-md:[&>*]:min-h-[40px]">
               <select
                 value={tab === "tasks" ? scope : "ALL"}
                 onMouseDown={() => {
@@ -533,8 +535,8 @@ function AllTasksInner() {
           )}
 
           {/* Filters */}
-          <div className="bg-surface border-2 border-on-surface p-3 flex flex-wrap items-end gap-4">
-            <div className="flex flex-col gap-1">
+          <div className="bg-surface border-2 border-on-surface p-3 flex flex-wrap items-end gap-4 max-md:grid max-md:grid-cols-2 max-md:gap-2 max-md:[&_:is(input,select)]:w-full max-md:[&_:is(input,select)]:min-w-0 max-md:[&_:is(input,select)]:min-h-[40px]">
+            <div className="flex flex-col gap-1 max-md:col-span-2">
               <label className="font-label-sm text-label-sm uppercase text-on-surface-variant">Doer</label>
               <select value={doerFilter} onChange={(e) => setDoerFilter(e.target.value)} className={inputCls}>
                 <option value="">All Doers</option>
@@ -556,7 +558,7 @@ function AllTasksInner() {
             {(doerFilter || fromDate || toDate || search || scope !== "ALL") && (
               <button
                 onClick={clearFilters}
-                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-label-sm uppercase tracking-wide border bg-surface text-on-surface border-on-surface hover:bg-surface-container transition-colors cursor-pointer max-md:col-span-2"
               >
                 Clear
               </button>
@@ -570,7 +572,7 @@ function AllTasksInner() {
           {/* Table */}
           <div className="w-full bg-surface-container-lowest border-2 border-on-surface overflow-x-auto">
             {tab === "unassigned" ? (
-              <table className="w-full text-left border-collapse min-w-[900px]">
+              <table className="m-cards w-full text-left border-collapse min-w-[900px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   <tr>
                     <th className="py-3 px-4 border-r border-surface-variant">Task Description</th>
@@ -610,23 +612,24 @@ function AllTasksInner() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant">
+                      <td data-label="Was" className="py-3 px-4 border-r border-surface-variant">
                         <span className="text-on-surface-variant">{t.doerName || "—"}</span>
                         <span className="ml-2 inline-block border border-error text-error font-label-sm text-[10px] uppercase px-1.5 py-0.5 align-middle">
                           Deleted
                         </span>
                       </td>
                       <td
+                        data-aside
                         className={`py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono whitespace-nowrap ${
                           t.dueDate && t.dueDate < todayIso() ? "text-error font-bold" : ""
                         }`}
                       >
                         {formatDMY(t.dueDate)}
                       </td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase text-on-surface-variant">
+                      <td data-meta className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase text-on-surface-variant">
                         {t.status}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td data-label="Reassign to" data-full className="py-3 px-4 text-center">
                         <select
                           defaultValue=""
                           disabled={reassigningId === t.id}
@@ -648,7 +651,7 @@ function AllTasksInner() {
                 </tbody>
               </table>
             ) : tab === "tasks" ? (
-              <table className="w-full text-left border-collapse min-w-[820px]">
+              <table className="m-cards w-full text-left border-collapse min-w-[820px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   <tr>
                     <th className="py-3 px-4 border-r border-surface-variant">Task Description</th>
@@ -677,13 +680,13 @@ function AllTasksInner() {
                   {completedTasks.map((t) => (
                     <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                       <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.title}</td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{t.doer?.name ?? "—"}</td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.originalDueDate)}</td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(taskCompletedOn(t))}</td>
-                      <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
+                      <td data-meta className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{t.doer?.name ?? "—"}</td>
+                      <td data-label="Planned" className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(t.originalDueDate)}</td>
+                      <td data-label="Done" className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(taskCompletedOn(t))}</td>
+                      <td data-label="Revisions" className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
                         {t.revisionCount > 0 ? <span className="text-error font-bold">{t.revisionCount}×</span> : "0"}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td data-hide-mobile className="py-3 px-4 text-center">
                         <span className="inline-block border-2 border-on-surface bg-on-surface text-surface-container-lowest font-label-sm text-label-sm uppercase px-3 py-1">
                           Completed
                         </span>
@@ -693,7 +696,7 @@ function AllTasksInner() {
                 </tbody>
               </table>
             ) : (
-              <table className="w-full text-left border-collapse min-w-[820px]">
+              <table className="m-cards w-full text-left border-collapse min-w-[820px]">
                 <thead className="bg-surface-container text-on-surface font-label-sm text-label-sm uppercase border-b-2 border-on-surface">
                   {checklistStatus === "Pending" ? (
                     <tr>
@@ -733,7 +736,7 @@ function AllTasksInner() {
                     ? pendingChecklistTasks.map((t) => (
                         <tr key={t.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                           <td className="py-3 px-4 border-r border-surface-variant font-medium">{t.taskName}</td>
-                          <td className="py-3 px-4 border-r border-surface-variant">
+                          <td data-label="Doer" data-full className="py-3 px-4 border-r border-surface-variant">
                             <select
                               value={t.assignedDoerId}
                               onChange={(e) => handleReassignChecklistTask(t.id, e.target.value)}
@@ -746,11 +749,17 @@ function AllTasksInner() {
                               ))}
                             </select>
                           </td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(dueDateFor(t))}</td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase">
+                          {/* Weekly/monthly items land on a weekday, so show which one. */}
+                          <td data-aside className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">
+                            {formatDMY(dueDateFor(t))}
+                            <span className="block font-label-sm text-[11px] uppercase text-on-surface-variant max-md:inline">
+                              {weekdayOf(dueDateFor(t))}
+                            </span>
+                          </td>
+                          <td data-label="Repeats" className="py-3 px-4 border-r border-surface-variant text-center font-label-sm text-label-sm uppercase">
                             {t.frequency}
                           </td>
-                          <td className="py-3 px-4 text-center">
+                          <td data-actions className="py-3 px-4 text-center">
                             {currentUser?.role === "MD" && (
                               <button
                                 onClick={() => handleDeleteChecklistTask(t)}
@@ -765,13 +774,13 @@ function AllTasksInner() {
                     : completedChecklistInstances.map((c) => (
                         <tr key={c.id} className="border-b border-surface-variant last:border-b-0 hover:bg-surface-container-low transition-colors">
                           <td className="py-3 px-4 border-r border-surface-variant font-medium">{c.taskName}</td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
+                          <td data-meta className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">
                             {nameById.get(c.assignedDoerId) ?? "—"}
                           </td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(c.date)}</td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(checklistCompletedOn(c))}</td>
-                          <td className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
-                          <td className="py-3 px-4 text-center">
+                          <td data-label="Scheduled" className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(c.date)}</td>
+                          <td data-label="Done" className="py-3 px-4 border-r border-surface-variant text-center font-data-mono text-data-mono">{formatDMY(checklistCompletedOn(c))}</td>
+                          <td data-label="By" className="py-3 px-4 border-r border-surface-variant text-on-surface-variant">{nameById.get(c.completedBy) ?? c.completedBy ?? "—"}</td>
+                          <td data-actions className="py-3 px-4 text-center">
                             {currentUser?.role === "MD" && (
                               <button
                                 onClick={() => handleDeleteChecklistTask({ id: c.templateId, taskName: c.taskName })}
